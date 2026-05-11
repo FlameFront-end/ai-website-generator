@@ -1,7 +1,15 @@
-import { Link, useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'react-toastify'
 
 import { RunStatusBadge } from '@/features/runs/components/RunStatusBadge'
-import { useArtifactContentQuery, useRunQuery } from '@/shared/api/services/runs'
+import {
+  runsApi,
+  useArtifactContentQuery,
+  useDeleteRunMutation,
+  useRunQuery,
+  useUpdateRunMutation,
+} from '@/shared/api/services/runs'
 import type { RunArtifact, RunLog } from '@/shared/api/services/runs'
 
 import styles from './run-details.module.scss'
@@ -12,6 +20,20 @@ const STEP_LABELS: Record<string, string> = {
   project_spec_ready: 'Спецификация проекта готова',
   prepare_design_artifacts: 'Подготовка описания дизайна',
   design_artifacts_ready: 'Описание дизайна и токены готовы',
+  prepare_reference_image: 'Подготовка визуального референса',
+  reference_ready: 'Визуальный референс готов',
+  pipeline_failed: 'Ошибка пайплайна',
+}
+
+const STEP_PROGRESS: Record<string, number> = {
+  queued: 8,
+  prepare_brief: 28,
+  project_spec_ready: 42,
+  prepare_design_artifacts: 58,
+  design_artifacts_ready: 74,
+  prepare_reference_image: 88,
+  reference_ready: 100,
+  pipeline_failed: 100,
 }
 
 const ARTIFACT_LABELS: Record<string, string> = {
@@ -34,12 +56,32 @@ const LOG_LEVEL_LABELS: Record<RunLog['level'], string> = {
   error: 'Ошибка',
 }
 
+type RunDetailsTab = 'overview' | 'reference' | 'spec' | 'design' | 'logs'
+
+const TABS: Array<{ id: RunDetailsTab; label: string }> = [
+  { id: 'overview', label: 'Обзор' },
+  { id: 'reference', label: 'Референс' },
+  { id: 'spec', label: 'Спецификация' },
+  { id: 'design', label: 'Дизайн' },
+  { id: 'logs', label: 'Логи' },
+]
+
 function formatRunTitle(slug: string) {
   return slug.replace(/^run-(\d+)$/, 'Запуск $1')
 }
 
+function getRunTitle(run: { slug: string; displayName: string | null }) {
+  return run.displayName || formatRunTitle(run.slug)
+}
+
 function formatStep(step: string | null) {
   return step ? STEP_LABELS[step] || step : 'Ожидаем статус пайплайна'
+}
+
+function getProgress(step: string | null, status: string) {
+  if (status === 'completed') return 100
+  if (status === 'failed') return 100
+  return step ? STEP_PROGRESS[step] || 12 : 12
 }
 
 function formatArtifactType(artifact: RunArtifact) {
@@ -135,16 +177,34 @@ function renderDesignTokens(content: string) {
   }
 }
 
+function SkeletonBlock({ lines = 4 }: { lines?: number }) {
+  return (
+    <div className={styles.skeletonBlock} aria-hidden="true">
+      {Array.from({ length: lines }).map((_, index) => (
+        <span key={index} />
+      ))}
+    </div>
+  )
+}
+
 export default function RunDetailsPage() {
+  const [activeTab, setActiveTab] = useState<RunDetailsTab>('overview')
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [draftName, setDraftName] = useState('')
+  const navigate = useNavigate()
   const { runId = '' } = useParams()
   const runQuery = useRunQuery(runId)
+  const updateRunMutation = useUpdateRunMutation()
+  const deleteRunMutation = useDeleteRunMutation()
   const run = runQuery.data
   const projectSpecArtifact = run?.artifacts.find(artifact => artifact.type === 'project_spec')
+  const referenceArtifact = run?.artifacts.find(artifact => artifact.type === 'reference_image')
   const designDescriptionArtifact = run?.artifacts.find(artifact => artifact.type === 'design_description')
   const designTokensArtifact = run?.artifacts.find(artifact => artifact.type === 'design_tokens')
   const projectSpecQuery = useArtifactContentQuery(run?.id ?? '', projectSpecArtifact?.id)
   const designDescriptionQuery = useArtifactContentQuery(run?.id ?? '', designDescriptionArtifact?.id)
   const designTokensQuery = useArtifactContentQuery(run?.id ?? '', designTokensArtifact?.id)
+  const progress = getProgress(run?.currentStep ?? null, run?.status ?? 'queued')
 
   if (runQuery.isLoading) {
     return <p>Загружаем запуск...</p>
@@ -160,74 +220,183 @@ export default function RunDetailsPage() {
     )
   }
 
+  const handleStartRename = () => {
+    setDraftName(run.displayName || formatRunTitle(run.slug))
+    setIsRenaming(true)
+  }
+
+  const handleSaveRename = () => {
+    updateRunMutation.mutate(
+      {
+        runId: run.id,
+        displayName: draftName.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          setIsRenaming(false)
+          toast.success('Название запуска обновлено')
+        },
+        onError: () => toast.error('Не удалось переименовать запуск'),
+      },
+    )
+  }
+
+  const handleDeleteRun = () => {
+    if (!window.confirm(`Удалить «${getRunTitle(run)}»? Папка запуска в generated тоже будет удалена.`)) {
+      return
+    }
+
+    deleteRunMutation.mutate(run.id, {
+      onSuccess: () => navigate('/'),
+      onError: () => toast.error('Не удалось удалить запуск'),
+    })
+  }
+
   return (
     <section className={styles.page}>
       <Link to="/">Назад к запускам</Link>
       <div className={styles.header}>
         <div>
-          <h1>{formatRunTitle(run.slug)}</h1>
+          {isRenaming ? (
+            <div className={styles.renameForm}>
+              <input
+                value={draftName}
+                maxLength={80}
+                autoFocus
+                onChange={event => setDraftName(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') handleSaveRename()
+                  if (event.key === 'Escape') setIsRenaming(false)
+                }}
+              />
+              <button type="button" disabled={updateRunMutation.isPending} onClick={handleSaveRename}>
+                Сохранить
+              </button>
+              <button type="button" onClick={() => setIsRenaming(false)}>
+                Отмена
+              </button>
+            </div>
+          ) : (
+            <h1>{getRunTitle(run)}</h1>
+          )}
           <p>{formatStep(run.currentStep)}</p>
         </div>
-        <RunStatusBadge status={run.status} />
+        <div className={styles.headerActions}>
+          <RunStatusBadge status={run.status} />
+          <button type="button" onClick={handleStartRename}>
+            Переименовать
+          </button>
+          <button type="button" className={styles.dangerButton} disabled={deleteRunMutation.isPending} onClick={handleDeleteRun}>
+            Удалить
+          </button>
+        </div>
       </div>
 
-      <div className={styles.panel}>
-        <h2>Бриф</h2>
-        <pre>{run.brief}</pre>
+      <div className={styles.progressPanel}>
+        <div>
+          <strong>{formatStep(run.currentStep)}</strong>
+          <span>{progress}%</span>
+        </div>
+        <div className={styles.progressTrack}>
+          <span style={{ width: `${progress}%` }} />
+        </div>
       </div>
 
-      <div className={styles.detailsGrid}>
-        <div className={styles.panel}>
-          <h2>Артефакты</h2>
-          {run.artifacts.length === 0 && <p>Артефактов пока нет.</p>}
-          <ul className={styles.list}>
-            {run.artifacts.map(artifact => (
-              <li key={artifact.id}>
-                <strong>{formatArtifactType(artifact)}</strong>
-                <span>{artifact.path}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <nav className={styles.tabs} aria-label="Разделы запуска">
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            className={activeTab === tab.id ? styles.activeTab : undefined}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
-        <div className={styles.panel}>
-          <h2>Логи</h2>
-          {run.logs.length === 0 && <p>Логов пока нет.</p>}
-          <ul className={styles.list}>
-            {run.logs.map(log => (
-              <li key={log.id}>
-                <strong>{log.message}</strong>
-                <span>
-                  {LOG_LEVEL_LABELS[log.level]} · {new Date(log.createdAt).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div key={activeTab} className={styles.tabContent}>
+        {activeTab === 'overview' && (
+          <div className={styles.overviewGrid}>
+            <div className={styles.panel}>
+              <h2>Бриф</h2>
+              <pre>{run.brief}</pre>
+            </div>
 
-        <div className={styles.panel}>
-          <h2>Спецификация проекта</h2>
-          {!projectSpecArtifact && <p>project-spec.json пока не готов.</p>}
-          {projectSpecQuery.isLoading && <p>Загружаем спецификацию проекта...</p>}
-          {projectSpecQuery.isError && <p>Не удалось загрузить спецификацию проекта.</p>}
-          {projectSpecQuery.data && renderProjectSpec(projectSpecQuery.data.content)}
-        </div>
+            <div className={styles.panel}>
+              <h2>Артефакты</h2>
+              {run.artifacts.length === 0 && <SkeletonBlock lines={3} />}
+              <ul className={styles.list}>
+                {run.artifacts.map(artifact => (
+                  <li key={artifact.id}>
+                    <strong>{formatArtifactType(artifact)}</strong>
+                    <span>{artifact.path}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
-        <div className={styles.panel}>
-          <h2>Описание дизайна</h2>
-          {!designDescriptionArtifact && <p>Описание дизайна пока не готово.</p>}
-          {designDescriptionQuery.isLoading && <p>Загружаем описание дизайна...</p>}
-          {designDescriptionQuery.isError && <p>Не удалось загрузить описание дизайна.</p>}
-          {designDescriptionQuery.data && <pre>{designDescriptionQuery.data.content}</pre>}
-        </div>
+        {activeTab === 'reference' && (
+          <div className={styles.previewPanel}>
+            <h2>Визуальный референс</h2>
+            {!referenceArtifact && <SkeletonBlock lines={6} />}
+            {referenceArtifact && (
+              <img
+                src={runsApi.getArtifactFileUrl(run.id, referenceArtifact.id)}
+                alt="Визуальный референс первого экрана"
+              />
+            )}
+          </div>
+        )}
 
-        <div className={styles.panel}>
-          <h2>Дизайн-токены</h2>
-          {!designTokensArtifact && <p>Дизайн-токены пока не готовы.</p>}
-          {designTokensQuery.isLoading && <p>Загружаем дизайн-токены...</p>}
-          {designTokensQuery.isError && <p>Не удалось загрузить дизайн-токены.</p>}
-          {designTokensQuery.data && renderDesignTokens(designTokensQuery.data.content)}
-        </div>
+        {activeTab === 'spec' && (
+          <div className={styles.panel}>
+            <h2>Спецификация проекта</h2>
+            {!projectSpecArtifact && <SkeletonBlock lines={8} />}
+            {projectSpecQuery.isLoading && <p>Загружаем спецификацию проекта...</p>}
+            {projectSpecQuery.isError && <p>Не удалось загрузить спецификацию проекта.</p>}
+            {projectSpecQuery.data && renderProjectSpec(projectSpecQuery.data.content)}
+          </div>
+        )}
+
+        {activeTab === 'design' && (
+          <div className={styles.overviewGrid}>
+            <div className={styles.panel}>
+              <h2>Описание дизайна</h2>
+              {!designDescriptionArtifact && <SkeletonBlock lines={9} />}
+              {designDescriptionQuery.isLoading && <p>Загружаем описание дизайна...</p>}
+              {designDescriptionQuery.isError && <p>Не удалось загрузить описание дизайна.</p>}
+              {designDescriptionQuery.data && <pre>{designDescriptionQuery.data.content}</pre>}
+            </div>
+
+            <div className={styles.panel}>
+              <h2>Дизайн-токены</h2>
+              {!designTokensArtifact && <SkeletonBlock lines={9} />}
+              {designTokensQuery.isLoading && <p>Загружаем дизайн-токены...</p>}
+              {designTokensQuery.isError && <p>Не удалось загрузить дизайн-токены.</p>}
+              {designTokensQuery.data && renderDesignTokens(designTokensQuery.data.content)}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'logs' && (
+          <div className={styles.panel}>
+            <h2>Логи</h2>
+            {run.logs.length === 0 && <SkeletonBlock lines={5} />}
+            <ul className={styles.list}>
+              {run.logs.map(log => (
+                <li key={log.id}>
+                  <strong>{log.message}</strong>
+                  <span>
+                    {LOG_LEVEL_LABELS[log.level]} · {new Date(log.createdAt).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </section>
   )

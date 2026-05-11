@@ -3,7 +3,8 @@ import { toast } from 'react-toastify'
 
 import { BriefForm } from '@/features/runs/components/BriefForm'
 import { RunStatusBadge } from '@/features/runs/components/RunStatusBadge'
-import { useCreateRunMutation, useRunsQuery } from '@/shared/api/services/runs'
+import { useCreateRunMutation, useDeleteRunMutation, useRunsQuery } from '@/shared/api/services/runs'
+import type { Run } from '@/shared/api/services/runs'
 
 import styles from './runs-list.module.scss'
 
@@ -11,10 +12,15 @@ function formatRunTitle(slug: string) {
   return slug.replace(/^run-(\d+)$/, 'Запуск $1')
 }
 
+function getRunTitle(run: Run) {
+  return run.displayName || formatRunTitle(run.slug)
+}
+
 export default function RunsListPage() {
   const navigate = useNavigate()
   const runsQuery = useRunsQuery()
   const createRunMutation = useCreateRunMutation()
+  const deleteRunMutation = useDeleteRunMutation()
 
   const handleCreateRun = (brief: string) => {
     createRunMutation.mutate(
@@ -24,6 +30,16 @@ export default function RunsListPage() {
         onError: () => toast.error('Не удалось создать запуск'),
       },
     )
+  }
+
+  const handleDeleteRun = (run: Run) => {
+    if (!window.confirm(`Удалить «${getRunTitle(run)}»? Папка запуска в generated тоже будет удалена.`)) {
+      return
+    }
+
+    deleteRunMutation.mutate(run.id, {
+      onError: () => toast.error('Не удалось удалить запуск'),
+    })
   }
 
   return (
@@ -42,10 +58,20 @@ export default function RunsListPage() {
           {runsQuery.isError && <p>API запусков пока недоступен.</p>}
           {runsQuery.data?.length === 0 && <p>Запусков пока нет.</p>}
           {runsQuery.data?.map(run => (
-            <button key={run.id} type="button" onClick={() => navigate(`/runs/${run.id}`)}>
-              <span>{formatRunTitle(run.slug)}</span>
-              <RunStatusBadge status={run.status} />
-            </button>
+            <div key={run.id} className={styles.runItem}>
+              <button type="button" onClick={() => navigate(`/runs/${run.id}`)}>
+                <span>{getRunTitle(run)}</span>
+                <RunStatusBadge status={run.status} />
+              </button>
+              <button
+                type="button"
+                className={styles.deleteButton}
+                disabled={deleteRunMutation.isPending}
+                onClick={() => handleDeleteRun(run)}
+              >
+                Удалить
+              </button>
+            </div>
           ))}
         </aside>
       </div>

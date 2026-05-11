@@ -22,6 +22,9 @@ export class RunEntity {
   @Column({ type: 'varchar', length: 32, unique: true })
   slug!: string;
 
+  @Column({ type: 'varchar', length: 160, nullable: true })
+  displayName!: string | null;
+
   @Column({ type: 'text' })
   brief!: string;
 

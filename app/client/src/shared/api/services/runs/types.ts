@@ -35,6 +35,7 @@ export interface RunLog {
 export interface Run {
   id: string
   slug: string
+  displayName: string | null
   brief: string
   status: RunStatus
   currentStep: string | null
@@ -54,4 +55,13 @@ export interface CreateRunResponse {
   id: string
   slug: string
   status: RunStatus
+}
+
+export interface UpdateRunRequest {
+  displayName: string | null
+}
+
+export interface DeleteRunResponse {
+  id: string
+  deleted: boolean
 }

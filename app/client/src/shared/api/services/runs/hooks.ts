@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { runsApi } from './runs.api'
 
@@ -28,8 +28,13 @@ export function useRunQuery(id: string) {
 }
 
 export function useCreateRunMutation() {
+  const queryClient = useQueryClient()
+
   return useMutation({
     mutationFn: runsApi.createRun,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all })
+    },
   })
 }
 
@@ -38,5 +43,29 @@ export function useArtifactContentQuery(runId: string, artifactId?: string) {
     queryKey: runsQueryKeys.artifactContent(runId, artifactId ?? ''),
     queryFn: () => runsApi.getArtifactContent(runId, artifactId ?? ''),
     enabled: Boolean(runId && artifactId),
+  })
+}
+
+export function useUpdateRunMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ runId, displayName }: { runId: string; displayName: string | null }) =>
+      runsApi.updateRun(runId, { displayName }),
+    onSuccess: run => {
+      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all })
+      void queryClient.setQueryData(runsQueryKeys.detail(run.id), run)
+    },
+  })
+}
+
+export function useDeleteRunMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: runsApi.deleteRun,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all })
+    },
   })
 }

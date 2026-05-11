@@ -7,3 +7,11 @@ body {
   color: #111827;
   text-rendering: optimizeLegibility;
 }
+
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}

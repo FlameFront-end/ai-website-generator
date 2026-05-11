@@ -7,8 +7,10 @@ import { Repository } from 'typeorm';
 import { appConfig } from '../../app/config';
 import { ArtifactType, RunArtifactEntity, RunEntity, RunLogEntity, RunLogLevel, RunStatus } from '../../db/entities';
 import type { CreateRunDto } from './dto/create-run.dto';
+import type { UpdateRunDto } from './dto/update-run.dto';
 
 const RUN_NUMBER_PAD = 3;
+const PIPELINE_STEP_DELAY_MS = 1200;
 
 type ProjectSpec = {
   siteType: string;
@@ -65,6 +67,34 @@ function normalizeBrief(brief: unknown): string {
   }
 
   return trimmedBrief;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function normalizeDisplayName(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw new BadRequestException('Название запуска должно быть строкой');
+  }
+
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.length === 0) {
+    return null;
+  }
+
+  if (trimmedValue.length > 80) {
+    throw new BadRequestException('Название запуска не должно быть длиннее 80 символов');
+  }
+
+  return trimmedValue;
 }
 
 function toRunSlug(runNumber: number): string {
@@ -196,6 +226,59 @@ function createDesignDescription(spec: ProjectSpec, tokens: DesignTokens): strin
 `;
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function createReferenceSvg(spec: ProjectSpec, tokens: DesignTokens): string {
+  const headline = escapeXml(spec.copy.headline);
+  const description = escapeXml(spec.copy.description);
+  const primaryButton = escapeXml(spec.copy.primaryButton);
+  const secondaryButton = escapeXml(spec.copy.secondaryButton);
+  const background = tokens.colors.background;
+  const textPrimary = tokens.colors.textPrimary;
+  const textSecondary = tokens.colors.textSecondary;
+  const accent = tokens.colors.accent;
+  const surface = tokens.colors.surface.replaceAll('rgba', 'rgb').replace(/,\s*0\.\d+\)/, ')');
+  const border = tokens.colors.border.replaceAll('rgba', 'rgb').replace(/,\s*0\.\d+\)/, ')');
+
+  return `<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="900" fill="${background}"/>
+  <circle cx="1090" cy="150" r="260" fill="${accent}" opacity="0.22"/>
+  <circle cx="260" cy="780" r="320" fill="#2563EB" opacity="0.16"/>
+  <rect x="96" y="80" width="1248" height="740" rx="36" fill="rgba(255,255,255,0.035)" stroke="${border}" stroke-width="1"/>
+  <g transform="translate(150 210)">
+    <text x="0" y="0" fill="${textPrimary}" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="700">
+      <tspan x="0" dy="0">${headline.slice(0, 32)}</tspan>
+      <tspan x="0" dy="86">${headline.slice(32)}</tspan>
+    </text>
+    <text x="0" y="205" fill="${textSecondary}" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="400">
+      <tspan x="0" dy="0">${description.slice(0, 62)}</tspan>
+      <tspan x="0" dy="34">${description.slice(62)}</tspan>
+    </text>
+    <rect x="0" y="320" width="210" height="58" rx="29" fill="${accent}"/>
+    <text x="105" y="357" text-anchor="middle" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">${primaryButton}</text>
+    <rect x="230" y="320" width="190" height="58" rx="29" fill="rgba(255,255,255,0.06)" stroke="${border}"/>
+    <text x="325" y="357" text-anchor="middle" fill="${textPrimary}" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">${secondaryButton}</text>
+  </g>
+  <g transform="translate(865 185)">
+    <rect width="360" height="470" rx="28" fill="${surface}" stroke="${border}"/>
+    <rect x="30" y="34" width="300" height="74" rx="18" fill="rgba(255,255,255,0.08)"/>
+    <rect x="30" y="138" width="142" height="110" rx="20" fill="${accent}" opacity="0.86"/>
+    <rect x="188" y="138" width="142" height="110" rx="20" fill="rgba(255,255,255,0.08)"/>
+    <path d="M54 328 C98 276 142 306 180 282 C228 252 270 284 310 234" stroke="${accent}" stroke-width="8" stroke-linecap="round"/>
+    <rect x="30" y="382" width="300" height="16" rx="8" fill="rgba(255,255,255,0.12)"/>
+    <rect x="30" y="414" width="210" height="16" rx="8" fill="rgba(255,255,255,0.09)"/>
+  </g>
+</svg>
+`;
+}
+
 @Injectable()
 export class RunsService {
   constructor(
@@ -224,12 +307,12 @@ export class RunsService {
     await this.writeStatusFile(slug, run);
     await this.addLog(run.id, 'Запуск поставлен в очередь', { slug });
 
-    const completedRun = await this.prepareBrief(run);
+    void this.processRun(run);
 
     return {
-      id: completedRun.id,
-      slug: completedRun.slug,
-      status: completedRun.status,
+      id: run.id,
+      slug: run.slug,
+      status: run.status,
     };
   }
 
@@ -301,6 +384,41 @@ export class RunsService {
     };
   }
 
+  async updateRun(id: string, dto: UpdateRunDto) {
+    const run = await this.getRunOrFail(id);
+    const displayName = normalizeDisplayName(dto?.displayName);
+
+    const updatedRun = await this.runsRepository.save({
+      ...run,
+      displayName,
+    });
+
+    await this.writeStatusFile(updatedRun.slug, updatedRun);
+    await this.addLog(updatedRun.id, displayName ? 'Запуск переименован' : 'Название запуска очищено', {
+      displayName,
+    });
+
+    return this.getRunOrFail(id);
+  }
+
+  async deleteRun(id: string) {
+    const run = await this.getRunOrFail(id);
+    const runPath = this.getRunPath(run.slug);
+    const generatedRoot = this.getGeneratedRootPath();
+
+    if (!runPath.startsWith(generatedRoot)) {
+      throw new BadRequestException('Папка запуска находится вне директории generated');
+    }
+
+    await this.runsRepository.remove(run);
+    await fs.rm(runPath, { recursive: true, force: true });
+
+    return {
+      id,
+      deleted: true,
+    };
+  }
+
   private async getNextRunNumber(): Promise<number> {
     const lastRun = await this.runsRepository.findOne({
       where: {},
@@ -312,9 +430,36 @@ export class RunsService {
     return (lastRun?.runNumber ?? 0) + 1;
   }
 
+  private async getRunOrFail(id: string): Promise<RunEntity> {
+    const run = await this.getRun(id);
+
+    if (!run) {
+      throw new NotFoundException('Запуск не найден');
+    }
+
+    return run;
+  }
+
+  private async processRun(run: RunEntity): Promise<void> {
+    try {
+      await sleep(PIPELINE_STEP_DELAY_MS);
+      await this.prepareBrief(run);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Неизвестная ошибка пайплайна';
+      await this.runsRepository.save({
+        ...run,
+        status: RunStatus.Failed,
+        currentStep: 'pipeline_failed',
+        errorMessage: message,
+      });
+      await this.addLog(run.id, 'Пайплайн завершился ошибкой', { error: message });
+    }
+  }
+
   private async prepareBrief(run: RunEntity): Promise<RunEntity> {
     const runningRun = await this.updateRunStatus(run, RunStatus.Running, 'prepare_brief');
     await this.addLog(run.id, 'Начата подготовка брифа');
+    await sleep(PIPELINE_STEP_DELAY_MS);
 
     const projectSpec = createProjectSpec(run.brief);
     const relativePath = path.join(appConfig.storage.generatedRoot, run.slug, 'project-spec.json').replaceAll('\\', '/');
@@ -335,6 +480,7 @@ export class RunsService {
   private async prepareDesignArtifacts(run: RunEntity, projectSpec: ProjectSpec): Promise<RunEntity> {
     const designRun = await this.updateRunStatus(run, RunStatus.Running, 'prepare_design_artifacts');
     await this.addLog(run.id, 'Начато описание дизайна');
+    await sleep(PIPELINE_STEP_DELAY_MS);
 
     const tokens = createDesignTokens(projectSpec);
     const description = createDesignDescription(projectSpec, tokens);
@@ -371,7 +517,29 @@ export class RunsService {
     await this.addLog(run.id, 'Описание дизайна сохранено', { path: descriptionRelativePath });
     await this.addLog(run.id, 'Дизайн-токены сохранены', { path: tokensRelativePath });
 
-    return this.updateRunStatus(designRun, RunStatus.Completed, 'design_artifacts_ready');
+    return this.prepareReferenceImage(designRun, projectSpec, tokens);
+  }
+
+  private async prepareReferenceImage(run: RunEntity, projectSpec: ProjectSpec, tokens: DesignTokens): Promise<RunEntity> {
+    const referenceRun = await this.updateRunStatus(run, RunStatus.Running, 'prepare_reference_image');
+    await this.addLog(run.id, 'Начата подготовка визуального референса');
+    await sleep(PIPELINE_STEP_DELAY_MS);
+
+    const svg = createReferenceSvg(projectSpec, tokens);
+    const relativePath = path
+      .join(appConfig.storage.generatedRoot, run.slug, 'reference', 'hero-reference.svg')
+      .replaceAll('\\', '/');
+
+    await fs.writeFile(path.join(this.getRunPath(run.slug), 'reference', 'hero-reference.svg'), svg, 'utf8');
+    await this.artifactsRepository.save({
+      runId: run.id,
+      type: ArtifactType.ReferenceImage,
+      path: relativePath,
+      mimeType: 'image/svg+xml',
+    });
+    await this.addLog(run.id, 'Визуальный референс сохранен', { path: relativePath });
+
+    return this.updateRunStatus(referenceRun, RunStatus.Completed, 'reference_ready');
   }
 
   private async updateRunStatus(run: RunEntity, status: RunStatus, currentStep: string): Promise<RunEntity> {
@@ -417,6 +585,42 @@ export class RunsService {
   }
 
   private getRunPath(slug: string): string {
-    return path.resolve(process.cwd(), '..', '..', appConfig.storage.generatedRoot, slug);
+    return path.join(this.getGeneratedRootPath(), slug);
+  }
+
+  private getGeneratedRootPath(): string {
+    return path.resolve(process.cwd(), '..', '..', appConfig.storage.generatedRoot);
+  }
+
+  async getArtifactFile(runId: string, artifactId: string) {
+    const artifact = await this.artifactsRepository.findOne({
+      where: {
+        id: artifactId,
+        runId,
+      },
+      relations: {
+        run: true,
+      },
+    });
+
+    if (!artifact) {
+      throw new NotFoundException('Артефакт не найден');
+    }
+
+    if (!artifact.mimeType?.startsWith('image/')) {
+      throw new BadRequestException('Артефакт не является изображением');
+    }
+
+    const runPath = this.getRunPath(artifact.run.slug);
+    const absolutePath = path.resolve(process.cwd(), '..', '..', artifact.path);
+
+    if (!absolutePath.startsWith(runPath)) {
+      throw new BadRequestException('Путь артефакта находится вне папки запуска');
+    }
+
+    return {
+      absolutePath,
+      mimeType: artifact.mimeType,
+    };
   }
 }
