@@ -11,8 +11,8 @@ export function Layout({ children }: LayoutProps) {
     <div className={styles.layout}>
       <header className={styles.header}>
         <div>
-          <strong>AI Website Generator</strong>
-          <span>Visual-first MVP</span>
+          <strong>ИИ-генератор сайтов</strong>
+          <span>Визуальный прототип</span>
         </div>
       </header>
       <main className={styles.main}>{children}</main>

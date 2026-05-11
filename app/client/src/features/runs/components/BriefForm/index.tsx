@@ -2,7 +2,7 @@ import { type FormEvent, useState } from 'react'
 
 import styles from './BriefForm.module.scss'
 
-const DEFAULT_BRIEF = `Сделай первый экран лендинга для AI-сервиса финансовой аналитики.
+const DEFAULT_BRIEF = `Сделай первый экран лендинга для ИИ-сервиса финансовой аналитики.
 
 Стиль:
 - темный
@@ -13,7 +13,7 @@ const DEFAULT_BRIEF = `Сделай первый экран лендинга д�
 - карточка продукта справа
 
 Текст:
-Заголовок: AI-аналитика для финансовых команд
+Заголовок: ИИ-аналитика для финансовых команд
 Описание: Получайте инсайты, прогнозы и отчеты быстрее без ручной рутины.
 Основная кнопка: Начать бесплатно
 Вторая кнопка: Смотреть демо`
@@ -37,10 +37,10 @@ export function BriefForm({ isSubmitting, onSubmit }: BriefFormProps) {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
-      <label htmlFor="brief">Brief</label>
+      <label htmlFor="brief">Бриф</label>
       <textarea id="brief" value={brief} onChange={event => setBrief(event.target.value)} />
       <button type="submit" disabled={isSubmitting || !brief.trim()}>
-        {isSubmitting ? 'Creating...' : 'Generate'}
+        {isSubmitting ? 'Создаем...' : 'Сгенерировать'}
       </button>
     </form>
   )

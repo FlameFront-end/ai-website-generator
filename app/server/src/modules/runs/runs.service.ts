@@ -27,13 +27,13 @@ type ProjectSpec = {
 
 function normalizeBrief(brief: unknown): string {
   if (typeof brief !== 'string') {
-    throw new BadRequestException('brief must be a string');
+    throw new BadRequestException('Бриф должен быть строкой');
   }
 
   const trimmedBrief = brief.trim();
 
   if (trimmedBrief.length < 10) {
-    throw new BadRequestException('brief must contain at least 10 characters');
+    throw new BadRequestException('Бриф должен содержать минимум 10 символов');
   }
 
   return trimmedBrief;
@@ -55,7 +55,7 @@ function extractStyleItems(brief: string): string[] {
     .map((line) => line.replace(/^[-*]\s*/, '').trim())
     .filter(Boolean);
 
-  return items.length > 0 ? items : ['modern'];
+  return items.length > 0 ? items : ['современный'];
 }
 
 function createProjectSpec(brief: string): ProjectSpec {
@@ -63,22 +63,22 @@ function createProjectSpec(brief: string): ProjectSpec {
   const hasProductCard = /карточк[аи]\s+продукт|product\s+card/i.test(brief);
 
   return {
-    siteType: /лендинг|landing/i.test(brief) ? 'landing' : 'website',
-    sectionType: /hero|первый экран|hero-блок/i.test(brief) ? 'hero' : 'hero',
+    siteType: /лендинг|landing/i.test(brief) ? 'лендинг' : 'сайт',
+    sectionType: /hero|первый экран|hero-блок/i.test(brief) ? 'hero-блок' : 'hero-блок',
     style,
-    audience: /финансов/i.test(brief) ? 'finance teams' : 'general audience',
+    audience: /финансов/i.test(brief) ? 'финансовые команды' : 'общая аудитория',
     requiredElements: [
-      'headline',
-      'description',
-      'primaryButton',
-      'secondaryButton',
-      ...(hasProductCard ? ['productCard'] : []),
+      'заголовок',
+      'описание',
+      'основная кнопка',
+      'вторая кнопка',
+      ...(hasProductCard ? ['карточка продукта'] : []),
     ],
     copy: {
-      headline: extractLineValue(brief, 'Заголовок', 'AI-powered landing page'),
-      description: extractLineValue(brief, 'Описание', 'Generate a clear hero section from a product brief.'),
-      primaryButton: extractLineValue(brief, 'Основная кнопка', 'Get started'),
-      secondaryButton: extractLineValue(brief, 'Вторая кнопка', 'View demo'),
+      headline: extractLineValue(brief, 'Заголовок', 'ИИ-лендинг по брифу'),
+      description: extractLineValue(brief, 'Описание', 'Сгенерируйте понятный первый экран на основе продуктового брифа.'),
+      primaryButton: extractLineValue(brief, 'Основная кнопка', 'Начать'),
+      secondaryButton: extractLineValue(brief, 'Вторая кнопка', 'Смотреть демо'),
     },
     visualPreferences: style,
   };
@@ -110,7 +110,7 @@ export class RunsService {
 
     await this.createRunFolders(slug);
     await this.writeStatusFile(slug, run);
-    await this.addLog(run.id, 'Run was queued', { slug });
+    await this.addLog(run.id, 'Запуск поставлен в очередь', { slug });
 
     const completedRun = await this.prepareBrief(run);
 
@@ -164,18 +164,18 @@ export class RunsService {
     });
 
     if (!artifact) {
-      throw new NotFoundException('Artifact not found');
+      throw new NotFoundException('Артефакт не найден');
     }
 
     if (!artifact.mimeType?.includes('json') && !artifact.mimeType?.startsWith('text/')) {
-      throw new BadRequestException('Artifact is not a text artifact');
+      throw new BadRequestException('Артефакт не является текстовым файлом');
     }
 
     const runPath = this.getRunPath(artifact.run.slug);
     const absolutePath = path.resolve(process.cwd(), '..', '..', artifact.path);
 
     if (!absolutePath.startsWith(runPath)) {
-      throw new BadRequestException('Artifact path is outside of the run directory');
+      throw new BadRequestException('Путь артефакта находится вне папки запуска');
     }
 
     const content = await fs.readFile(absolutePath, 'utf8');
@@ -202,7 +202,7 @@ export class RunsService {
 
   private async prepareBrief(run: RunEntity): Promise<RunEntity> {
     const runningRun = await this.updateRunStatus(run, RunStatus.Running, 'prepare_brief');
-    await this.addLog(run.id, 'Brief parsing started');
+    await this.addLog(run.id, 'Начата подготовка брифа');
 
     const projectSpec = createProjectSpec(run.brief);
     const relativePath = path.join(appConfig.storage.generatedRoot, run.slug, 'project-spec.json').replaceAll('\\', '/');
@@ -215,7 +215,7 @@ export class RunsService {
       path: relativePath,
       mimeType: 'application/json',
     });
-    await this.addLog(run.id, 'Project spec saved', { path: relativePath });
+    await this.addLog(run.id, 'Спецификация проекта сохранена', { path: relativePath });
 
     return this.updateRunStatus(runningRun, RunStatus.Completed, 'project_spec_ready');
   }

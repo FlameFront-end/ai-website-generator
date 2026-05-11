@@ -1,14 +1,14 @@
-# AI Website Generator
+# ИИ-генератор сайтов
 
-Visual-first MVP for generating a hero-block reference, frontend code, screenshots, and a visual QA report from a user brief.
+Визуальный прототип для генерации референса первого экрана, клиентского кода, скриншотов и отчета визуальной проверки по пользовательскому брифу.
 
-## Stack
+## Стек
 
 - `app/client`: React, TypeScript, Vite
 - `app/server`: NestJS, TypeScript
-- Local services: PostgreSQL and Redis via Docker Compose
+- Локальные сервисы: PostgreSQL и Redis через Docker Compose
 
-## Local Start
+## Локальный запуск
 
 ```bash
 cp .env.example .env
@@ -18,9 +18,8 @@ npm run dev:server
 npm run dev:client
 ```
 
-## Checks
+## Проверки
 
 ```bash
 npm run build
 ```
-

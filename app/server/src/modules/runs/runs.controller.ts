@@ -22,7 +22,7 @@ export class RunsController {
     const run = await this.runsService.getRun(id);
 
     if (!run) {
-      throw new NotFoundException('Run not found');
+      throw new NotFoundException('Запуск не найден');
     }
 
     return run;
