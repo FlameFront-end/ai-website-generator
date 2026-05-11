@@ -16,6 +16,14 @@ export interface RunArtifact {
   createdAt: string
 }
 
+export interface ArtifactContent {
+  artifactId: string
+  type: string
+  path: string
+  mimeType: string | null
+  content: string
+}
+
 export interface RunLog {
   id: string
   level: 'info' | 'warning' | 'error'

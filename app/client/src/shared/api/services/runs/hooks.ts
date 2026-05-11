@@ -5,6 +5,7 @@ import { runsApi } from './runs.api'
 export const runsQueryKeys = {
   all: ['runs'] as const,
   detail: (id: string) => ['runs', id] as const,
+  artifactContent: (runId: string, artifactId: string) => ['runs', runId, 'artifacts', artifactId, 'content'] as const,
 }
 
 export function useRunsQuery() {
@@ -29,5 +30,13 @@ export function useRunQuery(id: string) {
 export function useCreateRunMutation() {
   return useMutation({
     mutationFn: runsApi.createRun,
+  })
+}
+
+export function useArtifactContentQuery(runId: string, artifactId?: string) {
+  return useQuery({
+    queryKey: runsQueryKeys.artifactContent(runId, artifactId ?? ''),
+    queryFn: () => runsApi.getArtifactContent(runId, artifactId ?? ''),
+    enabled: Boolean(runId && artifactId),
   })
 }

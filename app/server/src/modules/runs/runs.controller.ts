@@ -27,4 +27,9 @@ export class RunsController {
 
     return run;
   }
+
+  @Get(':id/artifacts/:artifactId/content')
+  getArtifactContent(@Param('id') id: string, @Param('artifactId') artifactId: string) {
+    return this.runsService.getArtifactContent(id, artifactId);
+  }
 }
