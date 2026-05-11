@@ -1,5 +1,188 @@
 :root {
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color-scheme: light dark;
+
+  /* backgrounds */
+  --bg-page: #f4f6fb;
+  --bg-surface: rgba(255, 255, 255, 0.96);
+  --bg-surface-alt: rgba(255, 255, 255, 0.92);
+  --bg-subtle: #f8fafc;
+  --bg-muted: #fbfcff;
+  --bg-input: #fbfcff;
+  --bg-gradient: linear-gradient(180deg, #f9fafc 0%, #eef2f7 100%);
+
+  /* borders */
+  --border: rgba(229, 231, 235, 0.92);
+  --border-solid: #e5e7eb;
+  --border-soft: #e9edf5;
+  --border-muted: #edf0f5;
+
+  /* text */
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --text-heading: #0f172a;
+  --text-link: #2563eb;
+
+  /* components */
+  --tab-bg: rgba(255, 255, 255, 0.82);
+  --tab-active-bg: #111827;
+  --tab-active-color: #ffffff;
+  --tab-hover-bg: #f2f4f7;
+  --header-bg: rgba(255, 255, 255, 0.86);
+  --nav-border: rgba(229, 231, 235, 0.85);
+  --progress-track: #eef2f7;
+  --skeleton-from: #eef2f7;
+  --skeleton-to: #f8fafc;
+  --list-item-bg: #fbfcff;
+  --list-item-border: #e9edf5;
+  --run-button-bg: #fbfcff;
+  --run-button-border: #e6e9ef;
+  --modal-bg: #ffffff;
+  --score-bg: #f0fdf4;
+  --score-border: #bbf7d0;
+  --score-color: #15803d;
+  --danger-bg: #fff7f7;
+  --danger-border: #fee2e2;
+  --danger-color: #b42318;
+  --danger-hover-bg: #fef2f2;
+  --log-card-bg: #ffffff;
+  --log-card-border: #e5e7eb;
+  --log-expanded-bg: #eef2ff;
+  --log-details-bg: #f8fafc;
+  --log-static-bg: #fafafa;
+  --log-static-border: #f3f4f6;
+  --artifact-header-bg: #ffffff;
+  --artifact-item-border: #f0f2f5;
+  --artifact-download-bg: #f8fafc;
+  --artifact-badge-bg: #f0f4ff;
+  --artifact-badge-color: #6366f1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg-page: #0f1117;
+    --bg-surface: rgba(22, 27, 39, 0.97);
+    --bg-surface-alt: rgba(22, 27, 39, 0.95);
+    --bg-subtle: #161b27;
+    --bg-muted: #1a2032;
+    --bg-input: #1a2032;
+    --bg-gradient: linear-gradient(180deg, #0f1117 0%, #141920 100%);
+
+    --border: rgba(255, 255, 255, 0.08);
+    --border-solid: #2a3042;
+    --border-soft: #1e2433;
+    --border-muted: #1e2433;
+
+    --text-primary: #e2e8f0;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-faint: #4b5563;
+    --text-heading: #f1f5f9;
+    --text-link: #60a5fa;
+
+    --tab-bg: rgba(22, 27, 39, 0.9);
+    --tab-active-bg: #e2e8f0;
+    --tab-active-color: #0f1117;
+    --tab-hover-bg: rgba(255, 255, 255, 0.07);
+    --header-bg: rgba(15, 17, 23, 0.88);
+    --nav-border: rgba(255, 255, 255, 0.07);
+    --progress-track: #1e2433;
+    --skeleton-from: #1e2433;
+    --skeleton-to: #252d3d;
+    --list-item-bg: #1a2032;
+    --list-item-border: #1e2433;
+    --run-button-bg: #1a2032;
+    --run-button-border: #2a3042;
+    --modal-bg: #161b27;
+    --score-bg: rgba(21, 128, 61, 0.15);
+    --score-border: rgba(187, 247, 208, 0.2);
+    --score-color: #4ade80;
+    --danger-bg: rgba(180, 35, 24, 0.12);
+    --danger-border: rgba(254, 226, 226, 0.15);
+    --danger-color: #f87171;
+    --danger-hover-bg: rgba(254, 226, 226, 0.18);
+    --log-card-bg: #1a2032;
+    --log-card-border: #2a3042;
+    --log-expanded-bg: rgba(79, 70, 229, 0.15);
+    --log-details-bg: #161b27;
+    --log-static-bg: #161b27;
+    --log-static-border: #1e2433;
+    --artifact-header-bg: #161b27;
+    --artifact-item-border: #1e2433;
+    --artifact-download-bg: #161b27;
+    --artifact-badge-bg: rgba(99, 102, 241, 0.15);
+    --artifact-badge-color: #818cf8;
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-page: #0f1117;
+  --bg-surface: rgba(22, 27, 39, 0.97);
+  --bg-surface-alt: rgba(22, 27, 39, 0.95);
+  --bg-subtle: #161b27;
+  --bg-muted: #1a2032;
+  --bg-input: #1a2032;
+  --bg-gradient: linear-gradient(180deg, #0f1117 0%, #141920 100%);
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-solid: #2a3042;
+  --border-soft: #1e2433;
+  --border-muted: #1e2433;
+
+  --text-primary: #e2e8f0;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-faint: #4b5563;
+  --text-heading: #f1f5f9;
+  --text-link: #60a5fa;
+
+  --tab-bg: rgba(22, 27, 39, 0.9);
+  --tab-active-bg: #e2e8f0;
+  --tab-active-color: #0f1117;
+  --tab-hover-bg: rgba(255, 255, 255, 0.07);
+  --header-bg: rgba(15, 17, 23, 0.88);
+  --nav-border: rgba(255, 255, 255, 0.07);
+  --progress-track: #1e2433;
+  --skeleton-from: #1e2433;
+  --skeleton-to: #252d3d;
+  --list-item-bg: #1a2032;
+  --list-item-border: #1e2433;
+  --run-button-bg: #1a2032;
+  --run-button-border: #2a3042;
+  --modal-bg: #161b27;
+  --score-bg: rgba(21, 128, 61, 0.15);
+  --score-border: rgba(187, 247, 208, 0.2);
+  --score-color: #4ade80;
+  --danger-bg: rgba(180, 35, 24, 0.12);
+  --danger-border: rgba(254, 226, 226, 0.15);
+  --danger-color: #f87171;
+  --danger-hover-bg: rgba(254, 226, 226, 0.18);
+  --log-card-bg: #1a2032;
+  --log-card-border: #2a3042;
+  --log-expanded-bg: rgba(79, 70, 229, 0.15);
+  --log-details-bg: #161b27;
+  --log-static-bg: #161b27;
+  --log-static-border: #1e2433;
+  --artifact-header-bg: #161b27;
+  --artifact-item-border: #1e2433;
+  --artifact-download-bg: #161b27;
+  --artifact-badge-bg: rgba(99, 102, 241, 0.15);
+  --artifact-badge-color: #818cf8;
+}
+
+[data-theme="light"] {
   color-scheme: light;
 }

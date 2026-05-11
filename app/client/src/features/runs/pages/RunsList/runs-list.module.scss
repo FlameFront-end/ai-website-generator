@@ -16,75 +16,122 @@
 
   p {
     margin: 0;
-    color: #6b7280;
+    color: var(--text-muted);
   }
 }
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 24px;
   align-items: start;
 }
 
 .runs {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  border: 1px solid rgba(229, 231, 235, 0.9);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 16px;
+  background: var(--bg-surface-alt);
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+  max-height: 600px;
+  overflow: hidden;
 
   h2 {
     margin: 0 0 10px;
     font-size: 18px;
+    flex-shrink: 0;
   }
 
   p {
     margin: 0;
-    color: #6b7280;
+    color: var(--text-muted);
+  }
+}
+
+.runsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
   }
 }
 
 .runItem {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
 
-  button:first-child {
+  .runButton {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    width: 100%;
-    border: 1px solid #e6e9ef;
-    border-radius: 10px;
-    padding: 12px;
-    background: #fbfcff;
-    color: #111827;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    border: 1px solid var(--run-button-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--run-button-bg);
+    color: var(--text-primary);
     text-align: left;
+    cursor: pointer;
     transition:
       border-color 0.16s ease,
-      background 0.16s ease,
-      transform 0.16s ease;
+      background 0.16s ease;
 
     &:hover {
-      transform: translateY(-1px);
       border-color: #c7d2fe;
-      background: #ffffff;
+      background: var(--bg-subtle);
+    }
+
+    span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 500;
+      flex: 1;
     }
   }
 }
 
 .deleteButton {
-  border: 1px solid #fee2e2;
-  border-radius: 10px;
-  padding: 0 10px;
-  background: #fff7f7;
-  color: #b42318;
-  font-size: 13px;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: var(--danger-hover-bg);
+    border-color: var(--danger-border);
+  }
 
   &:disabled {
     cursor: not-allowed;

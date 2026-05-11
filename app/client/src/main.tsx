@@ -1,12 +1,14 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 
-import { App } from './app/app'
+import { App } from "./app/app";
 
-import '@/shared/styles/main.scss'
+import "highlight.js/styles/github.css";
 
-createRoot(document.getElementById('root')!).render(
+import "@/shared/styles/main.scss";
+
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
   </StrictMode>,
-)
+);

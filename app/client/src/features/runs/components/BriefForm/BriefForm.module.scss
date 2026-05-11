@@ -1,14 +1,14 @@
 .form {
   display: grid;
   gap: 14px;
-  border: 1px solid rgba(229, 231, 235, 0.9);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 22px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--bg-surface-alt);
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 
   label {
-    color: #111827;
+    color: var(--text-primary);
     font-size: 15px;
     font-weight: 700;
   }
@@ -16,11 +16,11 @@
   textarea {
     min-height: 360px;
     resize: vertical;
-    border: 1px solid #d7dce5;
+    border: 1px solid var(--border-soft);
     border-radius: 12px;
     padding: 16px;
-    background: #fbfcff;
-    color: #111827;
+    background: var(--bg-input);
+    color: var(--text-primary);
     line-height: 1.5;
     outline: none;
 

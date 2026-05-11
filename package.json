@@ -13,7 +13,8 @@
     "build:client": "npm run build --workspace app/client",
     "build:server": "npm run build --workspace app/server",
     "lint:client": "npm run lint --workspace app/client",
-    "lint:server": "npm run lint --workspace app/server"
+    "lint:server": "npm run lint --workspace app/server",
+    "install:all": "npm install"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.19",

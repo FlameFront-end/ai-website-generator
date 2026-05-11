@@ -9,5 +9,6 @@ export enum ArtifactType {
   VisualReport = 'visual_report',
   DiffImage = 'diff_image',
   BuildError = 'build_error',
+  BuildLog = 'build_log',
   ReferenceValidation = 'reference_validation',
 }

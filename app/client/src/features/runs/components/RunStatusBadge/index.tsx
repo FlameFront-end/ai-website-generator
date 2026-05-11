@@ -1,22 +1,22 @@
-import type { RunStatus } from '@/shared/api/services/runs'
+import type { RunStatus } from "@/shared/api/services/runs";
 
-import styles from './RunStatusBadge.module.scss'
+import styles from "./RunStatusBadge.module.scss";
 
 interface RunStatusBadgeProps {
-  status: RunStatus
+  status: RunStatus;
 }
 
 const STATUS_LABELS: Record<RunStatus, string> = {
-  queued: 'В очереди',
-  running: 'Выполняется',
-  reference_failed: 'Ошибка референса',
-  build_failed: 'Ошибка сборки',
-  visual_failed: 'Ошибка визуальной проверки',
-  needs_manual_review: 'Нужна ручная проверка',
-  completed: 'Завершен',
-  failed: 'Ошибка',
-}
+  queued: "В очереди",
+  running: "В работе",
+  reference_failed: "Ошибка",
+  build_failed: "Ошибка",
+  visual_failed: "Ошибка",
+  needs_manual_review: "Проверка",
+  completed: "Готово",
+  failed: "Ошибка",
+};
 
 export function RunStatusBadge({ status }: RunStatusBadgeProps) {
-  return <span className={styles.badge}>{STATUS_LABELS[status]}</span>
+  return <span className={styles.badge}>{STATUS_LABELS[status]}</span>;
 }

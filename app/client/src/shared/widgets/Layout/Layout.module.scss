@@ -1,36 +1,74 @@
 .layout {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(124, 58, 237, 0.08), transparent 34rem),
-    linear-gradient(180deg, #f9fafc 0%, #eef2f7 100%);
-  color: #111827;
+    radial-gradient(
+      circle at top left,
+      rgba(124, 58, 237, 0.08),
+      transparent 34rem
+    ),
+    var(--bg-gradient);
+  color: var(--text-primary);
 }
 
 .header {
   position: sticky;
   top: 0;
   z-index: 10;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.85);
-  background: rgba(255, 255, 255, 0.86);
+  border-bottom: 1px solid var(--nav-border);
+  background: var(--header-bg);
   backdrop-filter: blur(14px);
 
   > div {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     max-width: 1240px;
     margin: 0 auto;
     padding: 16px 28px;
   }
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: inherit;
 
   strong {
-    font-size: 16px;
-    letter-spacing: 0;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    color: var(--text-heading);
   }
 
-  span {
-    color: #667085;
-    font-size: 14px;
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.themeToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: 1px solid var(--border-solid);
+  border-radius: 8px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--tab-hover-bg);
+    color: var(--text-primary);
+    border-color: var(--text-faint);
   }
 }
 
