@@ -19,6 +19,10 @@ export type AppConfig = Readonly<{
   storage: Readonly<{
     generatedRoot: string;
   }>;
+  jwt: Readonly<{
+    secret: string;
+    expiresIn: string;
+  }>;
 }>;
 
 function readEnv(name: EnvName): string | undefined {
@@ -35,7 +39,9 @@ function readInteger(name: EnvName, defaultValue: number, minimum = 0): number {
   const value = Number(rawValue);
 
   if (!Number.isInteger(value) || value < minimum) {
-    throw new Error(`Environment variable ${name} must be an integer >= ${minimum}`);
+    throw new Error(
+      `Environment variable ${name} must be an integer >= ${minimum}`,
+    );
   }
 
   return value;
@@ -56,7 +62,9 @@ function readBoolean(name: EnvName, defaultValue: boolean): boolean {
     return false;
   }
 
-  throw new Error(`Environment variable ${name} must be either "true" or "false"`);
+  throw new Error(
+    `Environment variable ${name} must be either "true" or "false"`,
+  );
 }
 
 function buildDatabaseUrl(): string {
@@ -68,9 +76,18 @@ function buildDatabaseUrl(): string {
 
   const host = readString('POSTGRES_HOST', readString('DB_HOST', 'localhost'));
   const port = readString('POSTGRES_PORT', readString('DB_PORT', '5432'));
-  const user = readString('POSTGRES_USER', readString('DB_USER', 'ai_generator'));
-  const password = readString('POSTGRES_PASSWORD', readString('DB_PASSWORD', 'ai_generator'));
-  const database = readString('POSTGRES_DB', readString('DB_NAME', 'ai_website_generator'));
+  const user = readString(
+    'POSTGRES_USER',
+    readString('DB_USER', 'ai_generator'),
+  );
+  const password = readString(
+    'POSTGRES_PASSWORD',
+    readString('DB_PASSWORD', 'ai_generator'),
+  );
+  const database = readString(
+    'POSTGRES_DB',
+    readString('DB_NAME', 'ai_website_generator'),
+  );
 
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
@@ -87,5 +104,9 @@ export const appConfig: AppConfig = Object.freeze({
   }),
   storage: Object.freeze({
     generatedRoot: readString('GENERATED_ROOT', 'generated/runs'),
+  }),
+  jwt: Object.freeze({
+    secret: readString('JWT_SECRET', 'default-secret-change-in-production'),
+    expiresIn: readString('JWT_EXPIRES_IN', '7d'),
   }),
 });

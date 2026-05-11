@@ -2,6 +2,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -10,6 +12,7 @@ import {
 import { RunArtifactEntity } from './run-artifact.entity';
 import { RunLogEntity } from './run-log.entity';
 import { RunStatus } from './run-status.enum';
+import { UserEntity } from './user.entity';
 
 @Entity({ name: 'runs' })
 export class RunEntity {
@@ -40,7 +43,16 @@ export class RunEntity {
   @Column({ type: 'text', nullable: true })
   errorMessage!: string | null;
 
-  @OneToMany(() => RunArtifactEntity, (artifact) => artifact.run, { cascade: true })
+  @Column({ type: 'uuid', name: 'user_id', nullable: true })
+  userId!: string | null;
+
+  @ManyToOne(() => UserEntity, (user) => user.runs, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user!: UserEntity | null;
+
+  @OneToMany(() => RunArtifactEntity, (artifact) => artifact.run, {
+    cascade: true,
+  })
   artifacts!: RunArtifactEntity[];
 
   @OneToMany(() => RunLogEntity, (log) => log.run, { cascade: true })

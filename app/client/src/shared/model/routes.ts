@@ -1,4 +1,6 @@
 export const ROUTES = {
-  RUNS: '/',
-  RUN_DETAILS: '/runs/:runId',
-} as const
+  LOGIN: "/login",
+  REGISTER: "/register",
+  RUNS: "/",
+  RUN_DETAILS: "/runs/:runId",
+} as const;

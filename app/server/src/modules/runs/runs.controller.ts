@@ -8,31 +8,42 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CreateRunDto } from './dto/create-run.dto';
 import type { UpdateRunDto } from './dto/update-run.dto';
 import { RunsService } from './runs.service';
 
+interface RequestWithUser {
+  user: {
+    id: string;
+    email: string;
+  };
+}
+
 @Controller('runs')
+@UseGuards(JwtAuthGuard)
 export class RunsController {
   constructor(private readonly runsService: RunsService) {}
 
   @Post()
-  createRun(@Body() body: CreateRunDto) {
-    return this.runsService.createRun(body);
+  createRun(@Body() body: CreateRunDto, @Request() req: RequestWithUser) {
+    return this.runsService.createRun(body, req.user.id);
   }
 
   @Get()
-  getRuns() {
-    return this.runsService.getRuns();
+  getRuns(@Request() req: RequestWithUser) {
+    return this.runsService.getRuns(req.user.id);
   }
 
   @Get(':id')
-  async getRun(@Param('id') id: string) {
-    const run = await this.runsService.getRun(id);
+  async getRun(@Param('id') id: string, @Request() req: RequestWithUser) {
+    const run = await this.runsService.getRun(id, req.user.id);
 
     if (!run) {
       throw new NotFoundException('Запуск не найден');
@@ -42,21 +53,26 @@ export class RunsController {
   }
 
   @Patch(':id')
-  updateRun(@Param('id') id: string, @Body() body: UpdateRunDto) {
-    return this.runsService.updateRun(id, body);
+  updateRun(
+    @Param('id') id: string,
+    @Body() body: UpdateRunDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.runsService.updateRun(id, body, req.user.id);
   }
 
   @Delete(':id')
-  deleteRun(@Param('id') id: string) {
-    return this.runsService.deleteRun(id);
+  deleteRun(@Param('id') id: string, @Request() req: RequestWithUser) {
+    return this.runsService.deleteRun(id, req.user.id);
   }
 
   @Get(':id/artifacts/:artifactId/content')
   getArtifactContent(
     @Param('id') id: string,
     @Param('artifactId') artifactId: string,
+    @Request() req: RequestWithUser,
   ) {
-    return this.runsService.getArtifactContent(id, artifactId);
+    return this.runsService.getArtifactContent(id, artifactId, req.user.id);
   }
 
   @Get(':id/artifacts/:artifactId/file')
@@ -64,25 +80,38 @@ export class RunsController {
     @Param('id') id: string,
     @Param('artifactId') artifactId: string,
     @Res() response: Response,
+    @Request() req: RequestWithUser,
   ) {
-    const file = await this.runsService.getArtifactFile(id, artifactId);
+    const file = await this.runsService.getArtifactFile(
+      id,
+      artifactId,
+      req.user.id,
+    );
     response.type(file.mimeType);
     return response.sendFile(file.absolutePath);
   }
 
   @Get(':id/code-files')
-  getCodeFiles(@Param('id') id: string) {
-    return this.runsService.getCodeFiles(id);
+  getCodeFiles(@Param('id') id: string, @Request() req: RequestWithUser) {
+    return this.runsService.getCodeFiles(id, req.user.id);
   }
 
   @Get(':id/code-file')
-  getCodeFileContent(@Param('id') id: string, @Query('path') filePath: string) {
-    return this.runsService.getCodeFileContent(id, filePath);
+  getCodeFileContent(
+    @Param('id') id: string,
+    @Query('path') filePath: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.runsService.getCodeFileContent(id, filePath, req.user.id);
   }
 
   @Get(':id/download-code')
-  async downloadCode(@Param('id') id: string, @Res() response: Response) {
-    const buffer = await this.runsService.downloadCode(id);
+  async downloadCode(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: RequestWithUser,
+  ) {
+    const buffer = await this.runsService.downloadCode(id, req.user.id);
     response.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': 'attachment; filename="frontend-project.zip"',
@@ -91,7 +120,7 @@ export class RunsController {
   }
 
   @Post(':id/rebuild')
-  async rebuild(@Param('id') id: string) {
-    return this.runsService.rebuildRun(id);
+  async rebuild(@Param('id') id: string, @Request() req: RequestWithUser) {
+    return this.runsService.rebuildRun(id, req.user.id);
   }
 }

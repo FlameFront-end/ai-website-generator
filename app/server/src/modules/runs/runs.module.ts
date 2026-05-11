@@ -1,12 +1,24 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { RunArtifactEntity, RunEntity, RunLogEntity } from '../../db/entities';
+import {
+  RunArtifactEntity,
+  RunEntity,
+  RunLogEntity,
+  UserEntity,
+} from '../../db/entities';
 import { RunsController } from './runs.controller';
 import { RunsService } from './runs.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RunEntity, RunArtifactEntity, RunLogEntity])],
+  imports: [
+    TypeOrmModule.forFeature([
+      RunEntity,
+      RunArtifactEntity,
+      RunLogEntity,
+      UserEntity,
+    ]),
+  ],
   controllers: [RunsController],
   providers: [RunsService],
   exports: [RunsService],

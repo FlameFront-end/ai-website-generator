@@ -1,0 +1,159 @@
+// Custom Toast Styles for Dark Theme
+.Toastify__toast-container {
+  padding: 12px;
+}
+
+.Toastify__toast {
+  background: var(--card-bg, var(--bg-muted));
+  border: 1px solid var(--border-solid);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 16px;
+  min-height: 64px;
+
+  &-body {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  &-icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.Toastify__close-button {
+  color: var(--text-muted);
+  opacity: 0.6;
+  padding: 4px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: var(--text-primary);
+    opacity: 1;
+    background: var(--bg-muted);
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.Toastify__progress-bar {
+  height: 3px;
+  border-radius: 0 0 0 3px;
+
+  &--success {
+    background: linear-gradient(90deg, #22c55e, #4ade80);
+  }
+
+  &--error {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+  }
+
+  &--warning {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  }
+
+  &--info {
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  }
+}
+
+// Success toast
+.Toastify__toast--success {
+  border-left: 4px solid #22c55e;
+
+  .Toastify__toast-icon {
+    color: #22c55e;
+  }
+}
+
+// Error toast
+.Toastify__toast--error {
+  border-left: 4px solid #ef4444;
+
+  .Toastify__toast-icon {
+    color: #ef4444;
+  }
+}
+
+// Warning toast
+.Toastify__toast--warning {
+  border-left: 4px solid #f59e0b;
+
+  .Toastify__toast-icon {
+    color: #f59e0b;
+  }
+}
+
+// Info toast
+.Toastify__toast--info {
+  border-left: 4px solid #3b82f6;
+
+  .Toastify__toast-icon {
+    color: #3b82f6;
+  }
+}
+
+// Animation improvements
+.Toastify__bounce-enter {
+  &--top-right {
+    animation-name: bounceInRight;
+  }
+}
+
+.Toastify__bounce-exit {
+  &--top-right {
+    animation-name: bounceOutRight;
+  }
+}
+
+@keyframes bounceInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-8px) scale(1.01);
+  }
+  80% {
+    transform: translateX(4px) scale(0.99);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes bounceOutRight {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  40% {
+    opacity: 0.8;
+    transform: translateX(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+}

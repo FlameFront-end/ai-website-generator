@@ -676,9 +676,9 @@ export class RunsService {
     private readonly logsRepository: Repository<RunLogEntity>,
   ) {}
 
-  async createRun(dto: CreateRunDto) {
+  async createRun(dto: CreateRunDto, userId: string) {
     const brief = normalizeBrief(dto?.brief);
-    const runNumber = await this.getNextRunNumber();
+    const runNumber = await this.getNextRunNumber(userId);
     const slug = toRunSlug(runNumber);
 
     const run = await this.runsRepository.save({
@@ -687,13 +687,14 @@ export class RunsService {
       brief,
       status: RunStatus.Queued,
       currentStep: 'queued',
+      userId,
     });
 
-    await this.createRunFolders(slug);
-    await this.writeStatusFile(slug, run);
+    await this.createRunFolders(userId, slug);
+    await this.writeStatusFile(userId, slug, run);
     await this.addLog(run.id, 'Запуск поставлен в очередь', { slug });
 
-    void this.processRun(run);
+    void this.processRun(run, userId);
 
     return {
       id: run.id,
@@ -702,8 +703,9 @@ export class RunsService {
     };
   }
 
-  getRuns(): Promise<RunEntity[]> {
+  getRuns(userId: string): Promise<RunEntity[]> {
     return this.runsRepository.find({
+      where: { userId },
       relations: {
         artifacts: true,
         logs: true,
@@ -718,9 +720,9 @@ export class RunsService {
     });
   }
 
-  getRun(id: string): Promise<RunEntity | null> {
+  getRun(id: string, userId: string): Promise<RunEntity | null> {
     return this.runsRepository.findOne({
-      where: { id },
+      where: { id, userId },
       relations: {
         artifacts: true,
         logs: true,
@@ -733,7 +735,8 @@ export class RunsService {
     });
   }
 
-  async getArtifactContent(runId: string, artifactId: string) {
+  async getArtifactContent(runId: string, artifactId: string, userId: string) {
+    const run = await this.getRunOrFail(runId, userId);
     const artifact = await this.artifactsRepository.findOne({
       where: {
         id: artifactId,
@@ -755,7 +758,7 @@ export class RunsService {
       throw new BadRequestException('Артефакт не является текстовым файлом');
     }
 
-    const runPath = this.getRunPath(artifact.run.slug);
+    const runPath = this.getRunPath(userId, run.slug);
     const absolutePath = path.resolve(process.cwd(), '..', '..', artifact.path);
 
     if (!absolutePath.startsWith(runPath)) {
@@ -775,8 +778,8 @@ export class RunsService {
     };
   }
 
-  async updateRun(id: string, dto: UpdateRunDto) {
-    const run = await this.getRunOrFail(id);
+  async updateRun(id: string, dto: UpdateRunDto, userId: string) {
+    const run = await this.getRunOrFail(id, userId);
     const displayName = normalizeDisplayName(dto?.displayName);
 
     const updatedRun = await this.runsRepository.save({
@@ -784,7 +787,7 @@ export class RunsService {
       displayName,
     });
 
-    await this.writeStatusFile(updatedRun.slug, updatedRun);
+    await this.writeStatusFile(userId, updatedRun.slug, updatedRun);
     await this.addLog(
       updatedRun.id,
       displayName ? 'Запуск переименован' : 'Название запуска очищено',
@@ -793,12 +796,12 @@ export class RunsService {
       },
     );
 
-    return this.getRunOrFail(id);
+    return this.getRunOrFail(id, userId);
   }
 
-  async deleteRun(id: string) {
-    const run = await this.getRunOrFail(id);
-    const runPath = this.getRunPath(run.slug);
+  async deleteRun(id: string, userId: string) {
+    const run = await this.getRunOrFail(id, userId);
+    const runPath = this.getRunPath(userId, run.slug);
     const generatedRoot = this.getGeneratedRootPath();
 
     if (!runPath.startsWith(generatedRoot)) {
@@ -816,9 +819,9 @@ export class RunsService {
     };
   }
 
-  private async getNextRunNumber(): Promise<number> {
+  private async getNextRunNumber(userId: string): Promise<number> {
     const lastRun = await this.runsRepository.findOne({
-      where: {},
+      where: { userId },
       order: {
         runNumber: 'DESC',
       },
@@ -827,8 +830,8 @@ export class RunsService {
     return (lastRun?.runNumber ?? 0) + 1;
   }
 
-  private async getRunOrFail(id: string): Promise<RunEntity> {
-    const run = await this.getRun(id);
+  private async getRunOrFail(id: string, userId: string): Promise<RunEntity> {
+    const run = await this.getRun(id, userId);
 
     if (!run) {
       throw new NotFoundException('Запуск не найден');
@@ -837,10 +840,10 @@ export class RunsService {
     return run;
   }
 
-  private async processRun(run: RunEntity): Promise<void> {
+  private async processRun(run: RunEntity, userId: string): Promise<void> {
     try {
       await sleep(PIPELINE_STEP_DELAY_MS);
-      await this.prepareBrief(run);
+      await this.prepareBrief(run, userId);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Неизвестная ошибка пайплайна';
@@ -856,21 +859,31 @@ export class RunsService {
     }
   }
 
-  private async prepareBrief(run: RunEntity): Promise<RunEntity> {
+  private async prepareBrief(
+    run: RunEntity,
+    userId: string,
+  ): Promise<RunEntity> {
     const runningRun = await this.updateRunStatus(
       run,
       RunStatus.Running,
       'prepare_brief',
+      userId,
     );
     await this.addLog(run.id, 'Начата подготовка брифа');
     await sleep(PIPELINE_STEP_DELAY_MS);
 
     const projectSpec = createProjectSpec(run.brief);
     const relativePath = path
-      .join(appConfig.storage.generatedRoot, run.slug, 'project-spec.json')
+      .join(
+        appConfig.storage.generatedRoot,
+        userId,
+        'runs',
+        run.slug,
+        'project-spec.json',
+      )
       .replaceAll('\\', '/');
     const absolutePath = path.join(
-      this.getRunPath(run.slug),
+      this.getRunPath(userId, run.slug),
       'project-spec.json',
     );
 
@@ -889,17 +902,19 @@ export class RunsService {
       path: relativePath,
     });
 
-    return this.prepareDesignArtifacts(runningRun, projectSpec);
+    return this.prepareDesignArtifacts(runningRun, projectSpec, userId);
   }
 
   private async prepareDesignArtifacts(
     run: RunEntity,
     projectSpec: ProjectSpec,
+    userId: string,
   ): Promise<RunEntity> {
     const designRun = await this.updateRunStatus(
       run,
       RunStatus.Running,
       'prepare_design_artifacts',
+      userId,
     );
     await this.addLog(run.id, 'Начато описание дизайна');
     await sleep(PIPELINE_STEP_DELAY_MS);
@@ -910,6 +925,8 @@ export class RunsService {
     const descriptionRelativePath = path
       .join(
         appConfig.storage.generatedRoot,
+        userId,
+        'runs',
         run.slug,
         'design',
         'design-description.md',
@@ -918,6 +935,8 @@ export class RunsService {
     const tokensRelativePath = path
       .join(
         appConfig.storage.generatedRoot,
+        userId,
+        'runs',
         run.slug,
         'design',
         'design-tokens.json',
@@ -925,12 +944,20 @@ export class RunsService {
       .replaceAll('\\', '/');
 
     await fs.writeFile(
-      path.join(this.getRunPath(run.slug), 'design', 'design-description.md'),
+      path.join(
+        this.getRunPath(userId, run.slug),
+        'design',
+        'design-description.md',
+      ),
       description,
       'utf8',
     );
     await fs.writeFile(
-      path.join(this.getRunPath(run.slug), 'design', 'design-tokens.json'),
+      path.join(
+        this.getRunPath(userId, run.slug),
+        'design',
+        'design-tokens.json',
+      ),
       `${JSON.stringify(tokens, null, 2)}\n`,
       'utf8',
     );
@@ -957,18 +984,20 @@ export class RunsService {
       path: tokensRelativePath,
     });
 
-    return this.prepareReferenceImage(designRun, projectSpec, tokens);
+    return this.prepareReferenceImage(designRun, projectSpec, tokens, userId);
   }
 
   private async prepareReferenceImage(
     run: RunEntity,
     projectSpec: ProjectSpec,
     tokens: DesignTokens,
+    userId: string,
   ): Promise<RunEntity> {
     const referenceRun = await this.updateRunStatus(
       run,
       RunStatus.Running,
       'prepare_reference_image',
+      userId,
     );
     await this.addLog(run.id, 'Начата подготовка визуального референса');
     await sleep(PIPELINE_STEP_DELAY_MS);
@@ -977,6 +1006,8 @@ export class RunsService {
     const relativePath = path
       .join(
         appConfig.storage.generatedRoot,
+        userId,
+        'runs',
         run.slug,
         'reference',
         'hero-reference.svg',
@@ -984,7 +1015,11 @@ export class RunsService {
       .replaceAll('\\', '/');
 
     await fs.writeFile(
-      path.join(this.getRunPath(run.slug), 'reference', 'hero-reference.svg'),
+      path.join(
+        this.getRunPath(userId, run.slug),
+        'reference',
+        'hero-reference.svg',
+      ),
       svg,
       'utf8',
     );
@@ -1001,25 +1036,28 @@ export class RunsService {
       referenceRun,
       RunStatus.Running,
       'reference_ready',
+      userId,
     );
 
-    return this.prepareFrontendProject(readyRun, projectSpec, tokens);
+    return this.prepareFrontendProject(readyRun, projectSpec, tokens, userId);
   }
 
   private async prepareFrontendProject(
     run: RunEntity,
     projectSpec: ProjectSpec,
     tokens: DesignTokens,
+    userId: string,
   ): Promise<RunEntity> {
     const codeRun = await this.updateRunStatus(
       run,
       RunStatus.Running,
       'prepare_frontend_project',
+      userId,
     );
     await this.addLog(run.id, 'Начата генерация клиентского проекта');
     await sleep(PIPELINE_STEP_DELAY_MS);
 
-    const codePath = path.join(this.getRunPath(run.slug), 'code');
+    const codePath = path.join(this.getRunPath(userId, run.slug), 'code');
     const sourcePath = path.join(codePath, 'src');
     await fs.mkdir(sourcePath, { recursive: true });
 
@@ -1072,7 +1110,14 @@ export class RunsService {
       },
     };
     const manifestRelativePath = path
-      .join(appConfig.storage.generatedRoot, run.slug, 'code', 'manifest.json')
+      .join(
+        appConfig.storage.generatedRoot,
+        userId,
+        'runs',
+        run.slug,
+        'code',
+        'manifest.json',
+      )
       .replaceAll('\\', '/');
 
     await fs.writeFile(
@@ -1090,29 +1135,35 @@ export class RunsService {
       path: manifestRelativePath,
     });
 
-    const builtRun = await this.buildProject(codeRun, run.slug);
+    const builtRun = await this.buildProject(codeRun, run.slug, userId, 1);
     if (builtRun.status === RunStatus.BuildFailed) {
       return builtRun;
     }
 
-    const screenshotRun = await this.takeScreenshots(builtRun, run.slug);
+    const screenshotRun = await this.takeScreenshots(
+      builtRun,
+      run.slug,
+      userId,
+    );
 
-    return this.runVisualQA(screenshotRun, run.id, run.slug);
+    return this.runVisualQA(screenshotRun, run.id, run.slug, userId);
   }
 
   private async buildProject(
     run: RunEntity,
     slug: string,
+    userId: string,
     attempt = 1,
   ): Promise<RunEntity> {
     const buildRun = await this.updateRunStatus(
       run,
       RunStatus.Running,
       'build_project',
+      userId,
     );
     await this.addLog(run.id, `Попытка сборки ${attempt}`);
 
-    const codePath = path.join(this.getRunPath(slug), 'code');
+    const codePath = path.join(this.getRunPath(userId, slug), 'code');
     const execAsync = promisify(exec);
     const buildLogs: string[] = [];
 
@@ -1169,13 +1220,20 @@ export class RunsService {
       addLogLine('');
       addLogLine('=== Сборка успешна ===');
 
-      await this.saveBuildLogs(run.id, slug, buildLogs.join('\n'), false);
+      await this.saveBuildLogs(
+        run.id,
+        slug,
+        userId,
+        buildLogs.join('\n'),
+        false,
+      );
       await this.addLog(run.id, 'Сборка успешна');
 
       return await this.updateRunStatus(
         buildRun,
         RunStatus.Running,
         'build_success',
+        userId,
       );
     } catch (error: any) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1196,15 +1254,21 @@ export class RunsService {
       }
 
       await this.addLog(run.id, 'Ошибка сборки', { error: message, attempt });
-      await this.saveBuildLogs(run.id, slug, buildLogs.join('\n'), true);
+      await this.saveBuildLogs(
+        run.id,
+        slug,
+        userId,
+        buildLogs.join('\n'),
+        true,
+      );
 
       if (attempt < 2) {
         await this.addLog(run.id, 'Повторная попытка...');
-        return this.buildProject(run, slug, attempt + 1);
+        return this.buildProject(run, slug, userId, attempt + 1);
       }
 
       const errorPath = path.join(
-        this.getRunPath(slug),
+        this.getRunPath(userId, slug),
         'qa',
         'build-error.md',
       );
@@ -1215,7 +1279,14 @@ export class RunsService {
       );
 
       const errorRelativePath = path
-        .join(appConfig.storage.generatedRoot, slug, 'qa', 'build-error.md')
+        .join(
+          appConfig.storage.generatedRoot,
+          userId,
+          'runs',
+          slug,
+          'qa',
+          'build-error.md',
+        )
         .replaceAll('\\', '/');
       await this.artifactsRepository.save({
         runId: run.id,
@@ -1228,6 +1299,7 @@ export class RunsService {
         buildRun,
         RunStatus.BuildFailed,
         'build_failed',
+        userId,
       );
     }
   }
@@ -1235,14 +1307,26 @@ export class RunsService {
   private async saveBuildLogs(
     runId: string,
     slug: string,
+    userId: string,
     logs: string,
     isError: boolean,
   ): Promise<void> {
-    const logsPath = path.join(this.getRunPath(slug), 'qa', 'build-log.txt');
+    const logsPath = path.join(
+      this.getRunPath(userId, slug),
+      'qa',
+      'build-log.txt',
+    );
     await fs.writeFile(logsPath, logs, 'utf8');
 
     const logsRelativePath = path
-      .join(appConfig.storage.generatedRoot, slug, 'qa', 'build-log.txt')
+      .join(
+        appConfig.storage.generatedRoot,
+        userId,
+        'runs',
+        slug,
+        'qa',
+        'build-log.txt',
+      )
       .replaceAll('\\', '/');
 
     const existingArtifact = await this.artifactsRepository.findOne({
@@ -1273,16 +1357,21 @@ export class RunsService {
   private async takeScreenshots(
     run: RunEntity,
     slug: string,
+    userId: string,
   ): Promise<RunEntity> {
     const screenshotRun = await this.updateRunStatus(
       run,
       RunStatus.Running,
       'take_screenshots',
+      userId,
     );
     await this.addLog(run.id, 'Начато создание скриншотов');
 
-    const codePath = path.join(this.getRunPath(slug), 'code');
-    const screenshotsPath = path.join(this.getRunPath(slug), 'screenshots');
+    const codePath = path.join(this.getRunPath(userId, slug), 'code');
+    const screenshotsPath = path.join(
+      this.getRunPath(userId, slug),
+      'screenshots',
+    );
     let browser;
     let serverProcess;
 
@@ -1328,6 +1417,8 @@ export class RunsService {
       const desktopRelativePath = path
         .join(
           appConfig.storage.generatedRoot,
+          userId,
+          'runs',
           slug,
           'screenshots',
           'rendered-desktop.png',
@@ -1336,6 +1427,8 @@ export class RunsService {
       const mobileRelativePath = path
         .join(
           appConfig.storage.generatedRoot,
+          userId,
+          'runs',
           slug,
           'screenshots',
           'rendered-mobile.png',
@@ -1362,6 +1455,7 @@ export class RunsService {
         screenshotRun,
         RunStatus.Running,
         'screenshots_ready',
+        userId,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1376,6 +1470,7 @@ export class RunsService {
         screenshotRun,
         RunStatus.Failed,
         'screenshots_failed',
+        userId,
       );
     }
   }
@@ -1384,28 +1479,34 @@ export class RunsService {
     run: RunEntity,
     runId: string,
     slug: string,
+    userId: string,
   ): Promise<RunEntity> {
     const qaRun = await this.updateRunStatus(
       run,
       RunStatus.Running,
       'visual_qa',
+      userId,
     );
     await this.addLog(runId, 'Начат визуальный анализ');
 
     try {
       const referencePath = path.join(
-        this.getRunPath(slug),
+        this.getRunPath(userId, slug),
         'reference',
         'hero-reference.svg',
       );
       const renderedPath = path.join(
-        this.getRunPath(slug),
+        this.getRunPath(userId, slug),
         'screenshots',
         'rendered-desktop.png',
       );
-      const diffPath = path.join(this.getRunPath(slug), 'qa', 'diff.png');
+      const diffPath = path.join(
+        this.getRunPath(userId, slug),
+        'qa',
+        'diff.png',
+      );
       const reportPath = path.join(
-        this.getRunPath(slug),
+        this.getRunPath(userId, slug),
         'qa',
         'visual-report.md',
       );
@@ -1477,7 +1578,14 @@ export class RunsService {
       await fs.writeFile(diffPath, PNG.sync.write(diff));
 
       const diffRelativePath = path
-        .join(appConfig.storage.generatedRoot, slug, 'qa', 'diff.png')
+        .join(
+          appConfig.storage.generatedRoot,
+          userId,
+          'runs',
+          slug,
+          'qa',
+          'diff.png',
+        )
         .replaceAll('\\', '/');
       await this.artifactsRepository.save({
         runId,
@@ -1495,7 +1603,14 @@ export class RunsService {
       await fs.writeFile(reportPath, report, 'utf8');
 
       const reportRelativePath = path
-        .join(appConfig.storage.generatedRoot, slug, 'qa', 'visual-report.md')
+        .join(
+          appConfig.storage.generatedRoot,
+          userId,
+          'runs',
+          slug,
+          'qa',
+          'visual-report.md',
+        )
         .replaceAll('\\', '/');
       await this.artifactsRepository.save({
         runId,
@@ -1515,7 +1630,7 @@ export class RunsService {
         currentStep: 'completed',
         score,
       });
-      await this.writeStatusFile(slug, updatedRun);
+      await this.writeStatusFile(userId, slug, updatedRun);
 
       return updatedRun;
     } catch (error) {
@@ -1527,6 +1642,7 @@ export class RunsService {
         qaRun,
         RunStatus.VisualFailed,
         'visual_qa_failed',
+        userId,
       );
     }
   }
@@ -1581,9 +1697,12 @@ ${score}/10 (${status})
 `;
   }
 
-  async getCodeFiles(runId: string): Promise<{ path: string; size: number }[]> {
-    const run = await this.getRunOrFail(runId);
-    const codePath = path.join(this.getRunPath(run.slug), 'code');
+  async getCodeFiles(
+    runId: string,
+    userId: string,
+  ): Promise<{ path: string; size: number }[]> {
+    const run = await this.getRunOrFail(runId, userId);
+    const codePath = path.join(this.getRunPath(userId, run.slug), 'code');
 
     try {
       await fs.access(codePath);
@@ -1613,9 +1732,10 @@ ${score}/10 (${status})
   async getCodeFileContent(
     runId: string,
     filePath: string,
+    userId: string,
   ): Promise<{ path: string; content: string; mimeType: string }> {
-    const run = await this.getRunOrFail(runId);
-    const codePath = path.join(this.getRunPath(run.slug), 'code');
+    const run = await this.getRunOrFail(runId, userId);
+    const codePath = path.join(this.getRunPath(userId, run.slug), 'code');
     const absolutePath = path.resolve(codePath, filePath);
 
     if (!absolutePath.startsWith(codePath)) {
@@ -1647,9 +1767,9 @@ ${score}/10 (${status})
     return { path: filePath, content, mimeType };
   }
 
-  async downloadCode(runId: string): Promise<Buffer> {
-    const run = await this.getRunOrFail(runId);
-    const codePath = path.join(this.getRunPath(run.slug), 'code');
+  async downloadCode(runId: string, userId: string): Promise<Buffer> {
+    const run = await this.getRunOrFail(runId, userId);
+    const codePath = path.join(this.getRunPath(userId, run.slug), 'code');
 
     try {
       await fs.access(codePath);
@@ -1663,10 +1783,13 @@ ${score}/10 (${status})
     return zip.toBuffer();
   }
 
-  async rebuildRun(runId: string): Promise<{ id: string; status: RunStatus }> {
+  async rebuildRun(
+    runId: string,
+    userId: string,
+  ): Promise<{ id: string; status: RunStatus }> {
     // Загружаем без relations чтобы избежать cascade проблем
     const run = await this.runsRepository.findOne({
-      where: { id: runId },
+      where: { id: runId, userId },
     });
     if (!run) {
       throw new Error('Запуск не найден');
@@ -1679,10 +1802,11 @@ ${score}/10 (${status})
       run,
       RunStatus.Running,
       'build_project',
+      userId,
     );
 
     // Запускаем полный цикл: сборка -> скриншоты -> визуальный анализ
-    void this.runBuildAndQA(rebuildRun, run.slug);
+    void this.runBuildAndQA(rebuildRun, run.slug, userId);
 
     return {
       id: run.id,
@@ -1690,20 +1814,25 @@ ${score}/10 (${status})
     };
   }
 
-  private async runBuildAndQA(run: RunEntity, slug: string): Promise<void> {
-    const builtRun = await this.buildProject(run, slug, 1);
+  private async runBuildAndQA(
+    run: RunEntity,
+    slug: string,
+    userId: string,
+  ): Promise<void> {
+    const builtRun = await this.buildProject(run, slug, userId, 1);
     if (builtRun.status === RunStatus.BuildFailed) {
       return;
     }
 
-    const screenshotRun = await this.takeScreenshots(builtRun, slug);
-    await this.runVisualQA(screenshotRun, run.id, slug);
+    const screenshotRun = await this.takeScreenshots(builtRun, slug, userId);
+    await this.runVisualQA(screenshotRun, run.id, slug, userId);
   }
 
   private async updateRunStatus(
     run: RunEntity,
     status: RunStatus,
     currentStep: string,
+    userId: string,
   ): Promise<RunEntity> {
     const updatedRun = await this.runsRepository.save({
       ...run,
@@ -1711,7 +1840,7 @@ ${score}/10 (${status})
       currentStep,
     });
 
-    await this.writeStatusFile(run.slug, updatedRun);
+    await this.writeStatusFile(userId, run.slug, updatedRun);
     return updatedRun;
   }
 
@@ -1728,8 +1857,8 @@ ${score}/10 (${status})
     });
   }
 
-  private async createRunFolders(slug: string): Promise<void> {
-    const runPath = this.getRunPath(slug);
+  private async createRunFolders(userId: string, slug: string): Promise<void> {
+    const runPath = this.getRunPath(userId, slug);
     const folders = ['reference', 'design', 'code', 'screenshots', 'qa'];
 
     await fs.mkdir(runPath, { recursive: true });
@@ -1740,8 +1869,12 @@ ${score}/10 (${status})
     );
   }
 
-  private async writeStatusFile(slug: string, run: RunEntity): Promise<void> {
-    const statusPath = path.join(this.getRunPath(slug), 'status.json');
+  private async writeStatusFile(
+    userId: string,
+    slug: string,
+    run: RunEntity,
+  ): Promise<void> {
+    const statusPath = path.join(this.getRunPath(userId, slug), 'status.json');
     const payload = {
       id: run.id,
       slug: run.slug,
@@ -1758,8 +1891,8 @@ ${score}/10 (${status})
     );
   }
 
-  private getRunPath(slug: string): string {
-    return path.join(this.getGeneratedRootPath(), slug);
+  private getRunPath(userId: string, slug: string): string {
+    return path.join(this.getGeneratedRootPath(), userId, 'runs', slug);
   }
 
   private getGeneratedRootPath(): string {
@@ -1771,7 +1904,8 @@ ${score}/10 (${status})
     );
   }
 
-  async getArtifactFile(runId: string, artifactId: string) {
+  async getArtifactFile(runId: string, artifactId: string, userId: string) {
+    const run = await this.getRunOrFail(runId, userId);
     const artifact = await this.artifactsRepository.findOne({
       where: {
         id: artifactId,
@@ -1790,7 +1924,7 @@ ${score}/10 (${status})
       throw new BadRequestException('Артефакт не является изображением');
     }
 
-    const runPath = this.getRunPath(artifact.run.slug);
+    const runPath = this.getRunPath(userId, run.slug);
     const absolutePath = path.resolve(process.cwd(), '..', '..', artifact.path);
 
     if (!absolutePath.startsWith(runPath)) {

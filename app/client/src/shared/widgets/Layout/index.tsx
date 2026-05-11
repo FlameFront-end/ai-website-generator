@@ -1,8 +1,32 @@
 import type { ReactNode } from "react";
 
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+
+import { useAuth } from "@/shared/model/auth.context";
+import { ROUTES } from "@/shared/model/routes";
 import { useTheme } from "@/shared/hooks/useTheme";
 
 import styles from "./Layout.module.scss";
+
+function IconLogout() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
 
 interface LayoutProps {
   children: ReactNode;
@@ -45,6 +69,14 @@ function IconMoon() {
 
 export function Layout({ children }: LayoutProps) {
   const { theme, toggle } = useTheme();
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    toast.success("Вы вышли из системы");
+    navigate(ROUTES.LOGIN);
+  };
 
   return (
     <div className={styles.layout}>
@@ -66,14 +98,26 @@ export function Layout({ children }: LayoutProps) {
             </svg>
             <strong>Forgesite</strong>
           </a>
-          <button
-            type="button"
-            className={styles.themeToggle}
-            onClick={toggle}
-            title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
-          >
-            {theme === "dark" ? <IconSun /> : <IconMoon />}
-          </button>
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.themeToggle}
+              onClick={toggle}
+              title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+            >
+              {theme === "dark" ? <IconSun /> : <IconMoon />}
+            </button>
+            {isAuthenticated && (
+              <button
+                type="button"
+                className={styles.logoutButton}
+                onClick={handleLogout}
+                title="Выйти"
+              >
+                <IconLogout />
+              </button>
+            )}
+          </div>
         </div>
       </header>
       <main className={styles.main}>{children}</main>
