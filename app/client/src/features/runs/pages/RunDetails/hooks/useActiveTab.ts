@@ -1,0 +1,33 @@
+import { useCallback, useMemo } from "react";
+
+import { useSearchParams } from "react-router-dom";
+
+import { TABS } from "../constants";
+import type { RunDetailsTab } from "../types";
+
+const TAB_IDS = TABS.map((tab) => tab.id) as RunDetailsTab[];
+
+export function useActiveTab() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const activeTab = useMemo<RunDetailsTab>(() => {
+    const raw = searchParams.get("tab") as RunDetailsTab | null;
+    return raw && TAB_IDS.includes(raw) ? raw : "overview";
+  }, [searchParams]);
+
+  const setActiveTab = useCallback(
+    (tab: RunDetailsTab) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", tab);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  return { activeTab, setActiveTab };
+}

@@ -1,4 +1,4 @@
-import type { RunStatus } from "@/shared/api/services/runs";
+import type { RunStatus } from "@/api/services/runs";
 
 import styles from "./RunStatusBadge.module.scss";
 

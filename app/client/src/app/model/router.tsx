@@ -1,42 +1,17 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 
 import { AppRoutes } from "@/app/components/AppRoutes";
-import { lazyImport } from "@/shared/lib/lazy-import";
-import { useAuth } from "@/shared/model/auth.context";
-import { ROUTES } from "@/shared/model/routes";
-import { FullErrorScreen } from "@/shared/widgets/FullErrorScreen";
-import { FullScreenLoader } from "@/shared/widgets/FullScreenLoader";
-
-function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <FullScreenLoader />;
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to={ROUTES.LOGIN} replace />;
-  }
-
-  return <Outlet />;
-}
-
-function PublicOnlyRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <FullScreenLoader />;
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to={ROUTES.RUNS} replace />;
-  }
-
-  return <Outlet />;
-}
+import {
+  ProtectedRoute,
+  PublicOnlyRoute,
+  RootRedirect,
+} from "@/app/components/route-guards";
+import { lazyImport } from "@/lib";
+import { ROUTES } from "@/model";
+import { FullErrorScreen, FullScreenLoader } from "@/widgets";
 
 export const router = createBrowserRouter([
-  // Auth routes WITHOUT Layout (no header, no background)
+  // Public-only routes (no layout)
   {
     element: <PublicOnlyRoute />,
     errorElement: <FullErrorScreen />,
@@ -53,7 +28,7 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Protected routes WITH Layout
+  // Protected routes (with layout)
   {
     element: <AppRoutes />,
     errorElement: <FullErrorScreen />,
@@ -79,7 +54,6 @@ export const router = createBrowserRouter([
           },
         ],
       },
-      // Redirect root to runs (if authenticated) or login
       {
         path: "/",
         element: <RootRedirect />,
@@ -92,8 +66,3 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
-
-function RootRedirect() {
-  const { isAuthenticated } = useAuth();
-  return <Navigate to={isAuthenticated ? ROUTES.RUNS : ROUTES.LOGIN} replace />;
-}

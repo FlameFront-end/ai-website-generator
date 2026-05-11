@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { runsApi } from "./runs.api";
 
@@ -7,6 +8,8 @@ export const runsQueryKeys = {
   detail: (id: string) => ["runs", id] as const,
   artifactContent: (runId: string, artifactId: string) =>
     ["runs", runId, "artifacts", artifactId, "content"] as const,
+  artifactFile: (runId: string, artifactId: string) =>
+    ["runs", runId, "artifacts", artifactId, "file"] as const,
   codeFiles: (runId: string) => ["runs", runId, "code-files"] as const,
   codeFileContent: (runId: string, filePath: string) =>
     ["runs", runId, "code-files", filePath] as const,
@@ -48,6 +51,20 @@ export function useArtifactContentQuery(runId: string, artifactId?: string) {
     queryFn: () => runsApi.getArtifactContent(runId, artifactId ?? ""),
     enabled: Boolean(runId && artifactId),
   });
+}
+
+export function useArtifactFileUrl(runId: string, artifactId?: string) {
+  const query = useQuery({
+    queryKey: runsQueryKeys.artifactFile(runId, artifactId ?? ""),
+    queryFn: () => runsApi.getArtifactFile(runId, artifactId ?? ""),
+    enabled: Boolean(runId && artifactId),
+  });
+  const url = useMemo(
+    () => (query.data ? window.URL.createObjectURL(query.data) : null),
+    [query.data],
+  );
+
+  return { ...query, url };
 }
 
 export function useUpdateRunMutation() {

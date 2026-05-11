@@ -1,4 +1,4 @@
-import axiosInstance from "@/shared/api/axiosInstance";
+import { axiosInstance } from "@/api";
 
 import type {
   ArtifactContent,
@@ -65,6 +65,16 @@ export const runsApi = {
     return `${axiosInstance.defaults.baseURL}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(
       artifactId,
     )}/file`;
+  },
+
+  async getArtifactFile(runId: string, artifactId: string): Promise<Blob> {
+    const { data } = await axiosInstance.get<Blob>(
+      `/runs/${runId}/artifacts/${artifactId}/file`,
+      {
+        responseType: "blob",
+      },
+    );
+    return data;
   },
 
   async getCodeFiles(runId: string): Promise<CodeFile[]> {

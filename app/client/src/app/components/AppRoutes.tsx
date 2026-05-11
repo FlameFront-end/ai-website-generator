@@ -1,11 +1,11 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet } from "react-router-dom";
 
-import { Layout } from '@/shared/widgets/Layout'
+import { Layout } from "@/widgets";
 
 export function AppRoutes() {
   return (
     <Layout>
       <Outlet />
     </Layout>
-  )
+  );
 }

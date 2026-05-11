@@ -8,7 +8,7 @@ import {
   Info,
 } from "lucide-react";
 
-import type { RunLog } from "@/shared/api/services/runs";
+import type { RunLog } from "@/api/services/runs";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import styles from "./logs-panel.module.scss";

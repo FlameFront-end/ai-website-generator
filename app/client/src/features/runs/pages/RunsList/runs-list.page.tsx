@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { BriefForm } from "@/features/runs/components/BriefForm";
@@ -9,19 +9,13 @@ import {
   useCreateRunMutation,
   useDeleteRunMutation,
   useRunsQuery,
-} from "@/shared/api/services/runs";
-import type { Run } from "@/shared/api/services/runs";
-import { Modal } from "@/shared/widgets/Modal/modal";
+} from "@/api/services/runs";
+import type { Run } from "@/api/services/runs";
+import { IconButton, Modal, Spinner } from "@/kit";
+
+import { getRunTitle } from "../../lib/run-title";
 
 import styles from "./runs-list.module.scss";
-
-function formatRunTitle(slug: string) {
-  return slug.replace(/^run-(\d+)$/, "Запуск $1");
-}
-
-function getRunTitle(run: Run) {
-  return run.displayName || formatRunTitle(run.slug);
-}
 
 export default function RunsListPage() {
   const navigate = useNavigate();
@@ -55,11 +49,8 @@ export default function RunsListPage() {
   return (
     <section className={styles.page}>
       <div className={styles.intro}>
-        <h1>Генерация первого экрана по брифу</h1>
-        <p>
-          Создайте запуск, отслеживайте этапы пайплайна и проверяйте созданные
-          артефакты.
-        </p>
+        <h1>Создайте первый экран за минуту</h1>
+        <p>Опишите проект, выберите стиль, получите готовый код.</p>
       </div>
 
       <div className={styles.grid}>
@@ -69,10 +60,26 @@ export default function RunsListPage() {
         />
 
         <aside className={styles.runs}>
-          <h2>Последние запуски</h2>
-          {runsQuery.isLoading && <p>Загружаем запуски...</p>}
-          {runsQuery.isError && <p>API запусков пока недоступен.</p>}
-          {runsQuery.data?.length === 0 && <p>Запусков пока нет.</p>}
+          <h2>
+            <FileText size={18} />
+            Последние запуски
+          </h2>
+          {runsQuery.isLoading && (
+            <div className={styles.emptyState}>
+              <Spinner size={18} />
+              Загружаем запуски...
+            </div>
+          )}
+          {runsQuery.isError && (
+            <div className={styles.emptyState}>
+              API запусков пока недоступен.
+            </div>
+          )}
+          {runsQuery.data?.length === 0 && (
+            <div className={styles.emptyState}>
+              Запусков пока нет. Создайте первый запуск, заполнив бриф слева.
+            </div>
+          )}
           <div className={styles.runsList}>
             {runsQuery.data?.map((run) => (
               <div key={run.id} className={styles.runItem}>
@@ -84,15 +91,14 @@ export default function RunsListPage() {
                   <span>{getRunTitle(run)}</span>
                   <RunStatusBadge status={run.status} />
                 </button>
-                <button
-                  type="button"
-                  className={styles.deleteButton}
+                <IconButton
+                  icon={<Trash2 size={16} />}
+                  tone="danger"
                   disabled={deleteRunMutation.isPending}
                   onClick={() => setRunToDelete(run)}
                   title="Удалить"
-                >
-                  <Trash2 size={16} />
-                </button>
+                  aria-label="Удалить запуск"
+                />
               </div>
             ))}
           </div>

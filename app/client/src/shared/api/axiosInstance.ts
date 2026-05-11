@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import { env } from "@/shared/model/config";
+import { env } from "@/model";
 
 const axiosInstance = axios.create({
   baseURL: env.API_URL,

@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
+import type { FC, ReactNode } from "react";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ToastContainer } from "react-toastify";
 
-import { queryClient } from "@/shared/api/queryClient";
-import { AuthProvider } from "@/shared/model/auth.context";
+import { queryClient } from "@/api";
+import { AuthProvider } from "@/lib";
 
 import "react-toastify/dist/ReactToastify.css";
 import "./toast.styles.scss";
@@ -13,7 +13,7 @@ interface ProvidersProps {
   children: ReactNode;
 }
 
-export function Providers({ children }: ProvidersProps) {
+export const Providers: FC<ProvidersProps> = ({ children }) => {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
@@ -34,4 +34,4 @@ export function Providers({ children }: ProvidersProps) {
       </QueryClientProvider>
     </AuthProvider>
   );
-}
+};

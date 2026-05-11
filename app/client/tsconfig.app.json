@@ -13,6 +13,14 @@
     "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
+      "@/kit": ["src/shared/kit"],
+      "@/widgets": ["src/shared/widgets"],
+      "@/lib": ["src/shared/lib"],
+      "@/hooks": ["src/shared/hooks"],
+      "@/model": ["src/shared/model"],
+      "@/api": ["src/shared/api"],
+      "@/api/services": ["src/shared/api/services"],
+      "@/api/services/*": ["src/shared/api/services/*"],
       "@/*": ["src/*"]
     },
     "verbatimModuleSyntax": true,

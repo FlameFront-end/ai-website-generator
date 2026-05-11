@@ -1,13 +1,13 @@
-import type { ComponentType } from 'react'
+import type { ComponentType } from "react";
 
 type LazyModule = {
-  default: ComponentType
-}
+  default: ComponentType;
+};
 
 export async function lazyImport(importer: () => Promise<LazyModule>) {
-  const module = await importer()
+  const module = await importer();
 
   return {
     Component: module.default,
-  }
+  };
 }
