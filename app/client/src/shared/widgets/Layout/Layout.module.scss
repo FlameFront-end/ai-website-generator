@@ -1,30 +1,41 @@
 .layout {
   min-height: 100vh;
-  background: #f6f7f9;
+  background:
+    radial-gradient(circle at top left, rgba(124, 58, 237, 0.08), transparent 34rem),
+    linear-gradient(180deg, #f9fafc 0%, #eef2f7 100%);
   color: #111827;
 }
 
 .header {
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.85);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(14px);
 
   > div {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    max-width: 1180px;
+    max-width: 1240px;
     margin: 0 auto;
-    padding: 18px 24px;
+    padding: 16px 28px;
+  }
+
+  strong {
+    font-size: 16px;
+    letter-spacing: 0;
   }
 
   span {
-    color: #6b7280;
+    color: #667085;
     font-size: 14px;
   }
 }
 
 .main {
-  max-width: 1180px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 34px 28px 56px;
 }

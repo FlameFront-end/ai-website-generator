@@ -10,6 +10,8 @@ const STEP_LABELS: Record<string, string> = {
   queued: 'В очереди',
   prepare_brief: 'Подготовка брифа',
   project_spec_ready: 'Спецификация проекта готова',
+  prepare_design_artifacts: 'Подготовка описания дизайна',
+  design_artifacts_ready: 'Описание дизайна и токены готовы',
 }
 
 const ARTIFACT_LABELS: Record<string, string> = {
@@ -110,12 +112,39 @@ function renderProjectSpec(content: string) {
   }
 }
 
+function renderDesignTokens(content: string) {
+  try {
+    const tokens = JSON.parse(content) as Record<string, Record<string, string | number>>
+
+    return (
+      <dl className={styles.spec}>
+        {Object.entries(tokens).flatMap(([groupName, group]) =>
+          Object.entries(group).map(([key, value]) => (
+            <div key={`${groupName}-${key}`}>
+              <dt>
+                {groupName} · {key}
+              </dt>
+              <dd>{String(value)}</dd>
+            </div>
+          )),
+        )}
+      </dl>
+    )
+  } catch {
+    return <pre>{content}</pre>
+  }
+}
+
 export default function RunDetailsPage() {
   const { runId = '' } = useParams()
   const runQuery = useRunQuery(runId)
   const run = runQuery.data
   const projectSpecArtifact = run?.artifacts.find(artifact => artifact.type === 'project_spec')
+  const designDescriptionArtifact = run?.artifacts.find(artifact => artifact.type === 'design_description')
+  const designTokensArtifact = run?.artifacts.find(artifact => artifact.type === 'design_tokens')
   const projectSpecQuery = useArtifactContentQuery(run?.id ?? '', projectSpecArtifact?.id)
+  const designDescriptionQuery = useArtifactContentQuery(run?.id ?? '', designDescriptionArtifact?.id)
+  const designTokensQuery = useArtifactContentQuery(run?.id ?? '', designTokensArtifact?.id)
 
   if (runQuery.isLoading) {
     return <p>Загружаем запуск...</p>
@@ -142,12 +171,12 @@ export default function RunDetailsPage() {
         <RunStatusBadge status={run.status} />
       </div>
 
-      <div className={styles.grid}>
-        <div className={styles.panel}>
-          <h2>Бриф</h2>
-          <pre>{run.brief}</pre>
-        </div>
+      <div className={styles.panel}>
+        <h2>Бриф</h2>
+        <pre>{run.brief}</pre>
+      </div>
 
+      <div className={styles.detailsGrid}>
         <div className={styles.panel}>
           <h2>Артефакты</h2>
           {run.artifacts.length === 0 && <p>Артефактов пока нет.</p>}
@@ -182,6 +211,22 @@ export default function RunDetailsPage() {
           {projectSpecQuery.isLoading && <p>Загружаем спецификацию проекта...</p>}
           {projectSpecQuery.isError && <p>Не удалось загрузить спецификацию проекта.</p>}
           {projectSpecQuery.data && renderProjectSpec(projectSpecQuery.data.content)}
+        </div>
+
+        <div className={styles.panel}>
+          <h2>Описание дизайна</h2>
+          {!designDescriptionArtifact && <p>Описание дизайна пока не готово.</p>}
+          {designDescriptionQuery.isLoading && <p>Загружаем описание дизайна...</p>}
+          {designDescriptionQuery.isError && <p>Не удалось загрузить описание дизайна.</p>}
+          {designDescriptionQuery.data && <pre>{designDescriptionQuery.data.content}</pre>}
+        </div>
+
+        <div className={styles.panel}>
+          <h2>Дизайн-токены</h2>
+          {!designTokensArtifact && <p>Дизайн-токены пока не готовы.</p>}
+          {designTokensQuery.isLoading && <p>Загружаем дизайн-токены...</p>}
+          {designTokensQuery.isError && <p>Не удалось загрузить дизайн-токены.</p>}
+          {designTokensQuery.data && renderDesignTokens(designTokensQuery.data.content)}
         </div>
       </div>
     </section>

@@ -25,6 +25,34 @@ type ProjectSpec = {
   visualPreferences: string[];
 };
 
+type DesignTokens = {
+  colors: {
+    background: string;
+    textPrimary: string;
+    textSecondary: string;
+    accent: string;
+    surface: string;
+    border: string;
+  };
+  layout: {
+    containerWidth: string;
+    sectionPaddingY: string;
+    sectionPaddingX: string;
+    columns: number;
+  };
+  typography: {
+    headlineSize: string;
+    headlineWeight: number;
+    bodySize: string;
+    lineHeight: string;
+  };
+  components: {
+    buttonRadius: string;
+    cardRadius: string;
+    cardShadow: string;
+  };
+};
+
 function normalizeBrief(brief: unknown): string {
   if (typeof brief !== 'string') {
     throw new BadRequestException('Бриф должен быть строкой');
@@ -82,6 +110,90 @@ function createProjectSpec(brief: string): ProjectSpec {
     },
     visualPreferences: style,
   };
+}
+
+function hasStyle(spec: ProjectSpec, pattern: RegExp): boolean {
+  return spec.style.some((item) => pattern.test(item));
+}
+
+function createDesignTokens(spec: ProjectSpec): DesignTokens {
+  const isDark = hasStyle(spec, /темн|dark/i);
+  const isPremium = hasStyle(spec, /дорог|преми|premium/i);
+
+  return {
+    colors: {
+      background: isDark ? '#050816' : '#F7F8FB',
+      textPrimary: isDark ? '#FFFFFF' : '#101828',
+      textSecondary: isDark ? '#A7B0C0' : '#667085',
+      accent: '#7C3AED',
+      surface: isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF',
+      border: isDark ? 'rgba(255,255,255,0.14)' : '#E4E7EC',
+    },
+    layout: {
+      containerWidth: '1200px',
+      sectionPaddingY: '96px',
+      sectionPaddingX: '32px',
+      columns: spec.requiredElements.includes('карточка продукта') ? 2 : 1,
+    },
+    typography: {
+      headlineSize: isPremium ? '72px' : '64px',
+      headlineWeight: 700,
+      bodySize: '18px',
+      lineHeight: '1.08',
+    },
+    components: {
+      buttonRadius: '999px',
+      cardRadius: '24px',
+      cardShadow: isDark ? '0 32px 80px rgba(91, 64, 255, 0.24)' : '0 24px 60px rgba(16, 24, 40, 0.12)',
+    },
+  };
+}
+
+function createDesignDescription(spec: ProjectSpec, tokens: DesignTokens): string {
+  const productCardText = spec.requiredElements.includes('карточка продукта')
+    ? 'Справа располагается крупная карточка продукта с полупрозрачной поверхностью, мягкой обводкой и свечением.'
+    : 'Композиция строится вокруг текстового блока без отдельной продуктовой карточки.';
+
+  return `# Описание дизайна
+
+## Фон
+
+Основной фон: \`${tokens.colors.background}\`.
+Визуальный стиль: ${spec.style.join(', ')}.
+Акцентный цвет: \`${tokens.colors.accent}\`.
+Для глубины используются мягкие радиальные подсветки и темные/нейтральные переходы, которые можно реализовать через CSS.
+
+## Сетка
+
+Тип блока: ${spec.sectionType}.
+Максимальная ширина контейнера: \`${tokens.layout.containerWidth}\`.
+Количество колонок: ${tokens.layout.columns}.
+Текстовый блок расположен слева. ${productCardText}
+Вертикальные отступы секции: \`${tokens.layout.sectionPaddingY}\`, горизонтальные: \`${tokens.layout.sectionPaddingX}\`.
+
+## Типографика
+
+Заголовок: \`${tokens.typography.headlineSize}\`, насыщенность ${tokens.typography.headlineWeight}, плотная высота строки \`${tokens.typography.lineHeight}\`.
+Основной цвет текста: \`${tokens.colors.textPrimary}\`.
+Вторичный текст: \`${tokens.colors.textSecondary}\`, размер \`${tokens.typography.bodySize}\`.
+
+## Кнопки
+
+Основная кнопка использует акцентный цвет \`${tokens.colors.accent}\`, белый текст и радиус \`${tokens.components.buttonRadius}\`.
+Вторая кнопка выглядит спокойнее: прозрачная или поверхностная заливка, тонкая обводка и тот же радиус.
+
+## Карточки
+
+Поверхность карточек: \`${tokens.colors.surface}\`.
+Обводка: \`${tokens.colors.border}\`.
+Радиус карточек: \`${tokens.components.cardRadius}\`.
+Тень: \`${tokens.components.cardShadow}\`.
+
+## Адаптив
+
+На мобильном экране блок становится одноколоночным: сначала текст, затем карточка или визуальный блок.
+Заголовок уменьшается, кнопки остаются крупными и удобными для касания.
+`;
 }
 
 @Injectable()
@@ -217,7 +329,49 @@ export class RunsService {
     });
     await this.addLog(run.id, 'Спецификация проекта сохранена', { path: relativePath });
 
-    return this.updateRunStatus(runningRun, RunStatus.Completed, 'project_spec_ready');
+    return this.prepareDesignArtifacts(runningRun, projectSpec);
+  }
+
+  private async prepareDesignArtifacts(run: RunEntity, projectSpec: ProjectSpec): Promise<RunEntity> {
+    const designRun = await this.updateRunStatus(run, RunStatus.Running, 'prepare_design_artifacts');
+    await this.addLog(run.id, 'Начато описание дизайна');
+
+    const tokens = createDesignTokens(projectSpec);
+    const description = createDesignDescription(projectSpec, tokens);
+
+    const descriptionRelativePath = path
+      .join(appConfig.storage.generatedRoot, run.slug, 'design', 'design-description.md')
+      .replaceAll('\\', '/');
+    const tokensRelativePath = path
+      .join(appConfig.storage.generatedRoot, run.slug, 'design', 'design-tokens.json')
+      .replaceAll('\\', '/');
+
+    await fs.writeFile(path.join(this.getRunPath(run.slug), 'design', 'design-description.md'), description, 'utf8');
+    await fs.writeFile(
+      path.join(this.getRunPath(run.slug), 'design', 'design-tokens.json'),
+      `${JSON.stringify(tokens, null, 2)}\n`,
+      'utf8',
+    );
+
+    await this.artifactsRepository.save([
+      {
+        runId: run.id,
+        type: ArtifactType.DesignDescription,
+        path: descriptionRelativePath,
+        mimeType: 'text/markdown',
+      },
+      {
+        runId: run.id,
+        type: ArtifactType.DesignTokens,
+        path: tokensRelativePath,
+        mimeType: 'application/json',
+      },
+    ]);
+
+    await this.addLog(run.id, 'Описание дизайна сохранено', { path: descriptionRelativePath });
+    await this.addLog(run.id, 'Дизайн-токены сохранены', { path: tokensRelativePath });
+
+    return this.updateRunStatus(designRun, RunStatus.Completed, 'design_artifacts_ready');
   }
 
   private async updateRunStatus(run: RunEntity, status: RunStatus, currentStep: string): Promise<RunEntity> {
