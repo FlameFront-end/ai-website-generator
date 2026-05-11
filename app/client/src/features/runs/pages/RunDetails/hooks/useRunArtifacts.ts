@@ -8,7 +8,9 @@ type ArtifactType =
   | "design_description"
   | "design_tokens"
   | "frontend_project"
+  | "build_error"
   | "build_log"
+  | "reference_validation"
   | "desktop_screenshot"
   | "mobile_screenshot"
   | "diff_image"
@@ -22,7 +24,9 @@ const ARTIFACT_TYPES: ArtifactType[] = [
   "design_description",
   "design_tokens",
   "frontend_project",
+  "build_error",
   "build_log",
+  "reference_validation",
   "desktop_screenshot",
   "mobile_screenshot",
   "diff_image",

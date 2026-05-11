@@ -19,7 +19,10 @@ export const DesignTab: FC<DesignTabProps> = ({
   designTokens,
   styles,
 }) => {
-  const descriptionQuery = useArtifactContentQuery(runId, designDescription?.id);
+  const descriptionQuery = useArtifactContentQuery(
+    runId,
+    designDescription?.id,
+  );
   const tokensQuery = useArtifactContentQuery(runId, designTokens?.id);
 
   return (
@@ -28,7 +31,9 @@ export const DesignTab: FC<DesignTabProps> = ({
         <h2>Описание дизайна</h2>
         {!designDescription && <Skeleton lines={9} />}
         {descriptionQuery.isLoading && <p>Загружаем описание дизайна...</p>}
-        {descriptionQuery.isError && <p>Не удалось загрузить описание дизайна.</p>}
+        {descriptionQuery.isError && (
+          <p>Не удалось загрузить описание дизайна.</p>
+        )}
         {descriptionQuery.data && <pre>{descriptionQuery.data.content}</pre>}
       </div>
 
@@ -37,7 +42,8 @@ export const DesignTab: FC<DesignTabProps> = ({
         {!designTokens && <Skeleton lines={9} />}
         {tokensQuery.isLoading && <p>Загружаем дизайн-токены...</p>}
         {tokensQuery.isError && <p>Не удалось загрузить дизайн-токены.</p>}
-        {tokensQuery.data && renderDesignTokens(tokensQuery.data.content)}
+        {tokensQuery.data &&
+          renderDesignTokens(tokensQuery.data.content, styles.spec)}
       </div>
     </div>
   );

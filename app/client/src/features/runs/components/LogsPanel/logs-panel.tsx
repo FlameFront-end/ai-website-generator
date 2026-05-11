@@ -25,6 +25,15 @@ const LOG_LEVEL_ICONS: Record<RunLog["level"], React.ReactNode> = {
   error: <AlertCircle size={14} />,
 };
 
+const ANSI_ESCAPE_PATTERN = new RegExp(
+  `${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`,
+  "g",
+);
+
+function formatBuildLog(content: string) {
+  return content.replace(ANSI_ESCAPE_PATTERN, "").trim();
+}
+
 export function LogsPanel({
   logs,
   buildLogArtifact,
@@ -52,10 +61,13 @@ export function LogsPanel({
               <span className={styles.logIcon}>
                 <Box size={14} />
               </span>
-              <span className={styles.logTitle}>
-                Логи сборки (npm install + build)
+              <span className={styles.logTitleGroup}>
+                <span className={styles.logTitle}>Сборка проекта</span>
+                <span className={styles.logSubtitle}>
+                  Установка зависимостей и production-сборка
+                </span>
               </span>
-              <span className={styles.logLevel}>Подробно</span>
+              <span className={styles.logLevel}>npm install + build</span>
               <span className={styles.expandIcon}>
                 {expandedLogId === "build-log" ? (
                   <ChevronDown size={14} />
@@ -73,9 +85,15 @@ export function LogsPanel({
                 <p>Не удалось загрузить логи сборки.</p>
               )}
               {buildLogQuery.data && (
-                <pre className={styles.buildLogContent}>
-                  {buildLogQuery.data.content}
-                </pre>
+                <div className={styles.buildLogBody}>
+                  <div className={styles.buildLogSummary}>
+                    <span>npm install</span>
+                    <span>npm run build</span>
+                  </div>
+                  <pre className={styles.buildLogContent}>
+                    {formatBuildLog(buildLogQuery.data.content)}
+                  </pre>
+                </div>
               )}
             </div>
           )}

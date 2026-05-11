@@ -24,6 +24,7 @@ import {
   RunLogLevel,
   RunStatus,
 } from '../../db/entities';
+import { StorageService } from '../storage/storage.service';
 import type { CreateRunDto } from './dto/create-run.dto';
 import type { UpdateRunDto } from './dto/update-run.dto';
 
@@ -674,6 +675,7 @@ export class RunsService {
     private readonly artifactsRepository: Repository<RunArtifactEntity>,
     @InjectRepository(RunLogEntity)
     private readonly logsRepository: Repository<RunLogEntity>,
+    private readonly storageService: StorageService,
   ) {}
 
   async createRun(dto: CreateRunDto, userId: string) {
@@ -690,8 +692,8 @@ export class RunsService {
       userId,
     });
 
-    await this.createRunFolders(userId, slug);
-    await this.writeStatusFile(userId, slug, run);
+    await this.storageService.createRunFolders(userId, slug);
+    await this.storageService.writeStatusFile(userId, slug, run);
     await this.addLog(run.id, 'Запуск поставлен в очередь', { slug });
 
     void this.processRun(run, userId);
@@ -787,7 +789,11 @@ export class RunsService {
       displayName,
     });
 
-    await this.writeStatusFile(userId, updatedRun.slug, updatedRun);
+    await this.storageService.writeStatusFile(
+      userId,
+      updatedRun.slug,
+      updatedRun,
+    );
     await this.addLog(
       updatedRun.id,
       displayName ? 'Запуск переименован' : 'Название запуска очищено',
@@ -801,8 +807,8 @@ export class RunsService {
 
   async deleteRun(id: string, userId: string) {
     const run = await this.getRunOrFail(id, userId);
-    const runPath = this.getRunPath(userId, run.slug);
-    const generatedRoot = this.getGeneratedRootPath();
+    const runPath = this.storageService.getRunPath(userId, run.slug);
+    const generatedRoot = this.storageService.getGeneratedRootPath();
 
     if (!runPath.startsWith(generatedRoot)) {
       throw new BadRequestException(
@@ -1630,7 +1636,7 @@ export class RunsService {
         currentStep: 'completed',
         score,
       });
-      await this.writeStatusFile(userId, slug, updatedRun);
+      await this.storageService.writeStatusFile(userId, slug, updatedRun);
 
       return updatedRun;
     } catch (error) {
@@ -1840,7 +1846,7 @@ ${score}/10 (${status})
       currentStep,
     });
 
-    await this.writeStatusFile(userId, run.slug, updatedRun);
+    await this.storageService.writeStatusFile(userId, run.slug, updatedRun);
     return updatedRun;
   }
 
@@ -1857,51 +1863,8 @@ ${score}/10 (${status})
     });
   }
 
-  private async createRunFolders(userId: string, slug: string): Promise<void> {
-    const runPath = this.getRunPath(userId, slug);
-    const folders = ['reference', 'design', 'code', 'screenshots', 'qa'];
-
-    await fs.mkdir(runPath, { recursive: true });
-    await Promise.all(
-      folders.map((folder) =>
-        fs.mkdir(path.join(runPath, folder), { recursive: true }),
-      ),
-    );
-  }
-
-  private async writeStatusFile(
-    userId: string,
-    slug: string,
-    run: RunEntity,
-  ): Promise<void> {
-    const statusPath = path.join(this.getRunPath(userId, slug), 'status.json');
-    const payload = {
-      id: run.id,
-      slug: run.slug,
-      status: run.status,
-      currentStep: run.currentStep,
-      createdAt: run.createdAt,
-      updatedAt: run.updatedAt,
-    };
-
-    await fs.writeFile(
-      statusPath,
-      `${JSON.stringify(payload, null, 2)}\n`,
-      'utf8',
-    );
-  }
-
   private getRunPath(userId: string, slug: string): string {
-    return path.join(this.getGeneratedRootPath(), userId, 'runs', slug);
-  }
-
-  private getGeneratedRootPath(): string {
-    return path.resolve(
-      process.cwd(),
-      '..',
-      '..',
-      appConfig.storage.generatedRoot,
-    );
+    return this.storageService.getRunPath(userId, slug);
   }
 
   async getArtifactFile(runId: string, artifactId: string, userId: string) {

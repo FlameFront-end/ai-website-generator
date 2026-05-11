@@ -1,6 +1,5 @@
 import type { FC } from "react";
 
-import { Skeleton } from "@/kit";
 import type { Run } from "@/api/services/runs";
 
 import { formatArtifactType } from "../utils";
@@ -9,6 +8,20 @@ interface OverviewTabProps {
   run: Run;
   styles: Record<string, string>;
 }
+
+const SKELETON_ROWS = Array.from({ length: 6 });
+
+const OverviewArtifactsSkeleton: FC<{ styles: Record<string, string> }> = ({
+  styles,
+}) => (
+  <ul className={styles.list}>
+    {SKELETON_ROWS.map((_, index) => (
+      <li key={index} className={styles.overviewArtifactSkeletonItem}>
+        <span className={styles.overviewArtifactSkeletonTitle} />
+      </li>
+    ))}
+  </ul>
+);
 
 export const OverviewTab: FC<OverviewTabProps> = ({ run, styles }) => {
   return (
@@ -21,7 +34,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({ run, styles }) => {
       <div className={styles.panel}>
         <h2>Артефакты</h2>
         {run.artifacts.length === 0 ? (
-          <Skeleton lines={3} />
+          <OverviewArtifactsSkeleton styles={styles} />
         ) : (
           <ul className={styles.list}>
             {run.artifacts.map((artifact) => (

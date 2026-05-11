@@ -347,6 +347,21 @@
   }
 }
 
+.overviewArtifactSkeletonTitle {
+  display: block;
+  width: min(240px, 64%);
+  height: 16px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-to) 45%,
+    var(--skeleton-from) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeletonPulse 1.25s ease-in-out infinite;
+}
+
 .spec {
   display: grid;
   gap: 10px;
@@ -701,6 +716,54 @@
   }
 }
 
+.artifactSkeletonRow {
+  cursor: default;
+
+  &:hover {
+    background: var(--artifact-header-bg);
+  }
+}
+
+.artifactSkeletonChevron,
+.artifactSkeletonBadge,
+.artifactSkeletonLabel,
+.artifactSkeletonPath {
+  display: block;
+  flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-to) 45%,
+    var(--skeleton-from) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeletonPulse 1.25s ease-in-out infinite;
+}
+
+.artifactSkeletonChevron {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.artifactSkeletonBadge {
+  width: 42px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.artifactSkeletonLabel {
+  width: min(190px, 28%);
+  height: 16px;
+  border-radius: 999px;
+}
+
+.artifactSkeletonPath {
+  flex: 1;
+  height: 14px;
+  border-radius: 999px;
+}
+
 .artifactChevron {
   flex-shrink: 0;
   display: flex;
@@ -879,6 +942,72 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.resultSkeletonTitle,
+.resultSkeletonImage,
+.resultSkeletonMobileImage,
+.resultSkeletonDiff,
+.resultSkeletonReport span {
+  display: block;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-to) 45%,
+    var(--skeleton-from) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeletonPulse 1.25s ease-in-out infinite;
+}
+
+.resultSkeletonTitle {
+  width: 148px;
+  height: 16px;
+  border-radius: 999px;
+}
+
+.resultSkeletonImage {
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid var(--border-solid);
+}
+
+.resultSkeletonMobileImage {
+  aspect-ratio: 390 / 844;
+  width: min(220px, 100%);
+  min-height: 360px;
+  border: 1px solid var(--border-solid);
+}
+
+.resultSkeletonDiff {
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  min-height: 260px;
+  border: 1px solid var(--border-solid);
+}
+
+.resultSkeletonReport {
+  display: grid;
+  gap: 10px;
+
+  span {
+    height: 16px;
+    border-radius: 999px;
+
+    &:nth-child(2) {
+      width: 86%;
+    }
+
+    &:nth-child(3) {
+      width: 72%;
+    }
+
+    &:nth-child(4) {
+      width: 54%;
+    }
+  }
 }
 
 .diffImageWrap {

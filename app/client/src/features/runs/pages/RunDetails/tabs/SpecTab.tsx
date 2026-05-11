@@ -20,8 +20,11 @@ export const SpecTab: FC<SpecTabProps> = ({ runId, artifact, styles }) => {
       <h2>Спецификация проекта</h2>
       {!artifact && <Skeleton lines={8} />}
       {contentQuery.isLoading && <p>Загружаем спецификацию проекта...</p>}
-      {contentQuery.isError && <p>Не удалось загрузить спецификацию проекта.</p>}
-      {contentQuery.data && renderProjectSpec(contentQuery.data.content)}
+      {contentQuery.isError && (
+        <p>Не удалось загрузить спецификацию проекта.</p>
+      )}
+      {contentQuery.data &&
+        renderProjectSpec(contentQuery.data.content, styles.spec)}
     </div>
   );
 };
