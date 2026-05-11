@@ -1,0 +1,30 @@
+.layout {
+  min-height: 100vh;
+  background: #f6f7f9;
+  color: #111827;
+}
+
+.header {
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 24px;
+  }
+
+  span {
+    color: #6b7280;
+    font-size: 14px;
+  }
+}
+
+.main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}

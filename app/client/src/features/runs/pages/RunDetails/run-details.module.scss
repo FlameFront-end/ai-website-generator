@@ -1,0 +1,48 @@
+.page {
+  display: grid;
+  gap: 18px;
+
+  a {
+    color: #2563eb;
+    font-weight: 700;
+    text-decoration: none;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+
+  h1 {
+    margin: 0;
+    font-size: 30px;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: #6b7280;
+  }
+}
+
+.panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 18px;
+  background: #ffffff;
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 18px;
+  }
+
+  pre {
+    overflow: auto;
+    margin: 0;
+    white-space: pre-wrap;
+    color: #374151;
+    font-family: inherit;
+    line-height: 1.5;
+  }
+}

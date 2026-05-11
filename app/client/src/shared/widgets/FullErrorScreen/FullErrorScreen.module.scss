@@ -1,0 +1,18 @@
+.screen {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+
+  h1 {
+    margin: 0;
+    font-size: 28px;
+  }
+
+  p {
+    margin: 0;
+    color: #6b7280;
+  }
+}

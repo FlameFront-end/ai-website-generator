@@ -1,0 +1,25 @@
+{
+  "name": "ai-website-generator",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "app/client",
+    "app/server"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev --workspace app/client",
+    "dev:server": "npm run start:dev --workspace app/server",
+    "build": "npm run build --workspace app/client && npm run build --workspace app/server",
+    "build:client": "npm run build --workspace app/client",
+    "build:server": "npm run build --workspace app/server",
+    "lint:client": "npm run lint --workspace app/client",
+    "lint:server": "npm run lint --workspace app/server"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.19",
+    "@nestjs/core": "^11.1.19",
+    "@nestjs/platform-express": "^11.1.19",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  }
+}
