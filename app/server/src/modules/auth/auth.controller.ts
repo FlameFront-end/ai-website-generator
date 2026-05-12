@@ -7,8 +7,9 @@ import {
   Request,
 } from '@nestjs/common';
 
+import type { RequestWithUser } from '../../common/types/request.types';
 import { AuthService } from './auth.service';
-import type { LoginDto, RegisterDto } from './dto';
+import { LoginDto, RegisterDto } from './dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
@@ -27,7 +28,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getProfile(@Request() req: { user: { id: string; email: string } }) {
+  getProfile(@Request() req: RequestWithUser) {
     return req.user;
   }
 }

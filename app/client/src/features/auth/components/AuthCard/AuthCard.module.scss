@@ -1,34 +1,76 @@
 .container {
-  display: flex;
-  height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 460px) minmax(340px, 420px);
+  gap: 48px;
+  min-height: 100vh;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  background:
-    radial-gradient(
-      circle at top left,
-      rgba(124, 58, 237, 0.08),
-      transparent 34rem
-    ),
-    var(--bg-gradient);
+  padding: 32px;
+  background: var(--bg-gradient);
   color: var(--text-primary);
+}
+
+.hero {
+  display: grid;
+  gap: 18px;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    background: var(--bg-muted);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  h2 {
+    margin: 0;
+    color: var(--text-heading);
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+  }
+
+  p {
+    max-width: 410px;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 17px;
+    line-height: 1.65;
+  }
 }
 
 .card {
   width: 100%;
-  max-width: 400px;
-  padding: 2rem;
-  background: var(--card-bg, var(--bg-muted));
-  border: 1px solid var(--border-solid);
+  padding: 32px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.cardBadge {
+  width: fit-content;
+  margin: 0 auto 14px;
+  border-radius: 6px;
+  padding: 7px 11px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .title {
   margin: 0 0 1.5rem;
   text-align: center;
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
   color: var(--text-heading);
 }
 
@@ -45,12 +87,28 @@
   color: var(--text-muted);
 
   a {
-    color: var(--accent, #6366f1);
+    color: var(--text-heading);
     text-decoration: none;
     font-weight: 500;
 
     &:hover {
       text-decoration: underline;
+    }
+  }
+}
+
+@media (max-width: 860px) {
+  .container {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .hero {
+    text-align: center;
+
+    span,
+    p {
+      margin-inline: auto;
     }
   }
 }

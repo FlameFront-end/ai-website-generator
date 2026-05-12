@@ -1,4 +1,4 @@
-import type { FC, FormEvent } from "react";
+import type { FC, FormEvent, KeyboardEvent } from "react";
 import { useState } from "react";
 
 import { ArrowRight, FileText } from "lucide-react";
@@ -31,24 +31,47 @@ interface BriefFormProps {
 export const BriefForm: FC<BriefFormProps> = ({ isSubmitting, onSubmit }) => {
   const [brief, setBrief] = useState(DEFAULT_BRIEF);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitBrief = () => {
     const trimmed = brief.trim();
     if (trimmed) onSubmit(trimmed);
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    submitBrief();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      submitBrief();
+    }
   };
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       <div className={styles.header}>
-        <div className={styles.icon}>
-          <FileText size={20} />
+        <div>
+          <label htmlFor="brief">Опишите идею сайта</label>
+          <p>
+            Чем подробнее бриф, тем точнее будет структура, визуальный стиль и
+            итоговый код.
+          </p>
         </div>
-        <label htmlFor="brief">Бриф</label>
+      </div>
+      <div className={styles.tips}>
+        <span>
+          <FileText size={14} />
+          Ниша и аудитория
+        </span>
+        <span>Стиль и настроение</span>
+        <span>Тексты и кнопки</span>
       </div>
       <textarea
         id="brief"
         value={brief}
         onChange={(event) => setBrief(event.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder="Опишите, что хотите сгенерировать..."
       />
       <div className={styles.actions}>

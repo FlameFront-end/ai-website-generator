@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { exec } from 'node:child_process';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -7,8 +7,13 @@ import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { PipelineStateService } from './pipeline-state.service';
 
+const PREVIEW_PORT = '4173';
+const SERVER_STARTUP_DELAY_MS = 5000;
+
 @Injectable()
 export class ScreenshotService {
+  private readonly logger = new Logger(ScreenshotService.name);
+
   constructor(
     private readonly state: PipelineStateService,
     private readonly storageService: StorageService,
@@ -37,10 +42,10 @@ export class ScreenshotService {
       await this.state.addLog(run.id, 'Запуск preview сервера...');
       serverProcess = exec('npm run preview', {
         cwd: codePath,
-        env: { ...process.env, PORT: '4173' },
+        env: { ...process.env, PORT: PREVIEW_PORT },
       });
 
-      await this.state.sleep(5000);
+      await this.state.sleep(SERVER_STARTUP_DELAY_MS);
 
       await this.state.addLog(
         run.id,
@@ -50,7 +55,9 @@ export class ScreenshotService {
       const page = await browser.newPage();
 
       await page.setViewportSize({ width: 1440, height: 900 });
-      await page.goto('http://localhost:4173', { waitUntil: 'networkidle' });
+      await page.goto(`http://localhost:${PREVIEW_PORT}`, {
+        waitUntil: 'networkidle',
+      });
       await page.screenshot({
         path: path.join(screenshotsPath, 'rendered-desktop.png'),
         fullPage: false,
@@ -64,12 +71,6 @@ export class ScreenshotService {
         fullPage: false,
       });
       await this.state.addLog(run.id, 'Mobile скриншот сохранен');
-
-      if (browser) await browser.close();
-
-      if (serverProcess) {
-        serverProcess.kill();
-      }
 
       const desktopRelativePath = this.state.getRunRelativePath(
         userId,
@@ -105,12 +106,10 @@ export class ScreenshotService {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Screenshot capture failed: ${message}`);
       await this.state.addLog(run.id, 'Ошибка создания скриншотов', {
         error: message,
       });
-
-      if (browser) await browser.close().catch(() => undefined);
-      if (serverProcess) serverProcess.kill();
 
       return this.state.updateRunStatus(
         screenshotRun,
@@ -118,6 +117,9 @@ export class ScreenshotService {
         'screenshots_failed',
         userId,
       );
+    } finally {
+      if (browser) await browser.close().catch(() => undefined);
+      if (serverProcess) serverProcess.kill();
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -16,6 +16,8 @@ import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class PipelineStateService {
+  private readonly logger = new Logger(PipelineStateService.name);
+
   constructor(
     @InjectRepository(RunEntity)
     private readonly runsRepository: Repository<RunEntity>,
@@ -31,13 +33,7 @@ export class PipelineStateService {
     slug: string,
     ...segments: string[]
   ): string {
-    return path.resolve(
-      this.storageService.getGeneratedRootPath(),
-      userId,
-      'runs',
-      slug,
-      ...segments,
-    );
+    return path.join(this.storageService.getRunPath(userId, slug), ...segments);
   }
 
   getRunRelativePath(
@@ -45,27 +41,19 @@ export class PipelineStateService {
     slug: string,
     ...segments: string[]
   ): string {
-    return path.join(userId, 'runs', slug, ...segments).replaceAll('\\', '/');
+    return this.storageService.getRunRelativePath(userId, slug, ...segments);
   }
 
   async writeGeneratedFile(
     absolutePath: string,
     content: string | Buffer,
   ): Promise<void> {
-    try {
-      const dir = path.dirname(absolutePath);
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(absolutePath, content);
-      const size = Buffer.byteLength(content);
-      await this.log(`File written: ${absolutePath} (${size} bytes)`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.log(
-        `Failed to write file: ${absolutePath} - ${message}`,
-        'error',
-      );
-      throw error;
-    }
+    const dir = path.dirname(absolutePath);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(absolutePath, content);
+    this.logger.debug(
+      `File written: ${absolutePath} (${Buffer.byteLength(content)} bytes)`,
+    );
   }
 
   async saveArtifact(
@@ -173,18 +161,19 @@ export class PipelineStateService {
 
   async updateRun(
     run: RunEntity,
-    updates: Partial<RunEntity>,
+    updates: Partial<
+      Pick<
+        RunEntity,
+        | 'brief'
+        | 'displayName'
+        | 'status'
+        | 'currentStep'
+        | 'errorMessage'
+        | 'score'
+      >
+    >,
   ): Promise<RunEntity> {
-    const { brief, displayName, status, currentStep, errorMessage, score } =
-      updates;
-    await this.runsRepository.update(run.id, {
-      ...(brief !== undefined && { brief }),
-      ...(displayName !== undefined && { displayName }),
-      ...(status !== undefined && { status }),
-      ...(currentStep !== undefined && { currentStep }),
-      ...(errorMessage !== undefined && { errorMessage }),
-      ...(score !== undefined && { score }),
-    });
+    await this.runsRepository.update(run.id, updates);
     const updatedRun = await this.runsRepository.findOne({
       where: { id: run.id },
     });
@@ -209,27 +198,5 @@ export class PipelineStateService {
     } catch {
       return false;
     }
-  }
-
-  private async log(
-    message: string,
-    type: 'info' | 'error' = 'info',
-  ): Promise<void> {
-    const timestamp = new Date().toISOString();
-    const prefix = type === 'error' ? '❌' : '✅';
-    const logMessage = `[${timestamp}] ${prefix} ${message}\n`;
-
-    if (type === 'error') {
-      console.error(logMessage.trim());
-    } else {
-      console.log(logMessage.trim());
-    }
-
-    await fs
-      .appendFile(
-        path.resolve(process.cwd(), '..', '..', 'file-operations.log'),
-        logMessage,
-      )
-      .catch(() => {}); // Ignore log file errors
   }
 }

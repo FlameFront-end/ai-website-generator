@@ -14,17 +14,13 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 
+import type { RequestWithUser } from '../../common/types/request.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import type { CreateRunDto } from './dto/create-run.dto';
-import type { UpdateRunDto } from './dto/update-run.dto';
+import { ApproveStepDto } from './dto/approve-step.dto';
+import { CreateRunDto } from './dto/create-run.dto';
+import { EditRequestDto } from './dto/edit-request.dto';
+import { UpdateRunDto } from './dto/update-run.dto';
 import { RunsService } from './runs.service';
-
-interface RequestWithUser {
-  user: {
-    id: string;
-    email: string;
-  };
-}
 
 @Controller('runs')
 @UseGuards(JwtAuthGuard)
@@ -127,7 +123,7 @@ export class RunsController {
   @Post(':id/approve')
   approveStep(
     @Param('id') id: string,
-    @Body() body: { step: 'spec' | 'design' | 'reference' | 'code' | 'final' },
+    @Body() body: ApproveStepDto,
     @Request() req: RequestWithUser,
   ) {
     return this.runsService.approveStep(id, body.step, req.user.id);
@@ -136,11 +132,7 @@ export class RunsController {
   @Post(':id/edit-request')
   requestEdit(
     @Param('id') id: string,
-    @Body()
-    body: {
-      step: 'spec' | 'design' | 'reference' | 'code' | 'final';
-      instruction: string;
-    },
+    @Body() body: EditRequestDto,
     @Request() req: RequestWithUser,
   ) {
     return this.runsService.requestEdit(

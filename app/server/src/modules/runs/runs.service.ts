@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,7 +10,6 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Repository } from 'typeorm';
 
-import { InputValidator } from '../../common/validators/input.validator';
 import {
   RunArtifactEntity,
   RunEntity,
@@ -30,6 +30,8 @@ function toRunSlug(runNumber: number): string {
 
 @Injectable()
 export class RunsService {
+  private readonly logger = new Logger(RunsService.name);
+
   constructor(
     @InjectRepository(RunEntity)
     private readonly runsRepository: Repository<RunEntity>,
@@ -42,7 +44,7 @@ export class RunsService {
   ) {}
 
   async createRun(dto: CreateRunDto, userId: string) {
-    const brief = InputValidator.validateBriefOrThrow(dto?.brief);
+    const brief = dto.brief.trim();
     const runNumber = await this.getNextRunNumber(userId);
     const slug = toRunSlug(runNumber);
 
@@ -132,9 +134,7 @@ export class RunsService {
 
   async updateRun(id: string, dto: UpdateRunDto, userId: string) {
     await this.getRunOrFail(id, userId);
-    const displayName = InputValidator.validateDisplayNameOrThrow(
-      dto?.displayName,
-    );
+    const displayName = dto.displayName?.trim() || null;
 
     await this.runsRepository.update(id, { displayName });
 
@@ -168,29 +168,29 @@ export class RunsService {
     }
 
     await this.runsRepository.remove(run);
+    await this.deleteRunDirectory(runPath);
 
-    // Try to delete the directory, handle EBUSY by retrying with delay
+    return { id, deleted: true };
+  }
+
+  private async deleteRunDirectory(runPath: string): Promise<void> {
     try {
       await fs.rm(runPath, { recursive: true, force: true });
     } catch (error) {
-      // If directory is busy (EBUSY), wait a bit and try again
       if ((error as NodeJS.ErrnoException).code === 'EBUSY') {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         try {
           await fs.rm(runPath, { recursive: true, force: true });
         } catch (retryError) {
-          // Log warning but don't fail the delete operation
-          console.warn(`Failed to delete directory after retry: ${retryError}`);
+          this.logger.warn(
+            `Failed to delete directory after retry: ${runPath}`,
+            retryError,
+          );
         }
       } else {
         throw error;
       }
     }
-
-    return {
-      id,
-      deleted: true,
-    };
   }
 
   async getCodeFiles(
@@ -292,12 +292,7 @@ export class RunsService {
     runId: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.runsRepository.findOne({
-      where: { id: runId, userId },
-    });
-    if (!run) {
-      throw new Error('Запуск не найден');
-    }
+    const run = await this.getRunOrFail(runId, userId);
 
     await this.addLog(run.id, 'Запущена ручная пересборка');
 

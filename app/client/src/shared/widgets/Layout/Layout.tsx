@@ -1,7 +1,16 @@
 import type { FC, ReactNode } from "react";
 
-import { LogOut, Moon, Sun } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  Activity,
+  CreditCard,
+  Settings,
+  UserRound,
+  LogOut,
+  Moon,
+  Plus,
+  Sun,
+} from "lucide-react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { IconButton } from "@/kit";
@@ -18,8 +27,15 @@ interface LayoutProps {
 
 export const Layout: FC<LayoutProps> = ({ children }) => {
   const { theme, toggle } = useTheme();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const headerTitle = location.pathname.startsWith("/runs/")
+    ? "Детали запуска"
+    : location.pathname === ROUTES.NEW_RUN
+      ? "Новый запуск"
+      : "Запуски";
 
   const handleLogout = () => {
     logout();
@@ -29,32 +45,75 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className={styles.layout}>
-      <header className={styles.header}>
-        <div>
-          <a className={styles.logo} href="/">
+      <aside className={styles.sidebar}>
+        <div className={styles.sidebarTop}>
+          <Link className={styles.logo} to={ROUTES.RUNS}>
             <Logo size={28} />
             <strong>Forgesite</strong>
-          </a>
-          <div className={styles.actions}>
-            <IconButton
-              icon={theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-              onClick={toggle}
-              title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
-              aria-label="Переключить тему"
-            />
-            {isAuthenticated && (
-              <IconButton
-                icon={<LogOut size={16} />}
-                onClick={handleLogout}
-                tone="danger"
-                title="Выйти"
-                aria-label="Выйти"
-              />
-            )}
+          </Link>
+          <nav className={styles.nav}>
+            <NavLink
+              className={({ isActive }) =>
+                isActive ? styles.navActive : undefined
+              }
+              to={ROUTES.RUNS}
+              end
+            >
+              <Activity size={15} />
+              Запуски
+            </NavLink>
+            <span className={styles.navDisabled}>
+              <CreditCard size={15} />
+              Подписка
+            </span>
+            <span className={styles.navDisabled}>
+              <UserRound size={15} />
+              Аккаунт
+            </span>
+            <span className={styles.navDisabled}>
+              <Settings size={15} />
+              Настройки
+            </span>
+          </nav>
+        </div>
+        <div className={styles.sidebarFooter}>
+          <div className={styles.quickActions}>
+            <button type="button" onClick={() => navigate(ROUTES.NEW_RUN)}>
+              <Plus size={14} />
+              Новый запуск
+            </button>
+            <button type="button" onClick={toggle}>
+              {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+              {theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+            </button>
+          </div>
+          <div className={styles.sidebarBottom}>
+            <span title={user?.email ?? undefined}>
+              {user?.email ?? "Аккаунт"}
+            </span>
+            <span>Базовый</span>
           </div>
         </div>
-      </header>
-      <main className={styles.main}>{children}</main>
+      </aside>
+      <div className={styles.workspace}>
+        <header className={styles.header}>
+          <div>
+            <strong>{headerTitle}</strong>
+            <div className={styles.actions}>
+              {isAuthenticated && (
+                <IconButton
+                  icon={<LogOut size={16} />}
+                  onClick={handleLogout}
+                  tone="danger"
+                  title="Выйти"
+                  aria-label="Выйти"
+                />
+              )}
+            </div>
+          </div>
+        </header>
+        <main className={styles.main}>{children}</main>
+      </div>
     </div>
   );
 };

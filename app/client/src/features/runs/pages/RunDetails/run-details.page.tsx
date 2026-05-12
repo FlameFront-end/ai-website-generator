@@ -57,7 +57,15 @@ export default function RunDetailsPage() {
   };
 
   if (runQuery.isLoading) {
-    return <p>Загружаем запуск...</p>;
+    return (
+      <section className={styles.page}>
+        <div className={styles.loadingState}>
+          <span />
+          <h1>Загружаем запуск...</h1>
+          <p>Подготавливаем статус, артефакты и доступные действия.</p>
+        </div>
+      </section>
+    );
   }
 
   const run = runQuery.data;
@@ -65,16 +73,22 @@ export default function RunDetailsPage() {
   if (runQuery.isError || !run) {
     return (
       <section className={styles.page}>
-        <Link to="/">Назад к запускам</Link>
-        <h1>Запуск недоступен</h1>
-        <p>Не удалось загрузить данные запуска.</p>
+        <div className={styles.emptyPageState}>
+          <Link to="/">Назад к запускам</Link>
+          <h1>Запуск недоступен</h1>
+          <p>
+            Не удалось загрузить данные запуска. Попробуйте обновить страницу.
+          </p>
+        </div>
       </section>
     );
   }
 
   return (
     <section className={styles.page}>
-      <Link to="/">Назад к запускам</Link>
+      <Link className={styles.backLink} to="/">
+        Назад к запускам
+      </Link>
 
       <RunHeader
         run={run}

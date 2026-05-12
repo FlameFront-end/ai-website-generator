@@ -45,6 +45,13 @@ export const router = createBrowserRouter([
               ),
           },
           {
+            path: ROUTES.NEW_RUN,
+            lazy: () =>
+              lazyImport(
+                () => import("@/features/runs/pages/NewRun/new-run.page"),
+              ),
+          },
+          {
             path: ROUTES.RUN_DETAILS,
             lazy: () =>
               lazyImport(

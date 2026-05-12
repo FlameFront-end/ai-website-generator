@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { exec } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -8,9 +8,14 @@ import { StorageService } from '../storage/storage.service';
 import { PipelineStateService } from './pipeline-state.service';
 
 const execAsync = promisify(exec);
+const BUILD_TIMEOUT_MS = 120_000;
+const MAX_BUILD_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 2000;
 
 @Injectable()
 export class BuildService {
+  private readonly logger = new Logger(BuildService.name);
+
   constructor(
     private readonly state: PipelineStateService,
     private readonly storageService: StorageService,
@@ -34,55 +39,19 @@ export class BuildService {
       this.storageService.getRunPath(userId, slug),
       'code',
     );
-    const buildLogs: string[] = [];
-
-    const addLogLine = (line: string) => {
-      buildLogs.push(line);
-    };
 
     try {
       await this.state.addLog(run.id, 'Установка зависимостей...');
-      addLogLine(`=== npm install (попытка ${attempt}) ===`);
-      addLogLine(`Working directory: ${codePath}`);
-      addLogLine('');
-
-      const { stdout: installOut, stderr: installErr } = await execAsync(
-        'npm install',
-        {
-          cwd: codePath,
-          timeout: 120000,
-        },
-      );
-
-      if (installOut) {
-        addLogLine('--- stdout ---');
-        addLogLine(installOut);
-      }
-      if (installErr) {
-        addLogLine('--- stderr ---');
-        addLogLine(installErr);
-      }
+      await execAsync('npm install', {
+        cwd: codePath,
+        timeout: BUILD_TIMEOUT_MS,
+      });
 
       await this.state.addLog(run.id, 'Сборка проекта...');
-      addLogLine('');
-      addLogLine(`=== npm run build (попытка ${attempt}) ===`);
-
-      const { stdout: buildOut, stderr: buildErr } = await execAsync(
-        'npm run build',
-        {
-          cwd: codePath,
-          timeout: 120000,
-        },
-      );
-
-      if (buildOut) {
-        addLogLine('--- stdout ---');
-        addLogLine(buildOut);
-      }
-      if (buildErr) {
-        addLogLine('--- stderr ---');
-        addLogLine(buildErr);
-      }
+      await execAsync('npm run build', {
+        cwd: codePath,
+        timeout: BUILD_TIMEOUT_MS,
+      });
 
       await this.state.addLog(run.id, 'Сборка завершена успешно');
       return this.state.updateRunStatus(
@@ -93,13 +62,11 @@ export class BuildService {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addLogLine('');
-      addLogLine(`=== ОШИБКА ===`);
-      addLogLine(message);
+      this.logger.warn(`Build failed (attempt ${attempt}): ${message}`);
       await this.state.addLog(run.id, 'Ошибка сборки', { error: message });
 
-      if (attempt < 3) {
-        await this.state.sleep(2000);
+      if (attempt < MAX_BUILD_ATTEMPTS) {
+        await this.state.sleep(RETRY_DELAY_MS);
         return this.buildProject(run, slug, userId, attempt + 1);
       }
 

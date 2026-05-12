@@ -2,19 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import type { DesignDescription, DesignTokens, ProjectSpec } from './ai.types';
 
-const logger = new Logger('AiService');
-
-// Re-export types for convenience
 export type { DesignDescription, DesignTokens, ProjectSpec };
 
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name);
+
   /**
    * Extract project specification from brief
    * TODO: Replace with real AI service call
    */
   extractProjectSpec(brief: string): ProjectSpec {
-    logger.log('Extracting project spec from brief (MOCK)');
+    this.logger.log('Extracting project spec from brief (MOCK)');
     return this.mockProjectSpec(brief);
   }
 
@@ -23,7 +22,7 @@ export class AiService {
    * TODO: Replace with real AI service call
    */
   generateDesignTokens(spec: ProjectSpec): DesignTokens {
-    logger.log('Generating design tokens (MOCK)');
+    this.logger.log('Generating design tokens (MOCK)');
     return this.mockDesignTokens(spec);
   }
 
@@ -35,7 +34,7 @@ export class AiService {
     spec: ProjectSpec,
     tokens: DesignTokens,
   ): DesignDescription {
-    logger.log('Generating design description (MOCK)');
+    this.logger.log('Generating design description (MOCK)');
     return {
       markdown: this.mockDesignDescription(spec, tokens),
     };

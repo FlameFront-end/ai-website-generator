@@ -17,7 +17,10 @@
 .logsList {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .logItem {
@@ -27,25 +30,25 @@
 
 .logCard {
   width: 100%;
-  border: 1px solid var(--log-card-border);
-  border-radius: 8px;
-  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 10px 12px;
   background: var(--log-card-bg);
   text-align: left;
 
   &.expandable {
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
 
     &:hover {
-      border-color: #c7d2fe;
-      background: var(--bg-muted);
+      background: var(--bg-subtle);
     }
 
     &.expanded {
-      border-color: #4f46e5;
-      background: var(--log-expanded-bg);
-      border-radius: 8px 8px 0 0;
+      background: var(--bg-subtle);
     }
   }
 
@@ -56,14 +59,15 @@
   }
 }
 
+.logItem:last-child .logCard {
+  border-bottom: 0;
+}
+
 .buildLogSection .logCard {
   padding: 12px 14px;
-  border-color: rgba(99, 102, 241, 0.45);
-  background: linear-gradient(
-    135deg,
-    rgba(79, 70, 229, 0.16),
-    rgba(15, 23, 42, 0.08)
-  );
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface-alt);
 }
 
 .logHeader {
@@ -82,10 +86,10 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #6b7280;
+  color: var(--text-faint);
 
   &.info {
-    color: #2563eb;
+    color: var(--text-muted);
   }
 
   &.warning {
@@ -126,11 +130,11 @@
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  border: 1px solid rgba(129, 140, 248, 0.38);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0 10px;
-  background: rgba(99, 102, 241, 0.14);
-  color: var(--text-primary);
+  background: var(--bg-muted);
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
@@ -150,22 +154,23 @@
 }
 
 .logDetails {
-  border: 1px solid #4f46e5;
+  border: 0;
   border-top: none;
-  border-radius: 0 0 8px 8px;
-  padding: 14px;
-  background: var(--log-details-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+  background: var(--bg-surface);
 }
 
 .metadata {
   margin: 0;
-  padding: 10px;
-  background: #0f172a;
-  color: #e2e8f0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: #000000;
+  color: #ededed;
   font-family:
     "JetBrains Mono", "Fira Code", "SF Mono", Monaco, Consolas, monospace;
   font-size: 11px;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: auto;
   max-height: 250px;
 }
@@ -182,9 +187,9 @@
 
   span {
     border: 1px solid rgba(148, 163, 184, 0.24);
-    border-radius: 999px;
+    border-radius: 6px;
     padding: 5px 10px;
-    background: rgba(15, 23, 42, 0.42);
+    background: var(--bg-muted);
     color: var(--text-secondary);
     font-size: 11px;
     font-weight: 700;
@@ -194,14 +199,14 @@
 .buildLogContent {
   margin: 0;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: #0b1220;
-  color: #dbeafe;
+  border: 1px solid var(--border);
+  background: #000000;
+  color: #ededed;
   font-family:
     "JetBrains Mono", "Fira Code", "SF Mono", Monaco, Consolas, monospace;
   font-size: 12px;
   line-height: 1.65;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: auto;
   max-height: 520px;
   white-space: pre-wrap;

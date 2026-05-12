@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -7,6 +7,8 @@ import type { RunEntity } from '../../db/entities';
 
 @Injectable()
 export class StorageService {
+  private readonly logger = new Logger(StorageService.name);
+
   getGeneratedRootPath(): string {
     return path.resolve(
       process.cwd(),
@@ -52,16 +54,13 @@ export class StorageService {
       'qa',
     ] as const;
 
-    console.log(`[Storage] Creating run folders at: ${runPath}`);
     await fs.mkdir(runPath, { recursive: true });
     await Promise.all(
-      folders.map((folder) => {
-        const folderPath = path.join(runPath, folder);
-        console.log(`[Storage] Creating folder: ${folderPath}`);
-        return fs.mkdir(folderPath, { recursive: true });
-      }),
+      folders.map((folder) =>
+        fs.mkdir(path.join(runPath, folder), { recursive: true }),
+      ),
     );
-    console.log(`[Storage] ✅ All folders created for run ${slug}`);
+    this.logger.debug(`Run folders created: ${slug}`);
   }
 
   async writeStatusFile(

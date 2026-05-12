@@ -41,13 +41,13 @@ export const RunTabs: FC<RunTabsProps> = ({
           <button
             key={tab.id}
             type="button"
-            className={
-              activeTab === tab.id
-                ? styles.activeTab
-                : !isAvailable
-                  ? styles.disabledTab
-                  : undefined
-            }
+            className={[
+              activeTab === tab.id ? styles.activeTab : "",
+              !isAvailable ? styles.disabledTab : "",
+              needsApproval ? styles.approvalTab : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             onClick={() => isAvailable && onChange(tab.id)}
             disabled={!isAvailable}
           >
@@ -57,12 +57,16 @@ export const RunTabs: FC<RunTabsProps> = ({
                 className={styles.approveButton}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (isApproving) return;
                   onApprove();
                 }}
                 role="button"
-                tabIndex={0}
+                tabIndex={isApproving ? -1 : 0}
+                aria-disabled={isApproving}
+                title="Подтвердить этап"
               >
                 <CheckCircle2 className={styles.approveIcon} />
+                <span>Подтвердить</span>
               </span>
             )}
           </button>

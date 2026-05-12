@@ -1,15 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
-import { BriefForm } from "@/features/runs/components/BriefForm";
 import { RunStatusBadge } from "@/features/runs/components/RunStatusBadge";
-import {
-  useCreateRunMutation,
-  useDeleteRunMutation,
-  useRunsQuery,
-} from "@/api/services/runs";
+import { useDeleteRunMutation, useRunsQuery } from "@/api/services/runs";
 import type { Run } from "@/api/services/runs";
 import { IconButton, Modal, Spinner } from "@/kit";
 
@@ -20,19 +15,18 @@ import styles from "./runs-list.module.scss";
 export default function RunsListPage() {
   const navigate = useNavigate();
   const runsQuery = useRunsQuery();
-  const createRunMutation = useCreateRunMutation();
   const deleteRunMutation = useDeleteRunMutation();
   const [runToDelete, setRunToDelete] = useState<Run | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const handleCreateRun = (brief: string) => {
-    createRunMutation.mutate(
-      { brief },
-      {
-        onSuccess: (run) => navigate(`/runs/${run.id}`),
-        onError: () => toast.error("Не удалось создать запуск"),
-      },
-    );
-  };
+  const filteredRuns = runsQuery.data?.filter((run) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    return [getRunTitle(run), run.status, run.id, run.slug]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(query));
+  });
 
   const handleConfirmDelete = () => {
     if (!runToDelete) return;
@@ -48,22 +42,24 @@ export default function RunsListPage() {
 
   return (
     <section className={styles.page}>
-      <div className={styles.intro}>
-        <h1>Создайте первый экран за минуту</h1>
-        <p>Опишите проект, выберите стиль, получите готовый код.</p>
+      <div className={styles.toolbar}>
+        <label className={styles.toolbarSearch}>
+          <Search size={15} />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Поиск запусков..."
+          />
+        </label>
+        <button type="button" onClick={() => navigate("/new")}>
+          <Plus size={15} />
+          Новый запуск
+        </button>
       </div>
 
-      <div className={styles.grid}>
-        <BriefForm
-          isSubmitting={createRunMutation.isPending}
-          onSubmit={handleCreateRun}
-        />
-
+      <div className={styles.projectsGrid}>
         <aside className={styles.runs}>
-          <h2>
-            <FileText size={18} />
-            Последние запуски
-          </h2>
           {runsQuery.isLoading && (
             <div className={styles.emptyState}>
               <Spinner size={18} />
@@ -77,11 +73,16 @@ export default function RunsListPage() {
           )}
           {runsQuery.data?.length === 0 && (
             <div className={styles.emptyState}>
-              Запусков пока нет. Создайте первый запуск, заполнив бриф слева.
+              Запусков пока нет. Создайте первый запуск.
+            </div>
+          )}
+          {!!runsQuery.data?.length && filteredRuns?.length === 0 && (
+            <div className={styles.emptyState}>
+              По запросу «{searchQuery}» ничего не найдено.
             </div>
           )}
           <div className={styles.runsList}>
-            {runsQuery.data?.map((run) => (
+            {filteredRuns?.map((run) => (
               <div key={run.id} className={styles.runItem}>
                 <button
                   type="button"
