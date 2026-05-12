@@ -31,7 +31,7 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const headerTitle = location.pathname.startsWith("/runs/")
+  const headerTitle = location.pathname.startsWith(ROUTES.RUN_DETAILS_PREFIX)
     ? "Детали проекта"
     : location.pathname === ROUTES.NEW_RUN
       ? "Новый проект"

@@ -62,11 +62,11 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: "/",
+        path: ROUTES.ROOT,
         element: <RootRedirect />,
       },
       {
-        path: "*",
+        path: ROUTES.NOT_FOUND,
         lazy: () =>
           lazyImport(() => import("@/features/not-found/pages/not-found.page")),
       },

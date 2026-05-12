@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useRunQuery } from "@/api/services/runs";
 import { runsApi } from "@/shared/api/services/runs/runs.api";
+import { ROUTES } from "@/model";
 
 import { DeleteRunDialog, ProgressBar, RunHeader, RunTabs } from "./components";
 import { useActiveTab, useRunActions, useRunArtifacts } from "./hooks";
@@ -74,7 +75,7 @@ export default function RunDetailsPage() {
     return (
       <section className={styles.page}>
         <div className={styles.emptyPageState}>
-          <Link to="/">Назад к проектам</Link>
+          <Link to={ROUTES.RUNS}>Назад к проектам</Link>
           <h1>Проект недоступен</h1>
           <p>
             Не удалось загрузить данные проекта. Попробуйте обновить страницу.
@@ -86,7 +87,7 @@ export default function RunDetailsPage() {
 
   return (
     <section className={styles.page}>
-      <Link className={styles.backLink} to="/">
+      <Link className={styles.backLink} to={ROUTES.RUNS}>
         Назад к проектам
       </Link>
 

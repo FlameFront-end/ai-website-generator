@@ -7,6 +7,7 @@ import { RunStatusBadge } from "@/features/runs/components/RunStatusBadge";
 import { useDeleteRunMutation, useRunsQuery } from "@/api/services/runs";
 import type { Run } from "@/api/services/runs";
 import { IconButton, Modal, Spinner } from "@/kit";
+import { ROUTES } from "@/model";
 
 import { getRunTitle } from "../../lib/run-title";
 
@@ -52,7 +53,7 @@ export default function RunsListPage() {
             placeholder="Поиск проектов..."
           />
         </label>
-        <button type="button" onClick={() => navigate("/new")}>
+        <button type="button" onClick={() => navigate(ROUTES.NEW_RUN)}>
           <Plus size={15} />
           Новый проект
         </button>
@@ -87,7 +88,7 @@ export default function RunsListPage() {
                 <button
                   type="button"
                   className={styles.runButton}
-                  onClick={() => navigate(`/runs/${run.id}`)}
+                  onClick={() => navigate(ROUTES.runDetails(run.id))}
                 >
                   <span>{getRunTitle(run)}</span>
                   <RunStatusBadge status={run.status} />

@@ -1,4 +1,5 @@
 import { axiosInstance } from "@/api";
+import { API_ENDPOINTS } from "@/model";
 
 import type {
   ArtifactContent,
@@ -15,19 +16,19 @@ import type {
 export const runsApi = {
   async createRun(payload: CreateRunRequest): Promise<CreateRunResponse> {
     const { data } = await axiosInstance.post<CreateRunResponse>(
-      "/runs",
+      API_ENDPOINTS.RUNS,
       payload,
     );
     return data;
   },
 
   async getRuns(): Promise<Run[]> {
-    const { data } = await axiosInstance.get<Run[]>("/runs");
+    const { data } = await axiosInstance.get<Run[]>(API_ENDPOINTS.RUNS);
     return data;
   },
 
   async getRun(id: string): Promise<Run> {
-    const { data } = await axiosInstance.get<Run>(`/runs/${id}`);
+    const { data } = await axiosInstance.get<Run>(API_ENDPOINTS.run(id));
     return data;
   },
 
@@ -36,19 +37,22 @@ export const runsApi = {
     artifactId: string,
   ): Promise<ArtifactContent> {
     const { data } = await axiosInstance.get<ArtifactContent>(
-      `/runs/${runId}/artifacts/${artifactId}/content`,
+      API_ENDPOINTS.artifactContent(runId, artifactId),
     );
     return data;
   },
 
   async updateRun(runId: string, payload: UpdateRunRequest): Promise<Run> {
-    const { data } = await axiosInstance.patch<Run>(`/runs/${runId}`, payload);
+    const { data } = await axiosInstance.patch<Run>(
+      API_ENDPOINTS.run(runId),
+      payload,
+    );
     return data;
   },
 
   async deleteRun(runId: string): Promise<DeleteRunResponse> {
     const { data } = await axiosInstance.delete<DeleteRunResponse>(
-      `/runs/${runId}`,
+      API_ENDPOINTS.run(runId),
     );
     return data;
   },
@@ -57,19 +61,17 @@ export const runsApi = {
     const { data } = await axiosInstance.post<{
       id: string;
       status: RunStatus;
-    }>(`/runs/${runId}/rebuild`);
+    }>(API_ENDPOINTS.rebuildRun(runId));
     return data;
   },
 
   getArtifactFileUrl(runId: string, artifactId: string): string {
-    return `${axiosInstance.defaults.baseURL}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(
-      artifactId,
-    )}/file`;
+    return `${axiosInstance.defaults.baseURL}${API_ENDPOINTS.artifactFileEncoded(runId, artifactId)}`;
   },
 
   async getArtifactFile(runId: string, artifactId: string): Promise<Blob> {
     const { data } = await axiosInstance.get<Blob>(
-      `/runs/${runId}/artifacts/${artifactId}/file`,
+      API_ENDPOINTS.artifactFile(runId, artifactId),
       {
         responseType: "blob",
       },
@@ -79,7 +81,7 @@ export const runsApi = {
 
   async getCodeFiles(runId: string): Promise<CodeFile[]> {
     const { data } = await axiosInstance.get<CodeFile[]>(
-      `/runs/${runId}/code-files`,
+      API_ENDPOINTS.codeFiles(runId),
     );
     return data;
   },
@@ -89,7 +91,7 @@ export const runsApi = {
     filePath: string,
   ): Promise<CodeFileContent> {
     const { data } = await axiosInstance.get<CodeFileContent>(
-      `/runs/${runId}/code-file`,
+      API_ENDPOINTS.codeFile(runId),
       { params: { path: filePath } },
     );
     return data;
@@ -97,7 +99,7 @@ export const runsApi = {
 
   async downloadCode(runId: string): Promise<Blob> {
     const { data } = await axiosInstance.get<Blob>(
-      `/runs/${runId}/download-code`,
+      API_ENDPOINTS.downloadCode(runId),
       {
         responseType: "blob",
       },
@@ -112,7 +114,7 @@ export const runsApi = {
     const { data } = await axiosInstance.post<{
       id: string;
       status: RunStatus;
-    }>(`/runs/${runId}/approve`, { step });
+    }>(API_ENDPOINTS.approveStep(runId), { step });
     return data;
   },
 
@@ -124,7 +126,7 @@ export const runsApi = {
     const { data } = await axiosInstance.post<{
       id: string;
       status: RunStatus;
-    }>(`/runs/${runId}/edit-request`, { step, instruction });
+    }>(API_ENDPOINTS.editRequest(runId), { step, instruction });
     return data;
   },
 };

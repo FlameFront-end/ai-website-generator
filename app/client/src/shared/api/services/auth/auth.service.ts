@@ -1,4 +1,5 @@
 import { axiosInstance } from "@/api";
+import { API_ENDPOINTS } from "@/model";
 
 import type {
   AuthResponse,
@@ -10,7 +11,7 @@ import type {
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await axiosInstance.post<AuthResponse>(
-      "/auth/login",
+      API_ENDPOINTS.AUTH_LOGIN,
       credentials,
     );
     return response.data;
@@ -18,14 +19,14 @@ export const authService = {
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
     const response = await axiosInstance.post<AuthResponse>(
-      "/auth/register",
+      API_ENDPOINTS.AUTH_REGISTER,
       credentials,
     );
     return response.data;
   },
 
   async getMe(): Promise<User> {
-    const response = await axiosInstance.get<User>("/auth/me");
+    const response = await axiosInstance.get<User>(API_ENDPOINTS.AUTH_ME);
     return response.data;
   },
 };

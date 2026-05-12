@@ -1,2 +1,2 @@
 export { env } from "./config";
-export { ROUTES } from "./routes";
+export { API_ENDPOINTS, ROUTES } from "./routes";

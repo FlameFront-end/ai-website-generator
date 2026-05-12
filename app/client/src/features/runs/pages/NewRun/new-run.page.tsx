@@ -15,7 +15,7 @@ export default function NewRunPage() {
     createRunMutation.mutate(
       { brief },
       {
-        onSuccess: (run) => navigate(`/runs/${run.id}`),
+        onSuccess: (run) => navigate(ROUTES.runDetails(run.id)),
         onError: () => toast.error("Не удалось создать проект"),
       },
     );

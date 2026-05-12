@@ -9,6 +9,7 @@ import {
   useRebuildRunMutation,
   useUpdateRunMutation,
 } from "@/api/services/runs";
+import { ROUTES } from "@/model";
 
 interface UseRunActionsResult {
   rename: (runId: string, displayName: string | null) => void;
@@ -53,7 +54,7 @@ export function useRunActions({
   const remove = useCallback(
     (runId: string) => {
       deleteRunMutation.mutate(runId, {
-        onSuccess: () => navigate("/"),
+        onSuccess: () => navigate(ROUTES.RUNS),
         onError: () => toast.error("Не удалось удалить проект"),
       });
     },
