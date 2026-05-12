@@ -25,19 +25,19 @@ export default function LoginPage() {
 
   return (
     <AuthCard
-      title="Вход"
+      title="Войдите в Forgesite"
       onSubmit={handleSubmit}
       footer={
         <>
-          Нет аккаунта? <Link to={ROUTES.REGISTER}>Зарегистрироваться</Link>
+          Нет аккаунта? <Link to={ROUTES.REGISTER}>Создать аккаунт</Link>
         </>
       }
     >
       <Input
         id="email"
         type="email"
-        label="Email"
-        placeholder="your@email.com"
+        label="Почта"
+        placeholder="name@example.com"
         autoComplete="email"
         required
         value={email}
@@ -54,7 +54,7 @@ export default function LoginPage() {
         onChange={(e) => setPassword(e.target.value)}
       />
       <Button type="submit" fullWidth isLoading={isLoading}>
-        Войти
+        Продолжить
       </Button>
     </AuthCard>
   );

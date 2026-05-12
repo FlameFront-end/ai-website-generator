@@ -37,7 +37,7 @@ export default function RegisterPage() {
 
   return (
     <AuthCard
-      title="Регистрация"
+      title="Создайте аккаунт"
       onSubmit={handleSubmit}
       footer={
         <>
@@ -48,8 +48,8 @@ export default function RegisterPage() {
       <Input
         id="email"
         type="email"
-        label="Email"
-        placeholder="your@email.com"
+        label="Почта"
+        placeholder="name@example.com"
         autoComplete="email"
         required
         value={email}
@@ -67,7 +67,7 @@ export default function RegisterPage() {
       />
       <PasswordInput
         id="confirmPassword"
-        label="Подтвердите пароль"
+        label="Повторите пароль"
         placeholder="••••••"
         minLength={6}
         autoComplete="new-password"
@@ -76,7 +76,7 @@ export default function RegisterPage() {
         onChange={(e) => setConfirmPassword(e.target.value)}
       />
       <Button type="submit" fullWidth isLoading={isLoading}>
-        Зарегистрироваться
+        Создать аккаунт
       </Button>
     </AuthCard>
   );

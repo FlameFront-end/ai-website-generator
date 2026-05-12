@@ -1,24 +1,26 @@
-// Custom Toast Styles for Dark Theme
 .Toastify__toast-container {
-  padding: 12px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
 }
 
 .Toastify__toast {
-  background: var(--card-bg, var(--bg-muted));
-  border: 1px solid var(--border-solid);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  min-height: 0;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.5;
-  padding: 16px;
-  min-height: 64px;
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
 
   &-body {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    margin: 0;
     padding: 0;
 
     svg {
@@ -27,133 +29,76 @@
   }
 
   &-icon {
-    width: 24px;
-    height: 24px;
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
   }
 }
 
 .Toastify__close-button {
   color: var(--text-muted);
-  opacity: 0.6;
-  padding: 4px;
-  width: 28px;
-  height: 28px;
+  opacity: 1;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
 
   &:hover {
-    color: var(--text-primary);
-    opacity: 1;
-    background: var(--bg-muted);
+    background: var(--bg-subtle);
+    color: var(--text-heading);
   }
 
   svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 }
 
 .Toastify__progress-bar {
-  height: 3px;
-  border-radius: 0 0 0 3px;
-
-  &--success {
-    background: linear-gradient(90deg, #22c55e, #4ade80);
-  }
-
-  &--error {
-    background: linear-gradient(90deg, #ef4444, #f87171);
-  }
-
-  &--warning {
-    background: linear-gradient(90deg, #f59e0b, #fbbf24);
-  }
-
-  &--info {
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  }
+  height: 2px;
+  background: var(--text-heading);
+  opacity: 0.28;
 }
 
-// Success toast
-.Toastify__toast--success {
-  border-left: 4px solid #22c55e;
-
-  .Toastify__toast-icon {
-    color: #22c55e;
-  }
-}
-
-// Error toast
-.Toastify__toast--error {
-  border-left: 4px solid #ef4444;
-
-  .Toastify__toast-icon {
-    color: #ef4444;
-  }
-}
-
-// Warning toast
-.Toastify__toast--warning {
-  border-left: 4px solid #f59e0b;
-
-  .Toastify__toast-icon {
-    color: #f59e0b;
-  }
-}
-
-// Info toast
-.Toastify__toast--info {
-  border-left: 4px solid #3b82f6;
-
-  .Toastify__toast-icon {
-    color: #3b82f6;
-  }
-}
-
-// Animation improvements
 .Toastify__bounce-enter {
   &--top-right {
-    animation-name: bounceInRight;
+    animation-name: toastIn;
   }
 }
 
 .Toastify__bounce-exit {
   &--top-right {
-    animation-name: bounceOutRight;
+    animation-name: toastOut;
   }
 }
 
-@keyframes bounceInRight {
+@keyframes toastIn {
   0% {
     opacity: 0;
-    transform: translateX(100%) scale(0.9);
+    transform: translateY(-6px);
   }
-  60% {
-    opacity: 1;
-    transform: translateX(-8px) scale(1.01);
-  }
-  80% {
-    transform: translateX(4px) scale(0.99);
-  }
+
   100% {
-    transform: translateX(0) scale(1);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@keyframes bounceOutRight {
+@keyframes toastOut {
   0% {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateY(0);
   }
-  40% {
-    opacity: 0.8;
-    transform: translateX(-8px) scale(0.98);
-  }
+
   100% {
     opacity: 0;
-    transform: translateX(100%) scale(0.9);
+    transform: translateY(-6px);
   }
 }

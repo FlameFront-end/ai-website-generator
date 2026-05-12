@@ -50,64 +50,68 @@ export const RunHeader: FC<RunHeaderProps> = ({
   return (
     <div className={styles.header}>
       <div className={styles.headerTop}>
-        {isEditing ? (
-          <div className={styles.renameForm}>
-            <input
-              value={draftName}
-              maxLength={80}
-              autoFocus
-              onChange={(event) => setDraftName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") saveRename();
-                if (event.key === "Escape") setIsEditing(false);
-              }}
-            />
-            <Button
-              variant="primary"
-              isLoading={isRenaming}
-              onClick={saveRename}
-            >
-              Сохранить
-            </Button>
-            <Button variant="ghost" onClick={() => setIsEditing(false)}>
-              Отмена
-            </Button>
-          </div>
-        ) : (
-          <h1>{getRunTitle(run)}</h1>
-        )}
-        <div className={styles.headerMeta}>
-          <RunStatusBadge status={run.status} />
-          {run.score !== null && run.score !== undefined && (
-            <span className={styles.scoreBadge}>Score: {run.score}/100</span>
+        <div className={styles.headerTitle}>
+          {isEditing ? (
+            <div className={styles.renameForm}>
+              <input
+                value={draftName}
+                maxLength={80}
+                autoFocus
+                onChange={(event) => setDraftName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") saveRename();
+                  if (event.key === "Escape") setIsEditing(false);
+                }}
+              />
+              <Button
+                variant="primary"
+                isLoading={isRenaming}
+                onClick={saveRename}
+              >
+                Сохранить
+              </Button>
+              <Button variant="ghost" onClick={() => setIsEditing(false)}>
+                Отмена
+              </Button>
+            </div>
+          ) : (
+            <h1>{getRunTitle(run)}</h1>
           )}
         </div>
-      </div>
-      <div className={styles.headerActions}>
-        <Button variant="secondary" onClick={startRename}>
-          Переименовать
-        </Button>
-        {hasFrontendProject && (
-          <Button
-            variant="secondary"
-            isLoading={isDownloading}
-            onClick={onDownload}
-          >
-            Скачать код
-          </Button>
-        )}
-        <Button
-          variant="secondary"
-          isLoading={isRebuilding}
-          onClick={onRebuild}
-          title="Пересобрать проект"
-        >
-          Пересобрать
-        </Button>
-        <div className={styles.headerDivider} />
-        <Button variant="danger" isLoading={isDeleting} onClick={onDelete}>
-          Удалить
-        </Button>
+        <div className={styles.headerRight}>
+          <div className={styles.headerMeta}>
+            <RunStatusBadge status={run.status} />
+            {run.score !== null && run.score !== undefined && (
+              <span className={styles.scoreBadge}>Score: {run.score}/100</span>
+            )}
+          </div>
+          <div className={styles.headerActions}>
+            <Button variant="secondary" onClick={startRename}>
+              Переименовать
+            </Button>
+            {hasFrontendProject && (
+              <Button
+                variant="secondary"
+                isLoading={isDownloading}
+                onClick={onDownload}
+              >
+                Скачать код
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              isLoading={isRebuilding}
+              onClick={onRebuild}
+              title="Пересобрать проект"
+            >
+              Пересобрать
+            </Button>
+            <div className={styles.headerDivider} />
+            <Button variant="danger" isLoading={isDeleting} onClick={onDelete}>
+              Удалить
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
