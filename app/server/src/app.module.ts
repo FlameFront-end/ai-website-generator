@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { createTypeOrmModuleOptions } from './db/data-source';
 import { AiModule } from './modules/ai/ai.module';
@@ -21,7 +20,7 @@ import { StorageModule } from './modules/storage/storage.module';
     AuthModule,
     RunsModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [AppService],
 })
 export class AppModule {}

@@ -1,10 +1,45 @@
+import { cleanEnv, str, num, bool, url } from 'envalid';
 import { config as loadEnv } from 'dotenv';
 import path from 'node:path';
 
 loadEnv({ path: path.resolve(process.cwd(), '..', '..', '.env'), quiet: true });
 loadEnv({ quiet: true });
 
-type EnvName = keyof NodeJS.ProcessEnv | string;
+const env = cleanEnv(process.env, {
+  API_PORT: num({ default: 3000 }),
+  PORT: num({ default: undefined }),
+  CLIENT_ORIGIN: str({ default: 'http://localhost:5173' }),
+  DATABASE_URL: url({ default: undefined }),
+  POSTGRES_HOST: str({ default: undefined }),
+  DB_HOST: str({ default: 'localhost' }),
+  POSTGRES_PORT: str({ default: undefined }),
+  DB_PORT: str({ default: '5432' }),
+  POSTGRES_USER: str({ default: undefined }),
+  DB_USER: str({ default: 'ai_generator' }),
+  POSTGRES_PASSWORD: str({ default: undefined }),
+  DB_PASSWORD: str({ default: 'ai_generator' }),
+  POSTGRES_DB: str({ default: undefined }),
+  DB_NAME: str({ default: 'ai_website_generator' }),
+  DB_SYNCHRONIZE: bool({ default: true }),
+  DB_LOGGING: bool({ default: false }),
+  GENERATED_ROOT: str({ default: 'generated' }),
+  JWT_SECRET: str({ default: 'default-secret-change-in-production' }),
+  JWT_EXPIRES_IN: str({ default: '7d' }),
+});
+
+function buildDatabaseUrl(): string {
+  if (env.DATABASE_URL) {
+    return env.DATABASE_URL;
+  }
+
+  const host = env.POSTGRES_HOST ?? env.DB_HOST;
+  const port = env.POSTGRES_PORT ?? env.DB_PORT;
+  const user = env.POSTGRES_USER ?? env.DB_USER;
+  const password = env.POSTGRES_PASSWORD ?? env.DB_PASSWORD;
+  const database = env.POSTGRES_DB ?? env.DB_NAME;
+
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+}
 
 export type AppConfig = Readonly<{
   server: Readonly<{
@@ -25,88 +60,21 @@ export type AppConfig = Readonly<{
   }>;
 }>;
 
-function readEnv(name: EnvName): string | undefined {
-  const value = process.env[name]?.trim();
-  return value && value.length > 0 ? value : undefined;
-}
-
-function readString(name: EnvName, defaultValue: string): string {
-  return readEnv(name) ?? defaultValue;
-}
-
-function readInteger(name: EnvName, defaultValue: number, minimum = 0): number {
-  const rawValue = readString(name, String(defaultValue));
-  const value = Number(rawValue);
-
-  if (!Number.isInteger(value) || value < minimum) {
-    throw new Error(
-      `Environment variable ${name} must be an integer >= ${minimum}`,
-    );
-  }
-
-  return value;
-}
-
-function readBoolean(name: EnvName, defaultValue: boolean): boolean {
-  const value = readEnv(name);
-
-  if (value === undefined) {
-    return defaultValue;
-  }
-
-  if (value === 'true') {
-    return true;
-  }
-
-  if (value === 'false') {
-    return false;
-  }
-
-  throw new Error(
-    `Environment variable ${name} must be either "true" or "false"`,
-  );
-}
-
-function buildDatabaseUrl(): string {
-  const directUrl = readEnv('DATABASE_URL');
-
-  if (directUrl) {
-    return directUrl;
-  }
-
-  const host = readString('POSTGRES_HOST', readString('DB_HOST', 'localhost'));
-  const port = readString('POSTGRES_PORT', readString('DB_PORT', '5432'));
-  const user = readString(
-    'POSTGRES_USER',
-    readString('DB_USER', 'ai_generator'),
-  );
-  const password = readString(
-    'POSTGRES_PASSWORD',
-    readString('DB_PASSWORD', 'ai_generator'),
-  );
-  const database = readString(
-    'POSTGRES_DB',
-    readString('DB_NAME', 'ai_website_generator'),
-  );
-
-  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
-}
-
 export const appConfig: AppConfig = Object.freeze({
   server: Object.freeze({
-    port: readInteger('API_PORT', readInteger('PORT', 3000), 1),
-    corsOrigin: readString('CLIENT_ORIGIN', 'http://localhost:5173'),
+    port: env.PORT ?? env.API_PORT,
+    corsOrigin: env.CLIENT_ORIGIN,
   }),
   database: Object.freeze({
     url: buildDatabaseUrl(),
-    synchronize: readBoolean('DB_SYNCHRONIZE', true),
-    logging: readBoolean('DB_LOGGING', false),
+    synchronize: env.DB_SYNCHRONIZE,
+    logging: env.DB_LOGGING,
   }),
   storage: Object.freeze({
-    generatedRoot: readString('GENERATED_ROOT', 'generated'),
+    generatedRoot: env.GENERATED_ROOT,
   }),
   jwt: Object.freeze({
-    secret: readString('JWT_SECRET', 'default-secret-change-in-production'),
-    expiresIn: readString('JWT_EXPIRES_IN', '7d'),
+    secret: env.JWT_SECRET,
+    expiresIn: env.JWT_EXPIRES_IN,
   }),
 });
