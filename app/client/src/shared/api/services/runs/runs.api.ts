@@ -3,6 +3,8 @@ import { API_ENDPOINTS } from "@/model";
 
 import type {
   ArtifactContent,
+  ClarifyBriefRequest,
+  ClarifyBriefResponse,
   CodeFile,
   CodeFileContent,
   CreateRunRequest,
@@ -14,6 +16,16 @@ import type {
 } from "./types";
 
 export const runsApi = {
+  async clarifyBrief(
+    payload: ClarifyBriefRequest,
+  ): Promise<ClarifyBriefResponse> {
+    const { data } = await axiosInstance.post<ClarifyBriefResponse>(
+      `${API_ENDPOINTS.RUNS}/brief/clarify`,
+      payload,
+    );
+    return data;
+  },
+
   async createRun(payload: CreateRunRequest): Promise<CreateRunResponse> {
     const { data } = await axiosInstance.post<CreateRunResponse>(
       API_ENDPOINTS.RUNS,

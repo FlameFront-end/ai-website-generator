@@ -62,6 +62,55 @@ export interface CreateRunResponse {
   status: RunStatus;
 }
 
+export type BriefQuestionType =
+  | "text"
+  | "single_choice"
+  | "multi_choice"
+  | "scale"
+  | "yes_no";
+
+export interface BriefClarificationQuestion {
+  id: string;
+  type: BriefQuestionType;
+  question: string;
+  description?: string;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  suggestedAnswer?: string | string[] | number | boolean;
+  min?: number;
+  max?: number;
+}
+
+export interface BriefClarificationAnswer {
+  questionId: string;
+  question: string;
+  type?: BriefQuestionType;
+  description?: string;
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  suggestedAnswer?: string | string[] | number | boolean;
+  min?: number;
+  max?: number;
+  value: string | string[] | number | boolean;
+}
+
+export interface ClarifyBriefRequest {
+  brief: string;
+  answers?: BriefClarificationAnswer[];
+}
+
+export interface ClarifyBriefResponse {
+  status: "needs_clarification" | "ready";
+  confidence: number;
+  estimatedTotalQuestions?: number;
+  missingFields: string[];
+  understoodSummary?: string;
+  questions: BriefClarificationQuestion[];
+  finalBrief: string | null;
+}
+
 export interface UpdateRunRequest {
   displayName: string | null;
 }

@@ -15,8 +15,10 @@ import {
 import type { Response } from 'express';
 
 import type { RequestWithUser } from '../../common/types/request.types';
+import { AiService } from '../ai/ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApproveStepDto } from './dto/approve-step.dto';
+import { ClarifyBriefDto } from './dto/clarify-brief.dto';
 import { CreateRunDto } from './dto/create-run.dto';
 import { EditRequestDto } from './dto/edit-request.dto';
 import { UpdateRunDto } from './dto/update-run.dto';
@@ -25,7 +27,15 @@ import { RunsService } from './runs.service';
 @Controller('runs')
 @UseGuards(JwtAuthGuard)
 export class RunsController {
-  constructor(private readonly runsService: RunsService) {}
+  constructor(
+    private readonly runsService: RunsService,
+    private readonly aiService: AiService,
+  ) {}
+
+  @Post('brief/clarify')
+  clarifyBrief(@Body() body: ClarifyBriefDto) {
+    return this.aiService.clarifyBrief(body.brief, body.answers ?? []);
+  }
 
   @Post()
   createRun(@Body() body: CreateRunDto, @Request() req: RequestWithUser) {

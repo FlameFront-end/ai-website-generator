@@ -1,27 +1,11 @@
 import type { FC, FormEvent, KeyboardEvent } from "react";
 import { useState } from "react";
 
-import { ArrowRight, FileText } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/kit";
 
 import styles from "./BriefForm.module.scss";
-
-const DEFAULT_BRIEF = `Сделай первый экран лендинга для ИИ-сервиса финансовой аналитики.
-
-Стиль:
-- темный
-- дорогой
-- современный
-- крупная типографика
-- фиолетово-синие акценты
-- карточка продукта справа
-
-Текст:
-Заголовок: ИИ-аналитика для финансовых команд
-Описание: Получайте инсайты, прогнозы и отчеты быстрее без ручной рутины.
-Основная кнопка: Начать бесплатно
-Вторая кнопка: Смотреть демо`;
 
 interface BriefFormProps {
   isSubmitting: boolean;
@@ -29,7 +13,7 @@ interface BriefFormProps {
 }
 
 export const BriefForm: FC<BriefFormProps> = ({ isSubmitting, onSubmit }) => {
-  const [brief, setBrief] = useState(DEFAULT_BRIEF);
+  const [brief, setBrief] = useState("");
 
   const submitBrief = () => {
     const trimmed = brief.trim();
@@ -55,15 +39,12 @@ export const BriefForm: FC<BriefFormProps> = ({ isSubmitting, onSubmit }) => {
           <label htmlFor="brief">Опишите идею сайта</label>
           <p>
             Чем подробнее бриф, тем точнее будет структура, визуальный стиль и
-            итоговый код.
+            итоговый код. Если чего-то не хватит, мы зададим уточняющие вопросы.
           </p>
         </div>
       </div>
       <div className={styles.tips}>
-        <span>
-          <FileText size={14} />
-          Ниша и аудитория
-        </span>
+        <span>Ниша и аудитория</span>
         <span>Стиль и настроение</span>
         <span>Тексты и кнопки</span>
       </div>

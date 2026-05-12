@@ -1,6 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import type { DesignDescription, DesignTokens, ProjectSpec } from './ai.types';
+import type {
+  BriefClarificationAnswer,
+  BriefClarificationResult,
+  DesignDescription,
+  DesignTokens,
+  ProjectSpec,
+} from './ai.types';
 import {
   AI_PROVIDER,
   type AiProvider,
@@ -10,6 +16,7 @@ import { buildDesignTokensMessages } from './prompts/design-tokens.prompt';
 import { buildDesignDescriptionMessages } from './prompts/design-description.prompt';
 import { buildGenerateCodeMessages } from './prompts/generate-code.prompt';
 import { buildGenerateSvgMessages } from './prompts/generate-svg.prompt';
+import { buildClarifyBriefMessages } from './prompts/clarify-brief.prompt';
 
 export type { DesignDescription, DesignTokens, ProjectSpec };
 
@@ -18,6 +25,25 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
 
   constructor(@Inject(AI_PROVIDER) private readonly provider: AiProvider) {}
+
+  async clarifyBrief(
+    brief: string,
+    answers: BriefClarificationAnswer[] = [],
+  ): Promise<BriefClarificationResult> {
+    this.logger.log('Clarifying brief via AI');
+
+    const result = await this.provider.chat({
+      messages: buildClarifyBriefMessages(brief, answers),
+      json: true,
+      temperature: 0.35,
+      maxTokens: 4096,
+    });
+
+    return this.parseJson<BriefClarificationResult>(
+      result.content,
+      'BriefClarificationResult',
+    );
+  }
 
   /**
    * Extract project specification from brief via LLM
