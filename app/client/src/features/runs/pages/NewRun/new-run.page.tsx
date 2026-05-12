@@ -287,19 +287,17 @@ export default function NewRunPage() {
     ? answerMap[currentQuestion.id]
     : undefined;
   const progressLabel = getProgressLabel(answers.length);
+  const displayedStep = Math.min(answers.length + 1, MAX_CLARIFICATION_STEPS);
   const estimatedTotalQuestions = Math.min(
     MAX_CLARIFICATION_STEPS,
     Math.max(
-      answers.length + 1,
+      displayedStep,
       clarification?.estimatedTotalQuestions ?? answers.length + 2,
     ),
   );
   const progressPercent = Math.min(
     100,
-    Math.max(
-      20,
-      Math.round(((answers.length + 1) / estimatedTotalQuestions) * 100),
-    ),
+    Math.max(20, Math.round((displayedStep / estimatedTotalQuestions) * 100)),
   );
   const canSubmitAnswers = Boolean(
     currentQuestion &&
@@ -336,7 +334,7 @@ export default function NewRunPage() {
               <h1>Уточним детали проекта</h1>
             </div>
             <span className={styles.stepBadge}>
-              Шаг {answers.length + 1} из ~{estimatedTotalQuestions}
+              Шаг {displayedStep} из ~{estimatedTotalQuestions}
             </span>
           </div>
 

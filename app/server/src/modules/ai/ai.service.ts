@@ -32,6 +32,17 @@ export class AiService {
   ): Promise<BriefClarificationResult> {
     this.logger.log('Clarifying brief via AI');
 
+    if (answers.length >= 5) {
+      return {
+        status: 'ready',
+        confidence: 0.8,
+        estimatedTotalQuestions: 5,
+        missingFields: [],
+        questions: [],
+        finalBrief: this.buildFallbackFinalBrief(brief, answers),
+      };
+    }
+
     const result = await this.provider.chat({
       messages: buildClarifyBriefMessages(brief, answers),
       json: true,
@@ -39,10 +50,81 @@ export class AiService {
       maxTokens: 4096,
     });
 
-    return this.parseJson<BriefClarificationResult>(
+    const parsed = this.parseJson<BriefClarificationResult>(
       result.content,
       'BriefClarificationResult',
     );
+
+    return this.sanitizeClarificationResult(brief, answers, parsed);
+  }
+
+  private sanitizeClarificationResult(
+    brief: string,
+    answers: BriefClarificationAnswer[],
+    result: BriefClarificationResult,
+  ): BriefClarificationResult {
+    if (result.status !== 'needs_clarification') return result;
+
+    const previousQuestions = answers.map((answer) =>
+      this.normalizeQuestion(answer.question),
+    );
+    const questions = result.questions.filter((question) => {
+      const normalized = this.normalizeQuestion(question.question);
+      return (
+        !this.isBannedClarificationQuestion(normalized) &&
+        !previousQuestions.some(
+          (previous) =>
+            previous === normalized ||
+            previous.includes(normalized) ||
+            normalized.includes(previous),
+        )
+      );
+    });
+
+    if (questions.length > 0) {
+      return {
+        ...result,
+        questions: questions.slice(0, 1),
+      };
+    }
+
+    return {
+      ...result,
+      status: 'ready',
+      questions: [],
+      finalBrief: this.buildFallbackFinalBrief(brief, answers),
+    };
+  }
+
+  private normalizeQuestion(question: string) {
+    return question
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .trim();
+  }
+
+  private isBannedClarificationQuestion(question: string) {
+    return [
+      'бюджет',
+      'стоимость',
+      'цена',
+      'оплата',
+      'срок',
+      'дедлайн',
+      'deadline',
+      'budget',
+    ].some((word) => question.includes(word));
+  }
+
+  private buildFallbackFinalBrief(
+    brief: string,
+    answers: BriefClarificationAnswer[],
+  ) {
+    const answeredContext = answers
+      .map((answer) => `${answer.question}: ${String(answer.value)}`)
+      .join('\n');
+
+    return [brief, answeredContext].filter(Boolean).join('\n\n');
   }
 
   /**
