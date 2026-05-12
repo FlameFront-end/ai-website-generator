@@ -6,7 +6,12 @@ export type RunStatus =
   | "visual_failed"
   | "needs_manual_review"
   | "completed"
-  | "failed";
+  | "failed"
+  | "awaiting_spec_approval"
+  | "awaiting_design_approval"
+  | "awaiting_reference_approval"
+  | "awaiting_code_approval"
+  | "awaiting_final_approval";
 
 export interface RunArtifact {
   id: string;

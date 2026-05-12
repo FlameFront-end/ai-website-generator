@@ -3,18 +3,10 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { useRunQuery } from "@/api/services/runs";
+import { runsApi } from "@/shared/api/services/runs/runs.api";
 
-import {
-  DeleteRunDialog,
-  ProgressBar,
-  RunHeader,
-  RunTabs,
-} from "./components";
-import {
-  useActiveTab,
-  useRunActions,
-  useRunArtifacts,
-} from "./hooks";
+import { DeleteRunDialog, ProgressBar, RunHeader, RunTabs } from "./components";
+import { useActiveTab, useRunActions, useRunArtifacts } from "./hooks";
 import {
   ArtifactsTab,
   CodeTab,
@@ -30,11 +22,39 @@ import styles from "./run-details.module.scss";
 export default function RunDetailsPage() {
   const { runId = "" } = useParams();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
   const runQuery = useRunQuery(runId);
   const { activeTab, setActiveTab } = useActiveTab();
   const actions = useRunActions();
   const artifacts = useRunArtifacts(runQuery.data);
+
+  const getStepFromStatus = (
+    status: string,
+  ): "spec" | "design" | "reference" | "code" | "final" | null => {
+    if (status === "awaiting_spec_approval") return "spec";
+    if (status === "awaiting_design_approval") return "design";
+    if (status === "awaiting_reference_approval") return "reference";
+    if (status === "awaiting_code_approval") return "code";
+    if (status === "awaiting_final_approval") return "final";
+    return null;
+  };
+
+  const handleApprove = async () => {
+    if (!run) return;
+    const step = getStepFromStatus(run.status);
+    if (!step) return;
+
+    setIsApproving(true);
+    try {
+      await runsApi.approveStep(run.id, step);
+      runQuery.refetch();
+    } catch (error) {
+      console.error("Failed to approve step:", error);
+    } finally {
+      setIsApproving(false);
+    }
+  };
 
   if (runQuery.isLoading) {
     return <p>Загружаем запуск...</p>;
@@ -58,7 +78,7 @@ export default function RunDetailsPage() {
 
       <RunHeader
         run={run}
-        hasFrontendProject={Boolean(artifacts.frontend_project)}
+        hasFrontendProject={!!artifacts.frontend_project}
         isRenaming={actions.isRenaming}
         isDeleting={actions.isDeleting}
         isDownloading={actions.isDownloading}
@@ -70,13 +90,16 @@ export default function RunDetailsPage() {
         styles={styles}
       />
 
-      <ProgressBar
-        step={run.currentStep}
-        status={run.status}
-        styles={styles}
-      />
+      <ProgressBar step={run.currentStep} status={run.status} styles={styles} />
 
-      <RunTabs activeTab={activeTab} onChange={setActiveTab} styles={styles} />
+      <RunTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        styles={styles}
+        status={run.status}
+        onApprove={handleApprove}
+        isApproving={isApproving}
+      />
 
       <div key={activeTab} className={styles.tabContent}>
         {activeTab === "overview" && <OverviewTab run={run} styles={styles} />}
@@ -119,7 +142,9 @@ export default function RunDetailsPage() {
 
         {activeTab === "code" && <CodeTab runId={run.id} styles={styles} />}
 
-        {activeTab === "artifacts" && <ArtifactsTab run={run} styles={styles} />}
+        {activeTab === "artifacts" && (
+          <ArtifactsTab run={run} styles={styles} />
+        )}
 
         {activeTab === "logs" && (
           <LogsTab

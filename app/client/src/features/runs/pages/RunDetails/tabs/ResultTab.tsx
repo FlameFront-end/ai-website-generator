@@ -78,21 +78,29 @@ export const ResultTab: FC<ResultTabProps> = ({
             {desktopScreenshot && (
               <div className={styles.screenshotContainer}>
                 <h3>Desktop (1440×900)</h3>
-                <img
-                  src={desktopFile.url ?? undefined}
-                  alt="Скриншот desktop"
-                  className={styles.screenshotImage}
-                />
+                {desktopFile.isError ? (
+                  <p className={styles.error}>Скриншот недоступен</p>
+                ) : (
+                  <img
+                    src={desktopFile.url ?? undefined}
+                    alt="Скриншот desktop"
+                    className={styles.screenshotImage}
+                  />
+                )}
               </div>
             )}
             {mobileScreenshot && (
               <div className={styles.screenshotContainer}>
                 <h3>Mobile (390×844)</h3>
-                <img
-                  src={mobileFile.url ?? undefined}
-                  alt="Скриншот mobile"
-                  className={styles.screenshotImage}
-                />
+                {mobileFile.isError ? (
+                  <p className={styles.error}>Скриншот недоступен</p>
+                ) : (
+                  <img
+                    src={mobileFile.url ?? undefined}
+                    alt="Скриншот mobile"
+                    className={styles.screenshotImage}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -101,13 +109,17 @@ export const ResultTab: FC<ResultTabProps> = ({
         {diffImage && (
           <div className={styles.panel}>
             <h2>Сравнение (Diff)</h2>
-            <div className={styles.diffImageWrap}>
-              <img
-                src={diffFile.url ?? undefined}
-                alt="Различия между референсом и результатом"
-                className={styles.diffImage}
-              />
-            </div>
+            {diffFile.isError ? (
+              <p className={styles.error}>Изображение сравнения недоступно</p>
+            ) : (
+              <div className={styles.diffImageWrap}>
+                <img
+                  src={diffFile.url ?? undefined}
+                  alt="Различия между референсом и результатом"
+                  className={styles.diffImage}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

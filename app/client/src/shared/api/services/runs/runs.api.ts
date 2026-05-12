@@ -104,4 +104,27 @@ export const runsApi = {
     );
     return data;
   },
+
+  async approveStep(
+    runId: string,
+    step: "spec" | "design" | "reference" | "code" | "final",
+  ): Promise<{ id: string; status: RunStatus }> {
+    const { data } = await axiosInstance.post<{
+      id: string;
+      status: RunStatus;
+    }>(`/runs/${runId}/approve`, { step });
+    return data;
+  },
+
+  async requestEdit(
+    runId: string,
+    step: "spec" | "design" | "reference" | "code" | "final",
+    instruction: string,
+  ): Promise<{ id: string; status: RunStatus }> {
+    const { data } = await axiosInstance.post<{
+      id: string;
+      status: RunStatus;
+    }>(`/runs/${runId}/edit-request`, { step, instruction });
+    return data;
+  },
 };

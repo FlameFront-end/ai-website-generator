@@ -65,7 +65,10 @@ export function ArtifactViewer({
 
       {isOpen && (
         <div className={styles.artifactBody}>
-          {isImage && (
+          {isImage && fileQuery.isError && (
+            <p className={styles.error}>Не удалось загрузить изображение</p>
+          )}
+          {isImage && !fileQuery.isError && (
             <img
               src={fileQuery.url ?? undefined}
               alt={fileName}
@@ -77,6 +80,11 @@ export function ArtifactViewer({
               <span className={styles.codeLoadingSpinner} />
             </div>
           )}
+          {isText && contentQuery.isError && (
+            <p className={styles.error}>
+              Не удалось загрузить содержимое файла
+            </p>
+          )}
           {isText && contentQuery.data && (
             <CodeViewer
               content={contentQuery.data.content}
@@ -84,7 +92,10 @@ export function ArtifactViewer({
               styles={styles}
             />
           )}
-          {!isImage && !isText && (
+          {!isImage && !isText && fileQuery.isError && (
+            <p className={styles.error}>Файл недоступен для скачивания</p>
+          )}
+          {!isImage && !isText && !fileQuery.isError && (
             <div className={styles.artifactDownload}>
               <a
                 href={fileQuery.url ?? "#"}

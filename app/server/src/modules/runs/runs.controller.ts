@@ -120,7 +120,34 @@ export class RunsController {
   }
 
   @Post(':id/rebuild')
-  async rebuild(@Param('id') id: string, @Request() req: RequestWithUser) {
+  rebuild(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.runsService.rebuildRun(id, req.user.id);
+  }
+
+  @Post(':id/approve')
+  approveStep(
+    @Param('id') id: string,
+    @Body() body: { step: 'spec' | 'design' | 'reference' | 'code' | 'final' },
+    @Request() req: RequestWithUser,
+  ) {
+    return this.runsService.approveStep(id, body.step, req.user.id);
+  }
+
+  @Post(':id/edit-request')
+  requestEdit(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      step: 'spec' | 'design' | 'reference' | 'code' | 'final';
+      instruction: string;
+    },
+    @Request() req: RequestWithUser,
+  ) {
+    return this.runsService.requestEdit(
+      id,
+      body.step,
+      body.instruction,
+      req.user.id,
+    );
   }
 }

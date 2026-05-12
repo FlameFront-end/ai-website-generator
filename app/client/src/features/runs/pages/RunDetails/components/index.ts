@@ -1,4 +1,5 @@
 export { ArtifactViewer } from "./ArtifactViewer";
+export { ApprovalPanel } from "./ApprovalPanel";
 export { CodeViewer } from "./CodeViewer";
 export { DeleteRunDialog } from "./DeleteRunDialog";
 export { FileTree } from "./FileTree";

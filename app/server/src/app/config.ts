@@ -103,7 +103,7 @@ export const appConfig: AppConfig = Object.freeze({
     logging: readBoolean('DB_LOGGING', false),
   }),
   storage: Object.freeze({
-    generatedRoot: readString('GENERATED_ROOT', 'generated/runs'),
+    generatedRoot: readString('GENERATED_ROOT', 'generated'),
   }),
   jwt: Object.freeze({
     secret: readString('JWT_SECRET', 'default-secret-change-in-production'),

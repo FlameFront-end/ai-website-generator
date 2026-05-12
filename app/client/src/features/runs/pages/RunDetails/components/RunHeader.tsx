@@ -62,7 +62,11 @@ export const RunHeader: FC<RunHeaderProps> = ({
                 if (event.key === "Escape") setIsEditing(false);
               }}
             />
-            <Button variant="primary" isLoading={isRenaming} onClick={saveRename}>
+            <Button
+              variant="primary"
+              isLoading={isRenaming}
+              onClick={saveRename}
+            >
               Сохранить
             </Button>
             <Button variant="ghost" onClick={() => setIsEditing(false)}>

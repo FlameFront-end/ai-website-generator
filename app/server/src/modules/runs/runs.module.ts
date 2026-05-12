@@ -7,6 +7,7 @@ import {
   RunLogEntity,
   UserEntity,
 } from '../../db/entities';
+import { PipelineModule } from '../pipeline/pipeline.module';
 import { StorageModule } from '../storage/storage.module';
 import { RunsController } from './runs.controller';
 import { RunsService } from './runs.service';
@@ -14,6 +15,7 @@ import { RunsService } from './runs.service';
 @Module({
   imports: [
     StorageModule,
+    PipelineModule,
     TypeOrmModule.forFeature([
       RunEntity,
       RunArtifactEntity,

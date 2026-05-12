@@ -15,6 +15,11 @@ const STATUS_LABELS: Record<RunStatus, string> = {
   needs_manual_review: "Проверка",
   completed: "Готово",
   failed: "Ошибка",
+  awaiting_spec_approval: "Ожидание подтверждения",
+  awaiting_design_approval: "Ожидание подтверждения",
+  awaiting_reference_approval: "Ожидание подтверждения",
+  awaiting_code_approval: "Ожидание подтверждения",
+  awaiting_final_approval: "Ожидание подтверждения",
 };
 
 export function RunStatusBadge({ status }: RunStatusBadgeProps) {

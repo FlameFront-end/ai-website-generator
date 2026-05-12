@@ -22,7 +22,6 @@ export const LogsTab: FC<LogsTabProps> = ({
 
   return (
     <div className={styles.panel}>
-      <h2>Логи</h2>
       <LogsPanel
         logs={logs}
         buildLogArtifact={buildLogArtifact}

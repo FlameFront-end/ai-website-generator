@@ -22,6 +22,10 @@ export const ReferenceTab: FC<ReferenceTabProps> = ({
       <h2>Визуальный референс</h2>
       {!artifact ? (
         <Skeleton lines={6} />
+      ) : fileQuery.isError ? (
+        <p className={styles.error}>
+          Не удалось загрузить референс. Возможно, файл не найден.
+        </p>
       ) : (
         <img
           src={fileQuery.url ?? undefined}

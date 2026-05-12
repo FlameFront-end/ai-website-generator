@@ -40,5 +40,4 @@ Thumbs.db
 *.sln
 *.sw?
 
-1.md
-1.pdf
+/docs

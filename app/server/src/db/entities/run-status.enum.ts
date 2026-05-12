@@ -7,4 +7,9 @@ export enum RunStatus {
   NeedsManualReview = 'needs_manual_review',
   Completed = 'completed',
   Failed = 'failed',
+  AwaitingSpecApproval = 'awaiting_spec_approval',
+  AwaitingDesignApproval = 'awaiting_design_approval',
+  AwaitingReferenceApproval = 'awaiting_reference_approval',
+  AwaitingCodeApproval = 'awaiting_code_approval',
+  AwaitingFinalApproval = 'awaiting_final_approval',
 }
