@@ -16,7 +16,7 @@ export default function NewRunPage() {
       { brief },
       {
         onSuccess: (run) => navigate(`/runs/${run.id}`),
-        onError: () => toast.error("Не удалось создать запуск"),
+        onError: () => toast.error("Не удалось создать проект"),
       },
     );
   };

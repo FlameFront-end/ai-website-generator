@@ -23,7 +23,7 @@ export const DeleteRunDialog: FC<DeleteRunDialogProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      title="Удалить запуск?"
+      title="Удалить проект?"
       confirmText="Удалить"
       cancelText="Отмена"
       variant="danger"
@@ -32,7 +32,7 @@ export const DeleteRunDialog: FC<DeleteRunDialogProps> = ({
       onCancel={onCancel}
     >
       <p>
-        Запуск <strong>{getRunTitle(run)}</strong> будет удален безвозвратно.
+        Проект <strong>{getRunTitle(run)}</strong> будет удален безвозвратно.
       </p>
     </Modal>
   );

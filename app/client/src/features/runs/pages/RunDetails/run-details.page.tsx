@@ -61,7 +61,7 @@ export default function RunDetailsPage() {
       <section className={styles.page}>
         <div className={styles.loadingState}>
           <span />
-          <h1>Загружаем запуск...</h1>
+          <h1>Загружаем проект...</h1>
           <p>Подготавливаем статус, артефакты и доступные действия.</p>
         </div>
       </section>
@@ -74,10 +74,10 @@ export default function RunDetailsPage() {
     return (
       <section className={styles.page}>
         <div className={styles.emptyPageState}>
-          <Link to="/">Назад к запускам</Link>
-          <h1>Запуск недоступен</h1>
+          <Link to="/">Назад к проектам</Link>
+          <h1>Проект недоступен</h1>
           <p>
-            Не удалось загрузить данные запуска. Попробуйте обновить страницу.
+            Не удалось загрузить данные проекта. Попробуйте обновить страницу.
           </p>
         </div>
       </section>
@@ -87,7 +87,7 @@ export default function RunDetailsPage() {
   return (
     <section className={styles.page}>
       <Link className={styles.backLink} to="/">
-        Назад к запускам
+        Назад к проектам
       </Link>
 
       <RunHeader

@@ -32,10 +32,10 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
 
   const headerTitle = location.pathname.startsWith("/runs/")
-    ? "Детали запуска"
+    ? "Детали проекта"
     : location.pathname === ROUTES.NEW_RUN
-      ? "Новый запуск"
-      : "Запуски";
+      ? "Новый проект"
+      : "Проекты";
 
   const handleLogout = () => {
     logout();
@@ -60,7 +60,7 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
               end
             >
               <Activity size={15} />
-              Запуски
+              Проекты
             </NavLink>
             <span className={styles.navDisabled}>
               <CreditCard size={15} />
@@ -80,7 +80,7 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
           <div className={styles.quickActions}>
             <button type="button" onClick={() => navigate(ROUTES.NEW_RUN)}>
               <Plus size={14} />
-              Новый запуск
+              Новый проект
             </button>
             <button type="button" onClick={toggle}>
               {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}

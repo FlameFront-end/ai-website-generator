@@ -33,7 +33,7 @@ export const RunTabs: FC<RunTabsProps> = ({
   const approvalTab = STATUS_TO_TAB[status];
 
   return (
-    <nav className={styles.tabs} aria-label="Разделы запуска">
+    <nav className={styles.tabs} aria-label="Разделы проекта">
       {TABS.map((tab) => {
         const isAvailable = isTabAvailable(tab.id, status);
         const needsApproval = tab.id === approvalTab;

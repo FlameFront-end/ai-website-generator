@@ -34,9 +34,9 @@ export default function RunsListPage() {
     deleteRunMutation.mutate(runToDelete.id, {
       onSuccess: () => {
         setRunToDelete(null);
-        toast.success("Запуск удален");
+        toast.success("Проект удален");
       },
-      onError: () => toast.error("Не удалось удалить запуск"),
+      onError: () => toast.error("Не удалось удалить проект"),
     });
   };
 
@@ -49,12 +49,12 @@ export default function RunsListPage() {
             type="search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Поиск запусков..."
+            placeholder="Поиск проектов..."
           />
         </label>
         <button type="button" onClick={() => navigate("/new")}>
           <Plus size={15} />
-          Новый запуск
+          Новый проект
         </button>
       </div>
 
@@ -63,17 +63,17 @@ export default function RunsListPage() {
           {runsQuery.isLoading && (
             <div className={styles.emptyState}>
               <Spinner size={18} />
-              Загружаем запуски...
+              Загружаем проекты...
             </div>
           )}
           {runsQuery.isError && (
             <div className={styles.emptyState}>
-              API запусков пока недоступен.
+              API проектов пока недоступен.
             </div>
           )}
           {runsQuery.data?.length === 0 && (
             <div className={styles.emptyState}>
-              Запусков пока нет. Создайте первый запуск.
+              Проектов пока нет. Создайте первый проект.
             </div>
           )}
           {!!runsQuery.data?.length && filteredRuns?.length === 0 && (
@@ -98,7 +98,7 @@ export default function RunsListPage() {
                   disabled={deleteRunMutation.isPending}
                   onClick={() => setRunToDelete(run)}
                   title="Удалить"
-                  aria-label="Удалить запуск"
+                  aria-label="Удалить проект"
                 />
               </div>
             ))}
@@ -107,7 +107,7 @@ export default function RunsListPage() {
 
         <Modal
           isOpen={!!runToDelete}
-          title="Удалить запуск?"
+          title="Удалить проект?"
           confirmText="Удалить"
           cancelText="Отмена"
           variant="danger"
@@ -117,7 +117,7 @@ export default function RunsListPage() {
         >
           {runToDelete && (
             <p>
-              Запуск <strong>«{getRunTitle(runToDelete)}»</strong> и все его
+              Проект <strong>«{getRunTitle(runToDelete)}»</strong> и все его
               файлы в папке generated будут безвозвратно удалены.
             </p>
           )}

@@ -25,9 +25,9 @@ interface UseRunActionsOptions {
   onRenameSuccess?: () => void;
 }
 
-export function useRunActions(
-  { onRenameSuccess }: UseRunActionsOptions = {},
-): UseRunActionsResult {
+export function useRunActions({
+  onRenameSuccess,
+}: UseRunActionsOptions = {}): UseRunActionsResult {
   const navigate = useNavigate();
   const updateRunMutation = useUpdateRunMutation();
   const deleteRunMutation = useDeleteRunMutation();
@@ -40,10 +40,10 @@ export function useRunActions(
         { runId, displayName },
         {
           onSuccess: () => {
-            toast.success("Название запуска обновлено");
+            toast.success("Название проекта обновлено");
             onRenameSuccess?.();
           },
-          onError: () => toast.error("Не удалось переименовать запуск"),
+          onError: () => toast.error("Не удалось переименовать проект"),
         },
       );
     },
@@ -54,7 +54,7 @@ export function useRunActions(
     (runId: string) => {
       deleteRunMutation.mutate(runId, {
         onSuccess: () => navigate("/"),
-        onError: () => toast.error("Не удалось удалить запуск"),
+        onError: () => toast.error("Не удалось удалить проект"),
       });
     },
     [deleteRunMutation, navigate],
