@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Link, useParams } from "react-router-dom";
 
@@ -20,6 +20,14 @@ import {
 } from "./tabs";
 import styles from "./run-details.module.scss";
 
+const STATUS_TO_TAB = {
+  awaiting_spec_approval: "spec",
+  awaiting_design_approval: "design",
+  awaiting_reference_approval: "reference",
+  awaiting_code_approval: "code",
+  awaiting_final_approval: "result",
+} as const;
+
 export default function RunDetailsPage() {
   const { runId = "" } = useParams();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -29,6 +37,7 @@ export default function RunDetailsPage() {
   const { activeTab, setActiveTab } = useActiveTab();
   const actions = useRunActions();
   const artifacts = useRunArtifacts(runQuery.data);
+  const previousStatusRef = useRef<string | null>(null);
 
   const getStepFromStatus = (
     status: string,
@@ -56,6 +65,21 @@ export default function RunDetailsPage() {
       setIsApproving(false);
     }
   };
+
+  useEffect(() => {
+    const status = runQuery.data?.status;
+    if (!status) return;
+
+    const previousStatus = previousStatusRef.current;
+    previousStatusRef.current = status;
+
+    if (previousStatus !== "running") return;
+
+    const nextTab = STATUS_TO_TAB[status as keyof typeof STATUS_TO_TAB];
+    if (nextTab) {
+      setActiveTab(nextTab);
+    }
+  }, [runQuery.data?.status, setActiveTab]);
 
   if (runQuery.isLoading) {
     return (

@@ -1,7 +1,7 @@
 import type { ChatMessage } from '../providers/ai-provider.interface';
 import type { DesignTokens, ProjectSpec } from '../ai.types';
 
-const SYSTEM = `Ты — фронтенд-разработчик. Сгенерируй код React-компонента и CSS-стили для секции сайта.
+const SYSTEM = `Ты — senior фронтенд-разработчик. Сгенерируй код React-компонента и CSS-стили для секции сайта на основе всей накопленной AI-цепочки.
 
 Верни ТОЛЬКО валидный JSON (без markdown-обёрток) со следующей структурой:
 {
@@ -18,6 +18,7 @@ const SYSTEM = `Ты — фронтенд-разработчик. Сгенери
 - CSS-классы на элементах (БЕЗ inline-стилей)
 - Текст из спецификации (copy)
 - Все элементы из requiredElements
+- Используй навигацию, метрики, productCard, floatingCards и contentHierarchy из спецификации, если они есть
 
 Требования к styles.css:
 - CSS-переменные через :root не нужны — пиши значения напрямую
@@ -27,18 +28,21 @@ const SYSTEM = `Ты — фронтенд-разработчик. Сгенери
 - Визуальные эффекты: градиенты фона, backdrop-filter, тени
 - Плавные переходы для hover-состояний кнопок
 - Минимум 80 строк CSS — секция должна выглядеть как premium-лендинг
+- Сверяйся с designDescription: итоговая верстка должна соответствовать описанию дизайна
 
 ВАЖНО: Значения в JSON должны быть строками с экранированными переносами строк (\\n), НЕ многострочными.`;
 
 export function buildGenerateCodeMessages(
+  brief: string,
   spec: ProjectSpec,
   tokens: DesignTokens,
+  designDescription: string,
 ): ChatMessage[] {
   return [
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Спецификация проекта:\n${JSON.stringify(spec, null, 2)}\n\nДизайн-токены:\n${JSON.stringify(tokens, null, 2)}`,
+      content: `Исходный бриф:\n${brief}\n\nСпецификация проекта:\n${JSON.stringify(spec, null, 2)}\n\nДизайн-токены:\n${JSON.stringify(tokens, null, 2)}\n\nОписание дизайна:\n${designDescription}`,
     },
   ];
 }

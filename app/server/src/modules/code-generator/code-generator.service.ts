@@ -32,13 +32,20 @@ export class CodeGeneratorService {
    * Generate all project files — scaffolding is templated, UI code comes from AI
    */
   async generateProjectFiles(
+    brief: string,
     projectSpec: ProjectSpec,
     designTokens: DesignTokens,
+    designDescription: string,
     codePath: string,
   ): Promise<GeneratedFile[]> {
     this.logger.log('Generating project files (scaffolding + AI code)');
 
-    const aiCode = await this.aiService.generateCode(projectSpec, designTokens);
+    const aiCode = await this.aiService.generateCode(
+      brief,
+      projectSpec,
+      designTokens,
+      designDescription,
+    );
 
     const files: GeneratedFile[] = [
       {
@@ -100,10 +107,17 @@ export class CodeGeneratorService {
    * Generate reference SVG via AI
    */
   async generateReferenceSvg(
+    brief: string,
     projectSpec: ProjectSpec,
     designTokens: DesignTokens,
+    designDescription: string,
   ): Promise<string> {
-    return this.aiService.generateReferenceSvg(projectSpec, designTokens);
+    return this.aiService.generateReferenceSvg(
+      brief,
+      projectSpec,
+      designTokens,
+      designDescription,
+    );
   }
 
   private async writeFiles(

@@ -99,8 +99,12 @@ export class PipelineService {
     await this.state.addLog(run.id, 'Начато описание дизайна');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const tokens = await this.aiService.generateDesignTokens(projectSpec);
+    const tokens = await this.aiService.generateDesignTokens(
+      run.brief,
+      projectSpec,
+    );
     const designDescription = await this.aiService.generateDesignDescription(
+      run.brief,
       projectSpec,
       tokens,
     );
@@ -189,6 +193,7 @@ export class PipelineService {
     run: RunEntity,
     projectSpec: ProjectSpec,
     tokens: DesignTokens,
+    designDescription: string,
     userId: string,
   ): Promise<void> {
     const referenceRun = await this.state.updateRunStatus(
@@ -201,8 +206,10 @@ export class PipelineService {
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
     const referenceSvg = await this.codeGeneratorService.generateReferenceSvg(
+      run.brief,
       projectSpec,
       tokens,
+      designDescription,
     );
     const referenceRelativePath = this.state.getRunRelativePath(
       userId,
@@ -244,6 +251,7 @@ export class PipelineService {
     run: RunEntity,
     projectSpec: ProjectSpec,
     tokens: DesignTokens,
+    designDescription: string,
     userId: string,
   ): Promise<void> {
     const codeRun = await this.state.updateRunStatus(
@@ -260,8 +268,10 @@ export class PipelineService {
       'code',
     );
     await this.codeGeneratorService.generateProjectFiles(
+      run.brief,
       projectSpec,
       tokens,
+      designDescription,
       codePath,
     );
 
@@ -376,8 +386,12 @@ export class PipelineService {
       run.id,
       ArtifactType.DesignTokens,
     );
+    const designArtifact = await this.state.getArtifactByType(
+      run.id,
+      ArtifactType.DesignDescription,
+    );
 
-    if (!specArtifact || !tokensArtifact) {
+    if (!specArtifact || !tokensArtifact || !designArtifact) {
       await this.state.failRun(run, 'Артефакты дизайна не найдены');
       return;
     }
@@ -386,10 +400,19 @@ export class PipelineService {
     const tokensContent = await this.state.readArtifactFile(
       tokensArtifact.path,
     );
+    const designDescription = await this.state.readArtifactFile(
+      designArtifact.path,
+    );
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as DesignTokens;
 
-    await this.prepareReferenceImage(run, projectSpec, tokens, userId);
+    await this.prepareReferenceImage(
+      run,
+      projectSpec,
+      tokens,
+      designDescription,
+      userId,
+    );
   }
 
   private async resumeFromReference(
@@ -404,8 +427,12 @@ export class PipelineService {
       run.id,
       ArtifactType.DesignTokens,
     );
+    const designArtifact = await this.state.getArtifactByType(
+      run.id,
+      ArtifactType.DesignDescription,
+    );
 
-    if (!specArtifact || !tokensArtifact) {
+    if (!specArtifact || !tokensArtifact || !designArtifact) {
       await this.state.failRun(run, 'Артефакты не найдены');
       return;
     }
@@ -414,10 +441,19 @@ export class PipelineService {
     const tokensContent = await this.state.readArtifactFile(
       tokensArtifact.path,
     );
+    const designDescription = await this.state.readArtifactFile(
+      designArtifact.path,
+    );
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as DesignTokens;
 
-    await this.prepareFrontendProject(run, projectSpec, tokens, userId);
+    await this.prepareFrontendProject(
+      run,
+      projectSpec,
+      tokens,
+      designDescription,
+      userId,
+    );
   }
 
   private async resumeFromCode(run: RunEntity, userId: string): Promise<void> {
@@ -465,7 +501,28 @@ export class PipelineService {
       const projectSpec = JSON.parse(specContent) as ProjectSpec;
       const tokens = JSON.parse(tokensContent) as DesignTokens;
 
-      await this.prepareReferenceImage(run, projectSpec, tokens, userId);
+      const designArtifact = await this.state.getArtifactByType(
+        run.id,
+        ArtifactType.DesignDescription,
+      );
+      if (!designArtifact) {
+        await this.state.failRun(
+          run,
+          'Описание дизайна для генерации reference не найдено',
+        );
+        return;
+      }
+      const designDescription = await this.state.readArtifactFile(
+        designArtifact.path,
+      );
+
+      await this.prepareReferenceImage(
+        run,
+        projectSpec,
+        tokens,
+        designDescription,
+        userId,
+      );
     }
 
     const builtRun = await this.buildService.buildProject(
@@ -592,8 +649,12 @@ export class PipelineService {
     const specContent = await this.state.readArtifactFile(specArtifact.path);
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
 
-    const tokens = await this.aiService.generateDesignTokens(projectSpec);
+    const tokens = await this.aiService.generateDesignTokens(
+      run.brief,
+      projectSpec,
+    );
     const designDescription = await this.aiService.generateDesignDescription(
+      run.brief,
       projectSpec,
       tokens,
     );
@@ -659,8 +720,12 @@ export class PipelineService {
       run.id,
       ArtifactType.DesignTokens,
     );
+    const designArtifact = await this.state.getArtifactByType(
+      run.id,
+      ArtifactType.DesignDescription,
+    );
 
-    if (!specArtifact || !tokensArtifact) {
+    if (!specArtifact || !tokensArtifact || !designArtifact) {
       await this.state.failRun(run, 'Артефакты не найдены');
       return;
     }
@@ -669,12 +734,17 @@ export class PipelineService {
     const tokensContent = await this.state.readArtifactFile(
       tokensArtifact.path,
     );
+    const designDescription = await this.state.readArtifactFile(
+      designArtifact.path,
+    );
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as DesignTokens;
 
     const referenceSvg = await this.codeGeneratorService.generateReferenceSvg(
+      run.brief,
       projectSpec,
       tokens,
+      designDescription,
     );
     const referenceRelativePath = this.state.getRunRelativePath(
       userId,
@@ -713,8 +783,12 @@ export class PipelineService {
       run.id,
       ArtifactType.DesignTokens,
     );
+    const designArtifact = await this.state.getArtifactByType(
+      run.id,
+      ArtifactType.DesignDescription,
+    );
 
-    if (!specArtifact || !tokensArtifact) {
+    if (!specArtifact || !tokensArtifact || !designArtifact) {
       await this.state.failRun(run, 'Артефакты не найдены');
       return;
     }
@@ -722,6 +796,9 @@ export class PipelineService {
     const specContent = await this.state.readArtifactFile(specArtifact.path);
     const tokensContent = await this.state.readArtifactFile(
       tokensArtifact.path,
+    );
+    const designDescription = await this.state.readArtifactFile(
+      designArtifact.path,
     );
     const projectSpec = JSON.parse(specContent) as unknown as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as unknown as DesignTokens;
@@ -731,8 +808,10 @@ export class PipelineService {
       'code',
     );
     await this.codeGeneratorService.generateProjectFiles(
+      run.brief,
       projectSpec,
       tokens,
+      designDescription,
       codePath,
     );
 

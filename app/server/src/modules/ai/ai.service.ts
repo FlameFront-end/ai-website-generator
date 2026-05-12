@@ -29,7 +29,7 @@ export class AiService {
       messages: buildExtractSpecMessages(brief),
       json: true,
       temperature: 0.3,
-      maxTokens: 2048,
+      maxTokens: 4096,
     });
 
     return this.parseJson<ProjectSpec>(result.content, 'ProjectSpec');
@@ -38,14 +38,17 @@ export class AiService {
   /**
    * Generate design tokens based on project spec via LLM
    */
-  async generateDesignTokens(spec: ProjectSpec): Promise<DesignTokens> {
+  async generateDesignTokens(
+    brief: string,
+    spec: ProjectSpec,
+  ): Promise<DesignTokens> {
     this.logger.log('Generating design tokens via AI');
 
     const result = await this.provider.chat({
-      messages: buildDesignTokensMessages(spec),
+      messages: buildDesignTokensMessages(brief, spec),
       json: true,
       temperature: 0.3,
-      maxTokens: 2048,
+      maxTokens: 4096,
     });
 
     return this.parseJson<DesignTokens>(result.content, 'DesignTokens');
@@ -55,13 +58,14 @@ export class AiService {
    * Generate design description via LLM
    */
   async generateDesignDescription(
+    brief: string,
     spec: ProjectSpec,
     tokens: DesignTokens,
   ): Promise<DesignDescription> {
     this.logger.log('Generating design description via AI');
 
     const result = await this.provider.chat({
-      messages: buildDesignDescriptionMessages(spec, tokens),
+      messages: buildDesignDescriptionMessages(brief, spec, tokens),
       temperature: 0.5,
       maxTokens: 4096,
     });
@@ -73,13 +77,20 @@ export class AiService {
    * Generate React component code + CSS via LLM
    */
   async generateCode(
+    brief: string,
     spec: ProjectSpec,
     tokens: DesignTokens,
+    designDescription: string,
   ): Promise<{ mainTsx: string; stylesCss: string }> {
     this.logger.log('Generating frontend code via AI');
 
     const result = await this.provider.chat({
-      messages: buildGenerateCodeMessages(spec, tokens),
+      messages: buildGenerateCodeMessages(
+        brief,
+        spec,
+        tokens,
+        designDescription,
+      ),
       json: true,
       temperature: 0.3,
       maxTokens: 8192,
@@ -95,13 +106,20 @@ export class AiService {
    * Generate reference SVG via LLM
    */
   async generateReferenceSvg(
+    brief: string,
     spec: ProjectSpec,
     tokens: DesignTokens,
+    designDescription: string,
   ): Promise<string> {
     this.logger.log('Generating reference SVG via AI');
 
     const result = await this.provider.chat({
-      messages: buildGenerateSvgMessages(spec, tokens),
+      messages: buildGenerateSvgMessages(
+        brief,
+        spec,
+        tokens,
+        designDescription,
+      ),
       temperature: 0.4,
       maxTokens: 4096,
     });
