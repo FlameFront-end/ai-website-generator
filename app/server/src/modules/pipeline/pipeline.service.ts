@@ -46,7 +46,7 @@ export class PipelineService {
     await this.state.addLog(briefRun.id, 'Начата обработка брифа');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const projectSpec: ProjectSpec = this.aiService.extractProjectSpec(
+    const projectSpec: ProjectSpec = await this.aiService.extractProjectSpec(
       briefRun.brief,
     );
     const specRelativePath = this.state.getRunRelativePath(
@@ -99,8 +99,8 @@ export class PipelineService {
     await this.state.addLog(run.id, 'Начато описание дизайна');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const tokens = this.aiService.generateDesignTokens(projectSpec);
-    const designDescription = this.aiService.generateDesignDescription(
+    const tokens = await this.aiService.generateDesignTokens(projectSpec);
+    const designDescription = await this.aiService.generateDesignDescription(
       projectSpec,
       tokens,
     );
@@ -200,7 +200,7 @@ export class PipelineService {
     await this.state.addLog(run.id, 'Начата подготовка визуального референса');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const referenceSvg = this.codeGeneratorService.generateReferenceSvg(
+    const referenceSvg = await this.codeGeneratorService.generateReferenceSvg(
       projectSpec,
       tokens,
     );
@@ -547,7 +547,7 @@ export class PipelineService {
     await this.state.updateRun(run, { brief: updatedBrief });
 
     const projectSpec: ProjectSpec =
-      this.aiService.extractProjectSpec(updatedBrief);
+      await this.aiService.extractProjectSpec(updatedBrief);
     const specRelativePath = this.state.getRunRelativePath(
       userId,
       run.slug,
@@ -592,8 +592,8 @@ export class PipelineService {
     const specContent = await this.state.readArtifactFile(specArtifact.path);
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
 
-    const tokens = this.aiService.generateDesignTokens(projectSpec);
-    const designDescription = this.aiService.generateDesignDescription(
+    const tokens = await this.aiService.generateDesignTokens(projectSpec);
+    const designDescription = await this.aiService.generateDesignDescription(
       projectSpec,
       tokens,
     );
@@ -672,7 +672,7 @@ export class PipelineService {
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as DesignTokens;
 
-    const referenceSvg = this.codeGeneratorService.generateReferenceSvg(
+    const referenceSvg = await this.codeGeneratorService.generateReferenceSvg(
       projectSpec,
       tokens,
     );

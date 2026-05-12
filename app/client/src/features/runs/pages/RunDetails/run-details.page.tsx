@@ -112,6 +112,7 @@ export default function RunDetailsPage() {
         onChange={setActiveTab}
         styles={styles}
         status={run.status}
+        currentStep={run.currentStep ?? run.status}
         onApprove={handleApprove}
         isApproving={isApproving}
       />

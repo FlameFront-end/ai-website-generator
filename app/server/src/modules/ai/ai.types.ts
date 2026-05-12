@@ -48,10 +48,3 @@ export interface DesignTokens {
 export interface DesignDescription {
   markdown: string;
 }
-
-export interface AiServiceConfig {
-  provider: 'mock' | 'openai' | 'anthropic';
-  apiKey?: string;
-  model?: string;
-  timeout?: number;
-}

@@ -1,6 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import type { DesignDescription, DesignTokens, ProjectSpec } from './ai.types';
+import {
+  AI_PROVIDER,
+  type AiProvider,
+} from './providers/ai-provider.interface';
+import { buildExtractSpecMessages } from './prompts/extract-spec.prompt';
+import { buildDesignTokensMessages } from './prompts/design-tokens.prompt';
+import { buildDesignDescriptionMessages } from './prompts/design-description.prompt';
+import { buildGenerateCodeMessages } from './prompts/generate-code.prompt';
+import { buildGenerateSvgMessages } from './prompts/generate-svg.prompt';
 
 export type { DesignDescription, DesignTokens, ProjectSpec };
 
@@ -8,190 +17,138 @@ export type { DesignDescription, DesignTokens, ProjectSpec };
 export class AiService {
   private readonly logger = new Logger(AiService.name);
 
+  constructor(@Inject(AI_PROVIDER) private readonly provider: AiProvider) {}
+
   /**
-   * Extract project specification from brief
-   * TODO: Replace with real AI service call
+   * Extract project specification from brief via LLM
    */
-  extractProjectSpec(brief: string): ProjectSpec {
-    this.logger.log('Extracting project spec from brief (MOCK)');
-    return this.mockProjectSpec(brief);
+  async extractProjectSpec(brief: string): Promise<ProjectSpec> {
+    this.logger.log('Extracting project spec from brief via AI');
+
+    const result = await this.provider.chat({
+      messages: buildExtractSpecMessages(brief),
+      json: true,
+      temperature: 0.3,
+      maxTokens: 2048,
+    });
+
+    return this.parseJson<ProjectSpec>(result.content, 'ProjectSpec');
   }
 
   /**
-   * Generate design tokens based on project spec
-   * TODO: Replace with real AI service call
+   * Generate design tokens based on project spec via LLM
    */
-  generateDesignTokens(spec: ProjectSpec): DesignTokens {
-    this.logger.log('Generating design tokens (MOCK)');
-    return this.mockDesignTokens(spec);
+  async generateDesignTokens(spec: ProjectSpec): Promise<DesignTokens> {
+    this.logger.log('Generating design tokens via AI');
+
+    const result = await this.provider.chat({
+      messages: buildDesignTokensMessages(spec),
+      json: true,
+      temperature: 0.3,
+      maxTokens: 2048,
+    });
+
+    return this.parseJson<DesignTokens>(result.content, 'DesignTokens');
   }
 
   /**
-   * Generate design description
-   * TODO: Replace with real AI service call
+   * Generate design description via LLM
    */
-  generateDesignDescription(
+  async generateDesignDescription(
     spec: ProjectSpec,
     tokens: DesignTokens,
-  ): DesignDescription {
-    this.logger.log('Generating design description (MOCK)');
-    return {
-      markdown: this.mockDesignDescription(spec, tokens),
-    };
+  ): Promise<DesignDescription> {
+    this.logger.log('Generating design description via AI');
+
+    const result = await this.provider.chat({
+      messages: buildDesignDescriptionMessages(spec, tokens),
+      temperature: 0.5,
+      maxTokens: 4096,
+    });
+
+    return { markdown: result.content };
   }
 
-  private mockProjectSpec(brief: string): ProjectSpec {
-    const style = this.extractStyleItems(brief);
-    const hasProductCard = /карточк[аи]\s+продукт|product\s+card/i.test(brief);
-
-    return {
-      siteType: /лендинг|landing/i.test(brief) ? 'лендинг' : 'сайт',
-      sectionType: /hero|первый экран|hero-блок/i.test(brief)
-        ? 'hero-блок'
-        : 'hero-блок',
-      style,
-      audience: /финансов/i.test(brief)
-        ? 'финансовые команды'
-        : 'общая аудитория',
-      requiredElements: [
-        'заголовок',
-        'описание',
-        'основная кнопка',
-        'вторая кнопка',
-        ...(hasProductCard ? ['карточка продукта'] : []),
-      ],
-      copy: {
-        headline: this.extractLineValue(
-          brief,
-          'Заголовок',
-          'ИИ-лендинг по брифу',
-        ),
-        description: this.extractLineValue(
-          brief,
-          'Описание',
-          'Сгенерируйте понятный первый экран на основе продуктового брифа.',
-        ),
-        primaryButton: this.extractLineValue(
-          brief,
-          'Основная кнопка',
-          'Начать',
-        ),
-        secondaryButton: this.extractLineValue(
-          brief,
-          'Вторая кнопка',
-          'Смотреть демо',
-        ),
-      },
-      visualPreferences: style,
-    };
-  }
-
-  private mockDesignTokens(spec: ProjectSpec): DesignTokens {
-    const isDark = this.hasStyle(spec, /темн|dark/i);
-    const isPremium = this.hasStyle(spec, /дорог|преми|premium/i);
-
-    return {
-      colors: {
-        background: isDark ? '#050816' : '#F7F8FB',
-        textPrimary: isDark ? '#FFFFFF' : '#101828',
-        textSecondary: isDark ? '#A7B0C0' : '#667085',
-        accent: '#7C3AED',
-        surface: isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF',
-        border: isDark ? 'rgba(255,255,255,0.14)' : '#E4E7EC',
-      },
-      layout: {
-        containerWidth: '1200px',
-        sectionPaddingY: '96px',
-        sectionPaddingX: '32px',
-        columns: spec.requiredElements.includes('карточка продукта') ? 2 : 1,
-      },
-      typography: {
-        headlineSize: isPremium ? '72px' : '64px',
-        headlineWeight: 700,
-        bodySize: '18px',
-        lineHeight: '1.08',
-      },
-      components: {
-        buttonRadius: '999px',
-        cardRadius: '24px',
-        cardShadow: isDark
-          ? '0 32px 80px rgba(91, 64, 255, 0.24)'
-          : '0 24px 60px rgba(16, 24, 40, 0.12)',
-      },
-    };
-  }
-
-  private mockDesignDescription(
+  /**
+   * Generate React component code + CSS via LLM
+   */
+  async generateCode(
     spec: ProjectSpec,
     tokens: DesignTokens,
-  ): string {
-    const productCardText = spec.requiredElements.includes('карточка продукта')
-      ? 'Справа располагается крупная карточка продукта с полупрозрачной поверхностью, мягкой обводкой и свечением.'
-      : 'Композиция строится вокруг текстового блока без отдельной продуктовой карточки.';
+  ): Promise<{ mainTsx: string; stylesCss: string }> {
+    this.logger.log('Generating frontend code via AI');
 
-    return `# Описание дизайна
+    const result = await this.provider.chat({
+      messages: buildGenerateCodeMessages(spec, tokens),
+      json: true,
+      temperature: 0.3,
+      maxTokens: 8192,
+    });
 
-## Фон
-
-Основной фон: \`${tokens.colors.background}\`.
-Визуальный стиль: ${spec.style.join(', ')}.
-Акцентный цвет: \`${tokens.colors.accent}\`.
-Для глубины используются мягкие радиальные подсветки и темные/нейтральные переходы, которые можно реализовать через CSS.
-
-## Сетка
-
-Тип блока: ${spec.sectionType}.
-Максимальная ширина контейнера: \`${tokens.layout.containerWidth}\`.
-Количество колонок: ${tokens.layout.columns}.
-Текстовый блок расположен слева. ${productCardText}
-Вертикальные отступы секции: \`${tokens.layout.sectionPaddingY}\`, горизонтальные: \`${tokens.layout.sectionPaddingX}\`.
-
-## Типографика
-
-Заголовок: \`${tokens.typography.headlineSize}\`, насыщенность ${tokens.typography.headlineWeight}, плотная высота строки \`${tokens.typography.lineHeight}\`.
-Основной цвет текста: \`${tokens.colors.textPrimary}\`.
-Вторичный текст: \`${tokens.colors.textSecondary}\`, размер \`${tokens.typography.bodySize}\`.
-
-## Кнопки
-
-Основная кнопка использует акцентный цвет \`${tokens.colors.accent}\`, белый текст и радиус \`${tokens.components.buttonRadius}\`.
-Вторая кнопка выглядит спокойнее: прозрачная или поверхностная заливка, тонкая обводка и тот же радиус.
-
-## Карточки
-
-Поверхность карточек: \`${tokens.colors.surface}\`.
-Обводка: \`${tokens.colors.border}\`.
-Радиус карточек: \`${tokens.components.cardRadius}\`.
-Тень: \`${tokens.components.cardShadow}\`.
-
-## Адаптив
-
-На мобильном экране блок становится одноколоночным: сначала текст, затем карточка или визуальный блок.
-Заголовок уменьшается, кнопки остаются крупными и удобными для касания.
-`;
+    return this.parseJson<{ mainTsx: string; stylesCss: string }>(
+      result.content,
+      'GeneratedCode',
+    );
   }
 
-  private extractStyleItems(brief: string): string[] {
-    const styleBlock =
-      brief.match(/стиль\s*:\s*([\s\S]*?)(?:\n\s*\n|текст\s*:|$)/i)?.[1] ?? '';
-    const items = styleBlock
-      .split('\n')
-      .map((line) => line.replace(/^[-*]\s*/, '').trim())
-      .filter(Boolean);
+  /**
+   * Generate reference SVG via LLM
+   */
+  async generateReferenceSvg(
+    spec: ProjectSpec,
+    tokens: DesignTokens,
+  ): Promise<string> {
+    this.logger.log('Generating reference SVG via AI');
 
-    return items.length > 0 ? items : ['современный'];
+    const result = await this.provider.chat({
+      messages: buildGenerateSvgMessages(spec, tokens),
+      temperature: 0.4,
+      maxTokens: 4096,
+    });
+
+    const svg = this.extractSvg(result.content);
+    return svg;
   }
 
-  private hasStyle(spec: ProjectSpec, pattern: RegExp): boolean {
-    return spec.style.some((item) => pattern.test(item));
+  private parseJson<T>(raw: string, label: string): T {
+    let cleaned = raw.trim();
+
+    // Strip markdown code fences if present
+    const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    if (fenceMatch) {
+      cleaned = fenceMatch[1].trim();
+    }
+
+    try {
+      return JSON.parse(cleaned) as T;
+    } catch {
+      this.logger.error(
+        `Failed to parse ${label} JSON: ${cleaned.slice(0, 300)}`,
+      );
+      throw new Error(`AI вернул невалидный JSON для ${label}`);
+    }
   }
 
-  private extractLineValue(
-    brief: string,
-    label: string,
-    fallback: string,
-  ): string {
-    const match = brief.match(new RegExp(`${label}\\s*:\\s*(.+)`, 'i'));
-    return match?.[1]?.trim() || fallback;
+  private extractSvg(raw: string): string {
+    let cleaned = raw.trim();
+
+    // Strip markdown code fences
+    const fenceMatch = cleaned.match(
+      /```(?:svg|xml|html)?\s*\n?([\s\S]*?)\n?```/,
+    );
+    if (fenceMatch) {
+      cleaned = fenceMatch[1].trim();
+    }
+
+    // Ensure it starts with <svg
+    const svgStart = cleaned.indexOf('<svg');
+    if (svgStart === -1) {
+      this.logger.error(
+        `No <svg> tag found in AI response: ${cleaned.slice(0, 200)}`,
+      );
+      throw new Error('AI не вернул валидный SVG');
+    }
+
+    return cleaned.slice(svgStart);
   }
 }

@@ -10,6 +10,7 @@ interface RunTabsProps {
   onChange: (tab: RunDetailsTab) => void;
   styles: Record<string, string>;
   status: string;
+  currentStep: string;
   onApprove?: () => void;
   isApproving?: boolean;
 }
@@ -27,6 +28,7 @@ export const RunTabs: FC<RunTabsProps> = ({
   onChange,
   styles,
   status,
+  currentStep,
   onApprove,
   isApproving = false,
 }) => {
@@ -35,7 +37,7 @@ export const RunTabs: FC<RunTabsProps> = ({
   return (
     <nav className={styles.tabs} aria-label="Разделы проекта">
       {TABS.map((tab) => {
-        const isAvailable = isTabAvailable(tab.id, status);
+        const isAvailable = isTabAvailable(tab.id, status, currentStep);
         const needsApproval = tab.id === approvalTab;
         return (
           <button

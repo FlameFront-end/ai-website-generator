@@ -80,97 +80,71 @@ export const TABS: Array<{ id: RunDetailsTab; label: string }> = [
   { id: "logs", label: "Логи" },
 ];
 
-export function isTabAvailable(tabId: RunDetailsTab, status: string): boolean {
+/**
+ * Ordered pipeline steps — each tab unlocks once its minimum step has been reached.
+ */
+const STEP_ORDER: string[] = [
+  "queued",
+  "prepare_brief",
+  // spec tab unlocks here
+  "awaiting_spec_approval",
+  "prepare_design_artifacts",
+  // design tab unlocks here
+  "prepare_design_tokens",
+  "awaiting_design_approval",
+  "prepare_reference_image",
+  // reference tab unlocks here
+  "awaiting_reference_approval",
+  "prepare_frontend_project",
+  // code tab unlocks here
+  "awaiting_code_approval",
+  "build_project",
+  "built",
+  "take_screenshots",
+  "screenshots_ready",
+  // result tab unlocks here
+  "visual_qa",
+  "visual_qa_failed",
+  "awaiting_final_approval",
+  "completed",
+  "pipeline_failed",
+  "build_failed",
+  "screenshots_failed",
+];
+
+/** Minimum step index at which each tab becomes available */
+const TAB_MIN_STEP: Record<RunDetailsTab, number> = {
+  overview: 0,
+  spec: STEP_ORDER.indexOf("awaiting_spec_approval"),
+  design: STEP_ORDER.indexOf("awaiting_design_approval"),
+  reference: STEP_ORDER.indexOf("awaiting_reference_approval"),
+  code: STEP_ORDER.indexOf("awaiting_code_approval"),
+  result: STEP_ORDER.indexOf("screenshots_ready"),
+  artifacts: 0,
+  logs: 0,
+};
+
+function getStepIndex(step: string): number {
+  const idx = STEP_ORDER.indexOf(step);
+  return idx === -1 ? 0 : idx;
+}
+
+export function isTabAvailable(
+  tabId: RunDetailsTab,
+  _status: string,
+  currentStep?: string,
+): boolean {
   const alwaysAvailable: RunDetailsTab[] = ["overview", "artifacts", "logs"];
 
   if (alwaysAvailable.includes(tabId)) {
     return true;
   }
 
-  // Always allow access when running - let artifacts determine availability
-  if (status === "running") {
-    return true;
-  }
+  const step = currentStep ?? _status;
+  const currentIndex = getStepIndex(step);
+  const requiredIndex = TAB_MIN_STEP[tabId];
 
-  // Define the minimum status required for each tab
-  const tabMinStatus: Record<RunDetailsTab, string[]> = {
-    overview: [],
-    spec: [
-      "project_spec_ready",
-      "prepare_design_artifacts",
-      "design_artifacts_ready",
-      "prepare_reference_image",
-      "reference_ready",
-      "prepare_frontend_project",
-      "build_project",
-      "build_success",
-      "take_screenshots",
-      "screenshots_ready",
-      "visual_qa",
-      "awaiting_spec_approval",
-      "awaiting_design_approval",
-      "awaiting_reference_approval",
-      "awaiting_code_approval",
-      "awaiting_final_approval",
-      "completed",
-      "failed",
-    ],
-    design: [
-      "design_artifacts_ready",
-      "prepare_reference_image",
-      "reference_ready",
-      "prepare_frontend_project",
-      "build_project",
-      "build_success",
-      "take_screenshots",
-      "screenshots_ready",
-      "visual_qa",
-      "awaiting_design_approval",
-      "awaiting_reference_approval",
-      "awaiting_code_approval",
-      "awaiting_final_approval",
-      "completed",
-      "failed",
-    ],
-    reference: [
-      "reference_ready",
-      "prepare_frontend_project",
-      "build_project",
-      "build_success",
-      "take_screenshots",
-      "screenshots_ready",
-      "visual_qa",
-      "awaiting_reference_approval",
-      "awaiting_code_approval",
-      "awaiting_final_approval",
-      "completed",
-      "failed",
-    ],
-    code: [
-      "frontend_project_ready",
-      "build_project",
-      "build_success",
-      "take_screenshots",
-      "screenshots_ready",
-      "visual_qa",
-      "awaiting_code_approval",
-      "awaiting_final_approval",
-      "completed",
-      "failed",
-    ],
-    result: [
-      "screenshots_ready",
-      "visual_qa",
-      "awaiting_final_approval",
-      "completed",
-      "failed",
-    ],
-    artifacts: [],
-    logs: [],
-  };
-
-  const requiredStatuses = tabMinStatus[tabId];
-  return requiredStatuses?.includes(status) || false;
+  return currentIndex >= requiredIndex;
 }
 
 export const IMAGE_MIME_TYPES = [

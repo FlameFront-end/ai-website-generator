@@ -25,6 +25,14 @@ const env = cleanEnv(process.env, {
   GENERATED_ROOT: str({ default: 'generated' }),
   JWT_SECRET: str({ default: 'default-secret-change-in-production' }),
   JWT_EXPIRES_IN: str({ default: '7d' }),
+  AI_PROVIDER: str({
+    default: 'lmstudio',
+    choices: ['lmstudio', 'openai', 'openrouter', 'llm7'],
+  }),
+  AI_BASE_URL: str({ default: 'http://localhost:1234/v1' }),
+  AI_API_KEY: str({ default: '' }),
+  AI_MODEL: str({ default: '' }),
+  AI_TIMEOUT: num({ default: 120000 }),
 });
 
 function buildDatabaseUrl(): string {
@@ -40,6 +48,8 @@ function buildDatabaseUrl(): string {
 
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
+
+export type AiProviderType = 'lmstudio' | 'openai' | 'openrouter' | 'llm7';
 
 export type AppConfig = Readonly<{
   server: Readonly<{
@@ -57,6 +67,13 @@ export type AppConfig = Readonly<{
   jwt: Readonly<{
     secret: string;
     expiresIn: string;
+  }>;
+  ai: Readonly<{
+    provider: AiProviderType;
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+    timeout: number;
   }>;
 }>;
 
@@ -76,5 +93,12 @@ export const appConfig: AppConfig = Object.freeze({
   jwt: Object.freeze({
     secret: env.JWT_SECRET,
     expiresIn: env.JWT_EXPIRES_IN,
+  }),
+  ai: Object.freeze({
+    provider: env.AI_PROVIDER,
+    baseUrl: env.AI_BASE_URL,
+    apiKey: env.AI_API_KEY,
+    model: env.AI_MODEL,
+    timeout: env.AI_TIMEOUT,
   }),
 });
