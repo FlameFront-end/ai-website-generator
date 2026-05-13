@@ -95,10 +95,10 @@ export class CodeGeneratorService {
     return {
       projectType: 'next-tailwind',
       title: projectSpec.copy.headline,
-      entrypoint: 'app/page.tsx',
+      entrypoint: 'src/app/page.tsx',
       files: files.map((file) => file.path),
       commands: {
-        install: 'npm install',
+        install: 'npm install --include=dev',
         dev: 'npm run dev',
         build: 'npm run build',
       },
@@ -154,8 +154,6 @@ export class CodeGeneratorService {
           next: '^15.1.0',
           react: '^19.0.0',
           'react-dom': '^19.0.0',
-        },
-        devDependencies: {
           '@types/react': '^19.0.0',
           '@types/react-dom': '^19.0.0',
           autoprefixer: '^10.4.20',
@@ -163,6 +161,7 @@ export class CodeGeneratorService {
           tailwindcss: '^3.4.17',
           typescript: '^5.7.0',
         },
+        devDependencies: {},
         private: true,
         name: packageName || 'generated-landing',
         version: '0.0.0',
@@ -200,6 +199,10 @@ export default nextConfig;
           isolatedModules: true,
           jsx: 'preserve',
           incremental: true,
+          baseUrl: '.',
+          paths: {
+            '@/*': ['./src/*'],
+          },
           plugins: [{ name: 'next' }],
         },
         include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
@@ -215,9 +218,11 @@ export default nextConfig;
 
 const config: Config = {
   content: [
-    './app/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './lib/**/*.{ts,tsx}',
+    './src/app/**/*.{ts,tsx}',
+    './src/components/**/*.{ts,tsx}',
+    './src/config/**/*.{ts,tsx}',
+    './src/content/**/*.{ts,tsx}',
+    './src/lib/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {},
@@ -249,7 +254,7 @@ Generated Next.js + Tailwind site.
 ## Commands
 
 \`\`\`bash
-npm install
+npm install --include=dev
 npm run dev
 npm run build
 \`\`\`
@@ -276,7 +281,12 @@ npm run build
         content: file.content,
       }));
 
-    const requiredPaths = ['app/page.tsx', 'app/layout.tsx', 'app/globals.css'];
+    const requiredPaths = [
+      'src/app/page.tsx',
+      'src/app/layout.tsx',
+      'src/app/globals.css',
+      'src/components/landing/landing-page.tsx',
+    ];
     const paths = new Set(normalizedFiles.map((file) => file.path));
     const missingPaths = requiredPaths.filter(
       (requiredPath) => !paths.has(requiredPath),
@@ -288,6 +298,83 @@ npm run build
       );
     }
 
+    this.validateGeneratedFileReferences(normalizedFiles);
+
     return normalizedFiles;
+  }
+
+  private validateGeneratedFileReferences(files: GeneratedFile[]): void {
+    const paths = new Set(files.map((file) => file.path));
+    const importPattern =
+      /(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+    for (const file of files) {
+      if (!['.ts', '.tsx'].includes(path.posix.extname(file.path))) {
+        continue;
+      }
+
+      const currentDir = path.posix.dirname(file.path);
+      const missingImports = new Set<string>();
+      let match: RegExpExecArray | null;
+
+      while ((match = importPattern.exec(file.content)) !== null) {
+        const specifier = match[1] ?? match[2];
+        const resolvedPath = this.resolveGeneratedImportPath(
+          specifier,
+          currentDir,
+        );
+
+        if (!resolvedPath) {
+          continue;
+        }
+
+        if (!this.hasGeneratedImportTarget(paths, resolvedPath)) {
+          missingImports.add(specifier);
+        }
+      }
+
+      if (missingImports.size > 0) {
+        throw new Error(
+          `AI returned ${file.path} with missing local imports: ${[
+            ...missingImports,
+          ].join(', ')}`,
+        );
+      }
+    }
+  }
+
+  private resolveGeneratedImportPath(
+    specifier: string,
+    currentDir: string,
+  ): string | null {
+    if (specifier.startsWith('@/')) {
+      return path.posix.normalize(`src/${specifier.slice(2)}`);
+    }
+
+    if (specifier.startsWith('./') || specifier.startsWith('../')) {
+      const resolvedPath = path.posix.normalize(
+        path.posix.join(currentDir, specifier),
+      );
+
+      return resolvedPath.startsWith('src/') ? resolvedPath : null;
+    }
+
+    return null;
+  }
+
+  private hasGeneratedImportTarget(paths: Set<string>, importPath: string) {
+    if (paths.has(importPath)) {
+      return true;
+    }
+
+    const candidates = [
+      `${importPath}.ts`,
+      `${importPath}.tsx`,
+      `${importPath}.css`,
+      path.posix.join(importPath, 'index.ts'),
+      path.posix.join(importPath, 'index.tsx'),
+    ];
+
+    return candidates.some((candidate) => paths.has(candidate));
   }
 }

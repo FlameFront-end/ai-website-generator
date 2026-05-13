@@ -42,7 +42,7 @@ export class BuildService {
 
     try {
       await this.state.addLog(run.id, 'Установка зависимостей...');
-      await execAsync('npm install', {
+      await execAsync('npm install --include=dev', {
         cwd: codePath,
         timeout: BUILD_TIMEOUT_MS,
       });

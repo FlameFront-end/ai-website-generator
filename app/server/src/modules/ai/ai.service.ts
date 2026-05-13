@@ -207,7 +207,28 @@ export class AiService {
       maxTokens: 4096,
     });
 
-    return { markdown: result.content };
+    return { markdown: this.sanitizeDesignDescription(result.content) };
+  }
+
+  private sanitizeDesignDescription(markdown: string): string {
+    return markdown
+      .replace(/```[\s\S]*?```/g, '')
+      .split(/\r?\n(?=#{1,6}\s+)/)
+      .filter((section) => {
+        const heading = section.split(/\r?\n/, 1)[0]?.toLowerCase() ?? '';
+
+        return ![
+          'developer handoff',
+          'html/css',
+          'react',
+          'implementation',
+          'пример кода',
+          'код',
+        ].some((blockedHeading) => heading.includes(blockedHeading));
+      })
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   /**
@@ -230,7 +251,7 @@ export class AiService {
       ),
       json: true,
       temperature: 0.3,
-      maxTokens: 8192,
+      maxTokens: 16384,
     });
 
     return this.parseJson<{ files: GeneratedCodeFile[] }>(

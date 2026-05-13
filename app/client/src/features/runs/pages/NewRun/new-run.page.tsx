@@ -104,7 +104,7 @@ function NewRunDraftPage({
     initialDraft?.isHistoryExpanded ?? false,
   );
   const [isClarifying, setIsClarifying] = useState(false);
-  const historyEndRef = useRef<HTMLDivElement | null>(null);
+  const historyListRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const hasDraft =
@@ -410,11 +410,16 @@ function NewRunDraftPage({
   );
 
   useEffect(() => {
-    historyEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
+    const historyList = historyListRef.current;
+    if (!historyList) return;
+
+    requestAnimationFrame(() => {
+      historyList.scrollTo({
+        top: historyList.scrollHeight,
+        behavior: "smooth",
+      });
     });
-  }, [answers.length]);
+  }, [answers.length, isHistoryExpanded]);
 
   return (
     <section className={styles.page}>
@@ -471,7 +476,7 @@ function NewRunDraftPage({
                   {isHistoryExpanded ? "Свернуть" : "Развернуть"}
                 </button>
               </div>
-              <div className={styles.answerHistoryList}>
+              <div ref={historyListRef} className={styles.answerHistoryList}>
                 {answers.map((answer, index) => (
                   <div key={`${answer.questionId}:${index}`}>
                     <div className={styles.answerHistoryItemHeader}>
@@ -486,7 +491,6 @@ function NewRunDraftPage({
                     <p>{formatAnswerValue(answer.value)}</p>
                   </div>
                 ))}
-                <div ref={historyEndRef} className={styles.historyEnd} />
               </div>
             </div>
           )}
