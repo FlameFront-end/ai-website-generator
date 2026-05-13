@@ -7,7 +7,9 @@ import {
   useCodeFilesQuery,
 } from "@/api/services/runs";
 
+import { CodeViewer } from "../components/CodeViewer";
 import { FileTree } from "../components/FileTree";
+import { getLanguageFromPath } from "../utils";
 
 interface CodeTabProps {
   runId: string;
@@ -39,15 +41,28 @@ export const CodeTab: FC<CodeTabProps> = ({ runId, styles }) => {
           />
         )}
       </div>
-      <div className={styles.codeViewer}>
-        {selectedFile && contentQuery.isLoading && <p>Загружаем файл...</p>}
+      <div className={styles.fileViewer}>
+        {selectedFile && contentQuery.isLoading && (
+          <div className={styles.codeLoading}>
+            <span className={styles.codeLoadingSpinner} />
+          </div>
+        )}
         {selectedFile && contentQuery.isError && (
-          <p>Не удалось загрузить файл.</p>
+          <div className={styles.fileViewerEmpty}>
+            <p>Не удалось загрузить файл.</p>
+          </div>
         )}
         {contentQuery.data && (
-          <pre className={styles.codeBlock}>
-            <code>{contentQuery.data.content}</code>
-          </pre>
+          <CodeViewer
+            content={contentQuery.data.content}
+            language={getLanguageFromPath(selectedFile ?? "")}
+            styles={styles}
+          />
+        )}
+        {!selectedFile && (
+          <div className={styles.fileViewerEmpty}>
+            <p>Выберите файл в дереве проекта</p>
+          </div>
         )}
       </div>
     </div>

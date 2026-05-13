@@ -19,16 +19,16 @@ hljs.registerLanguage("markdown", langMarkdown);
 
 export function CodeViewer({ content, language, styles }: CodeViewerProps) {
   const codeRef = useRef<HTMLElement>(null);
+  const normalizedLanguage = hljs.getLanguage(language) ? language : "plaintext";
 
   useEffect(() => {
     if (!codeRef.current) return;
     codeRef.current.removeAttribute("data-highlighted");
     codeRef.current.textContent = content;
-    const lang = hljs.getLanguage(language) ? language : "plaintext";
-    if (lang !== "plaintext") {
+    if (normalizedLanguage !== "plaintext") {
       hljs.highlightElement(codeRef.current);
     }
-  }, [content, language]);
+  }, [content, normalizedLanguage]);
 
   const lines = content.split("\n");
 
@@ -40,7 +40,7 @@ export function CodeViewer({ content, language, styles }: CodeViewerProps) {
         ))}
       </div>
       <pre className={styles.codeBlock}>
-        <code ref={codeRef} />
+        <code ref={codeRef} className={`language-${normalizedLanguage}`} />
       </pre>
     </div>
   );

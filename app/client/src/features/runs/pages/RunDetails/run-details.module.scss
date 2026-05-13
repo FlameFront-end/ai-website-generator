@@ -840,6 +840,7 @@ p {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
   min-width: 0;
   background: #000000;
 }
@@ -907,6 +908,8 @@ p {
 .codeWrapper {
   display: flex;
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow: auto;
   background: #000000;
 }
@@ -932,7 +935,8 @@ p {
 }
 
 .codeBlock {
-  flex: 1;
+  flex: 1 0 auto;
+  min-width: max-content;
   overflow: visible;
   margin: 0;
   padding: 18px 22px;
