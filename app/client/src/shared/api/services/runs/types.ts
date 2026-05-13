@@ -55,6 +55,7 @@ export interface Run {
 
 export interface CreateRunRequest {
   brief: string;
+  displayName?: string | null;
 }
 
 export interface CreateRunResponse {
@@ -108,6 +109,7 @@ export interface ClarifyBriefResponse {
   estimatedTotalQuestions?: number;
   missingFields: string[];
   understoodSummary?: string;
+  projectTitle?: string;
   questions: BriefClarificationQuestion[];
   finalBrief: string | null;
 }

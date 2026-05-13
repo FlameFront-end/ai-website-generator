@@ -157,6 +157,7 @@ export interface BriefClarificationResult {
   estimatedTotalQuestions?: number;
   missingFields: string[];
   understoodSummary?: string;
+  projectTitle?: string;
   questions: BriefClarificationQuestion[];
   finalBrief: string | null;
 }

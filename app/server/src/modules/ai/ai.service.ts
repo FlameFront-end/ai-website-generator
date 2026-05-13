@@ -34,17 +34,6 @@ export class AiService {
   ): Promise<BriefClarificationResult> {
     this.logger.log('Clarifying brief via AI');
 
-    if (answers.length >= 5) {
-      return {
-        status: 'ready',
-        confidence: 0.8,
-        estimatedTotalQuestions: 5,
-        missingFields: [],
-        questions: [],
-        finalBrief: this.buildFallbackFinalBrief(brief, answers),
-      };
-    }
-
     const result = await this.providers.chat('analysis', {
       messages: buildClarifyBriefMessages(brief, answers),
       json: true,
@@ -65,7 +54,13 @@ export class AiService {
     answers: BriefClarificationAnswer[],
     result: BriefClarificationResult,
   ): BriefClarificationResult {
-    if (result.status !== 'needs_clarification') return result;
+    if (result.status !== 'needs_clarification') {
+      return {
+        ...result,
+        projectTitle:
+          result.projectTitle?.trim() || this.buildFallbackProjectTitle(brief),
+      };
+    }
 
     const previousQuestions = answers.map((answer) =>
       this.normalizeQuestion(answer.question),
@@ -93,6 +88,7 @@ export class AiService {
     return {
       ...result,
       status: 'ready',
+      projectTitle: this.buildFallbackProjectTitle(brief),
       questions: [],
       finalBrief: this.buildFallbackFinalBrief(brief, answers),
     };
@@ -123,10 +119,41 @@ export class AiService {
     answers: BriefClarificationAnswer[],
   ) {
     const answeredContext = answers
-      .map((answer) => `${answer.question}: ${String(answer.value)}`)
+      .map((answer) => {
+        const value = Array.isArray(answer.value)
+          ? answer.value.join(', ')
+          : String(answer.value);
+        return value.trim();
+      })
+      .filter(Boolean)
       .join('\n');
 
-    return [brief, answeredContext].filter(Boolean).join('\n\n');
+    return [
+      'Идея сайта',
+      brief.trim(),
+      '',
+      'Уточнённый контекст',
+      answeredContext,
+      '',
+      'Проектная задача',
+      'Нужно сгенерировать полноценный современный сайт на основе исходной идеи и уточнённого контекста. Сайт должен понятно объяснять предложение, быть ориентирован на выбранную аудиторию и вести пользователя к целевому действию.',
+      '',
+      'Требования к генерации',
+      'Использовать уточнения как требования к структуре, содержанию, визуальному стилю, тону коммуникации и приоритетам интерфейса. Если часть деталей не указана явно, аккуратно додумать их в рамках исходной идеи, аудитории и выбранного направления сайта.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private buildFallbackProjectTitle(brief: string): string {
+    const title = brief
+      .trim()
+      .replace(/\s+/g, ' ')
+      .split(/[.!?\n]/)[0]
+      .slice(0, 60)
+      .trim();
+
+    return title || 'Новый проект';
   }
 
   /**

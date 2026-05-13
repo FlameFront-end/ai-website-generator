@@ -11,6 +11,7 @@ import {
 import type { RunLog } from "@/api/services/runs";
 import type { UseQueryResult } from "@tanstack/react-query";
 
+import { translateLogMessage } from "../../pages/RunDetails/utils";
 import styles from "./logs-panel.module.scss";
 
 interface LogsPanelProps {
@@ -124,7 +125,9 @@ export function LogsPanel({
                       >
                         {LOG_LEVEL_ICONS[log.level]}
                       </span>
-                      <span className={styles.logTitle}>{log.message}</span>
+                      <span className={styles.logTitle}>
+                        {translateLogMessage(log.message)}
+                      </span>
                       <span className={styles.logTime}>
                         {new Date(log.createdAt).toLocaleString()}
                       </span>
@@ -145,7 +148,9 @@ export function LogsPanel({
                       >
                         {LOG_LEVEL_ICONS[log.level]}
                       </span>
-                      <span className={styles.logTitle}>{log.message}</span>
+                      <span className={styles.logTitle}>
+                        {translateLogMessage(log.message)}
+                      </span>
                       <span className={styles.logTime}>
                         {new Date(log.createdAt).toLocaleString()}
                       </span>

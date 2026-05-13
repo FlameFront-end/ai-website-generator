@@ -66,11 +66,18 @@ export default function NewRunPage() {
   const requestedDraftId = searchParams.get("draft");
 
   return (
-    <NewRunDraftPage key={requestedDraftId ?? "new"} draftId={requestedDraftId} />
+    <NewRunDraftPage
+      key={requestedDraftId ?? "new"}
+      draftId={requestedDraftId}
+    />
   );
 }
 
-function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null }) {
+function NewRunDraftPage({
+  draftId: requestedDraftId,
+}: {
+  draftId: string | null;
+}) {
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
   const createRunMutation = useCreateRunMutation();
@@ -84,6 +91,7 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
   const [finalBrief, setFinalBrief] = useState<string | null>(
     initialDraft?.finalBrief ?? null,
   );
+  const [projectTitle, setProjectTitle] = useState(initialDraft?.title ?? "");
   const [clarification, setClarification] =
     useState<ClarifyBriefResponse | null>(initialDraft?.clarification ?? null);
   const [answers, setAnswers] = useState<BriefClarificationAnswer[]>(
@@ -116,7 +124,7 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
 
     const draft: BriefDraft = {
       id: draftId,
-      title: initialDraft?.title ?? null,
+      title: projectTitle.trim() || null,
       rawBrief,
       finalBrief,
       clarification,
@@ -131,10 +139,10 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
   }, [
     draftId,
     initialDraft?.createdAt,
-    initialDraft?.title,
     requestedDraftId,
     rawBrief,
     finalBrief,
+    projectTitle,
     clarification,
     answers,
     answerMap,
@@ -157,6 +165,7 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
 
       if (result.status === "ready" && result.finalBrief) {
         setFinalBrief(result.finalBrief);
+        setProjectTitle(result.projectTitle ?? "");
       }
     } catch (error) {
       console.error("Failed to clarify brief:", error);
@@ -169,6 +178,7 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
   const handleInitialBrief = (brief: string) => {
     setRawBrief(brief);
     setFinalBrief(null);
+    setProjectTitle("");
     setClarification(null);
     setAnswers([]);
     setAnswerMap({});
@@ -234,7 +244,7 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
 
   const handleCreateRun = (brief: string) => {
     createRunMutation.mutate(
-      { brief },
+      { brief, displayName: projectTitle.trim() || null },
       {
         onSuccess: (run) => {
           deleteBriefDraft(draftId);
@@ -250,6 +260,7 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
     setSearchParams({}, { replace: true });
     setRawBrief("");
     setFinalBrief(null);
+    setProjectTitle("");
     setClarification(null);
     setAnswers([]);
     setAnswerMap({});
@@ -544,20 +555,22 @@ function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null
         <div className={styles.wizard}>
           <div>
             <p className={styles.eyebrow}>Финальный бриф</p>
-            <h1>Теперь данных достаточно</h1>
+            <h1>{projectTitle || "Теперь данных достаточно"}</h1>
             <p>Проверьте улучшенный бриф и запускайте генерацию проекта.</p>
           </div>
+          <input
+            className={styles.input}
+            value={projectTitle}
+            onChange={(event) => setProjectTitle(event.target.value)}
+            placeholder="Короткое название проекта"
+          />
           <textarea
             className={styles.finalBrief}
             value={finalBrief}
             onChange={(event) => setFinalBrief(event.target.value)}
           />
           <div className={styles.actions}>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={resetDraft}
-            >
+            <Button type="button" variant="secondary" onClick={resetDraft}>
               Вернуться к началу
             </Button>
             <Button

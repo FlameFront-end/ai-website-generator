@@ -24,6 +24,7 @@ import type { Run } from "@/api/services/runs";
 import { Input, Modal, Spinner } from "@/kit";
 import { ROUTES } from "@/model";
 
+import { formatStep } from "../RunDetails/utils";
 import {
   deleteBriefDraft,
   readBriefDrafts,
@@ -69,7 +70,12 @@ export default function RunsListPage() {
     drafts.filter((draft) => {
       if (!query) return true;
 
-      return [getDraftTitle(draft), draft.rawBrief, draft.finalBrief, "черновик"]
+      return [
+        getDraftTitle(draft),
+        draft.rawBrief,
+        draft.finalBrief,
+        "черновик",
+      ]
         .filter((value): value is string => Boolean(value))
         .some((value) => value.toLowerCase().includes(query));
     }),
@@ -199,9 +205,9 @@ export default function RunsListPage() {
           )}
           {(Boolean(runsQuery.data?.length) || drafts.length > 0) &&
             !hasItems && (
-            <div className={styles.emptyState}>
-              По запросу «{searchQuery}» ничего не найдено.
-            </div>
+              <div className={styles.emptyState}>
+                По запросу «{searchQuery}» ничего не найдено.
+              </div>
             )}
           <div className={styles.runsList}>
             {filteredDrafts.map((draft) => (
@@ -214,7 +220,9 @@ export default function RunsListPage() {
                       ? styles.pinnedCard
                       : ""
                   }`}
-                  onClick={() => navigate(`${ROUTES.NEW_RUN}?draft=${draft.id}`)}
+                  onClick={() =>
+                    navigate(`${ROUTES.NEW_RUN}?draft=${draft.id}`)
+                  }
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
@@ -223,7 +231,9 @@ export default function RunsListPage() {
                   }}
                 >
                   <div className={styles.cardHeader}>
-                    <span className={styles.cardTitle}>{getDraftTitle(draft)}</span>
+                    <span className={styles.cardTitle}>
+                      {getDraftTitle(draft)}
+                    </span>
                     <div className={styles.cardHeaderRight}>
                       <span className={styles.draftBadge}>Черновик</span>
                       <span className={styles.cardActions}>
@@ -354,7 +364,9 @@ export default function RunsListPage() {
                           }}
                           title={run.isPinned ? "Открепить" : "Закрепить"}
                           aria-label={
-                            run.isPinned ? "Открепить проект" : "Закрепить проект"
+                            run.isPinned
+                              ? "Открепить проект"
+                              : "Закрепить проект"
                           }
                         >
                           {run.isPinned ? (
@@ -601,18 +613,7 @@ function getArtifactWord(count: number) {
 }
 
 function getStepLabel(step: string) {
-  const labels: Record<string, string> = {
-    prepare_brief: "Подготовка брифа",
-    extract_spec: "Спецификация",
-    design_tokens: "Дизайн-токены",
-    design_description: "Описание дизайна",
-    generate_reference: "Референс",
-    generate_code: "Генерация кода",
-    build: "Сборка",
-    visual_qa: "Проверка качества",
-  };
-
-  return labels[step] ?? step;
+  return formatStep(step);
 }
 
 function formatDate(value: string) {

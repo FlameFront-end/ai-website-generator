@@ -45,12 +45,14 @@ export class RunsService {
 
   async createRun(dto: CreateRunDto, userId: string) {
     const brief = dto.brief.trim();
+    const displayName = dto.displayName?.trim() || null;
     const runNumber = await this.getNextRunNumber(userId);
     const slug = toRunSlug(runNumber);
 
     const run = await this.runsRepository.save({
       runNumber,
       slug,
+      displayName,
       brief,
       status: RunStatus.Queued,
       currentStep: 'queued',
@@ -338,7 +340,10 @@ export class RunsService {
       );
     }
 
-    await this.addLog(run.id, `Запрошен перезапуск текущего шага "${step}"`);
+    await this.addLog(
+      run.id,
+      `Запрошен перезапуск текущего шага "${this.formatPipelineStep(step)}"`,
+    );
 
     await this.pipelineService.restartStep(run, step, userId);
 
@@ -441,7 +446,10 @@ export class RunsService {
 
     const nextStatus = stepToStatusMap[step];
     await this.runsRepository.update(runId, { status: nextStatus });
-    await this.addLog(run.id, `Шаг "${step}" подтверждён`);
+    await this.addLog(
+      run.id,
+      `Шаг "${this.formatPipelineStep(step)}" подтверждён`,
+    );
 
     if (step !== 'final') {
       void this.pipelineService.resumeRun(run, userId);
@@ -461,7 +469,7 @@ export class RunsService {
 
     await this.addLog(
       run.id,
-      `Запрос правки для шага "${step}": ${instruction}`,
+      `Запрос правки для шага "${this.formatPipelineStep(step)}": ${instruction}`,
       {
         instruction,
       },
@@ -485,5 +493,17 @@ export class RunsService {
     };
 
     return statusToStep[status] ?? null;
+  }
+
+  private formatPipelineStep(step: string): string {
+    const labels: Record<string, string> = {
+      spec: 'Спецификация',
+      design: 'Дизайн',
+      reference: 'Референс',
+      code: 'Код',
+      final: 'Финальная проверка',
+    };
+
+    return labels[step] ?? step;
   }
 }

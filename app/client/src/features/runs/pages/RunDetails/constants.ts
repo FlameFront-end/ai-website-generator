@@ -9,7 +9,11 @@ export const STEP_LABELS: Record<string, string> = {
   prepare_reference_image: "Подготовка визуального референса",
   reference_ready: "Визуальный референс готов",
   prepare_frontend_project: "Генерация клиентского проекта",
+  generate_code: "Генерация кода",
+  code: "Код",
   build_project: "Сборка проекта",
+  build: "Сборка проекта",
+  built: "Сборка завершена",
   build_success: "Сборка успешна",
   take_screenshots: "Создание скриншотов",
   screenshots_ready: "Скриншоты готовы",
@@ -25,6 +29,10 @@ export const STEP_LABELS: Record<string, string> = {
   awaiting_reference_approval: "Ожидание подтверждения референса",
   awaiting_code_approval: "Ожидание подтверждения кода",
   awaiting_final_approval: "Ожидание финального подтверждения",
+  spec: "Спецификация",
+  design: "Дизайн",
+  reference: "Референс",
+  final: "Финальная проверка",
 };
 
 export const STEP_PROGRESS: Record<string, number> = {
