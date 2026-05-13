@@ -78,6 +78,7 @@ export class RunsService {
         logs: true,
       },
       order: {
+        isPinned: 'DESC',
         createdAt: 'DESC',
         logs: {
           createdAt: 'DESC',
@@ -151,6 +152,26 @@ export class RunsService {
       {
         displayName,
       },
+    );
+
+    return updatedRun;
+  }
+
+  async updateRunPinned(id: string, isPinned: boolean, userId: string) {
+    await this.getRunOrFail(id, userId);
+
+    await this.runsRepository.update({ id, userId }, { isPinned });
+
+    const updatedRun = await this.getRunOrFail(id, userId);
+    await this.storageService.writeStatusFile(
+      userId,
+      updatedRun.slug,
+      updatedRun,
+    );
+    await this.addLog(
+      updatedRun.id,
+      isPinned ? 'Запуск закреплён' : 'Запуск откреплён',
+      { isPinned },
     );
 
     return updatedRun;
@@ -304,6 +325,29 @@ export class RunsService {
     };
   }
 
+  async restartCurrentStep(
+    runId: string,
+    userId: string,
+  ): Promise<{ id: string; status: string }> {
+    const run = await this.getRunOrFail(runId, userId);
+    const step = this.getRestartableStep(run.status);
+
+    if (!step) {
+      throw new BadRequestException(
+        'Перезапустить можно только текущий шаг, который ожидает подтверждения',
+      );
+    }
+
+    await this.addLog(run.id, `Запрошен перезапуск текущего шага "${step}"`);
+
+    await this.pipelineService.restartStep(run, step, userId);
+
+    return {
+      id: run.id,
+      status: RunStatus.Running,
+    };
+  }
+
   async getArtifactFile(runId: string, artifactId: string, userId: string) {
     await this.getRunOrFail(runId, userId);
     const artifact = await this.getArtifactOrFail(artifactId, runId);
@@ -426,5 +470,20 @@ export class RunsService {
     void this.pipelineService.regenerateStep(run, step, instruction, userId);
 
     return { id: run.id, status: run.status };
+  }
+
+  private getRestartableStep(
+    status: RunStatus,
+  ): 'spec' | 'design' | 'reference' | 'code' | null {
+    const statusToStep: Partial<
+      Record<RunStatus, 'spec' | 'design' | 'reference' | 'code'>
+    > = {
+      [RunStatus.AwaitingSpecApproval]: 'spec',
+      [RunStatus.AwaitingDesignApproval]: 'design',
+      [RunStatus.AwaitingReferenceApproval]: 'reference',
+      [RunStatus.AwaitingCodeApproval]: 'code',
+    };
+
+    return statusToStep[status] ?? null;
   }
 }

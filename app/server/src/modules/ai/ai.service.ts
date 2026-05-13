@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import type {
   BriefClarificationAnswer,
@@ -7,10 +7,7 @@ import type {
   DesignTokens,
   ProjectSpec,
 } from './ai.types';
-import {
-  AI_PROVIDER,
-  type AiProvider,
-} from './providers/ai-provider.interface';
+import { AiProviderRegistry } from './providers/ai-provider.registry';
 import { buildExtractSpecMessages } from './prompts/extract-spec.prompt';
 import { buildDesignTokensMessages } from './prompts/design-tokens.prompt';
 import { buildDesignDescriptionMessages } from './prompts/design-description.prompt';
@@ -20,11 +17,16 @@ import { buildClarifyBriefMessages } from './prompts/clarify-brief.prompt';
 
 export type { DesignDescription, DesignTokens, ProjectSpec };
 
+export interface GeneratedCodeFile {
+  path: string;
+  content: string;
+}
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
 
-  constructor(@Inject(AI_PROVIDER) private readonly provider: AiProvider) {}
+  constructor(private readonly providers: AiProviderRegistry) {}
 
   async clarifyBrief(
     brief: string,
@@ -43,7 +45,7 @@ export class AiService {
       };
     }
 
-    const result = await this.provider.chat({
+    const result = await this.providers.chat('analysis', {
       messages: buildClarifyBriefMessages(brief, answers),
       json: true,
       temperature: 0.35,
@@ -133,7 +135,7 @@ export class AiService {
   async extractProjectSpec(brief: string): Promise<ProjectSpec> {
     this.logger.log('Extracting project spec from brief via AI');
 
-    const result = await this.provider.chat({
+    const result = await this.providers.chat('analysis', {
       messages: buildExtractSpecMessages(brief),
       json: true,
       temperature: 0.3,
@@ -152,7 +154,7 @@ export class AiService {
   ): Promise<DesignTokens> {
     this.logger.log('Generating design tokens via AI');
 
-    const result = await this.provider.chat({
+    const result = await this.providers.chat('analysis', {
       messages: buildDesignTokensMessages(brief, spec),
       json: true,
       temperature: 0.3,
@@ -172,7 +174,7 @@ export class AiService {
   ): Promise<DesignDescription> {
     this.logger.log('Generating design description via AI');
 
-    const result = await this.provider.chat({
+    const result = await this.providers.chat('analysis', {
       messages: buildDesignDescriptionMessages(brief, spec, tokens),
       temperature: 0.5,
       maxTokens: 4096,
@@ -189,10 +191,10 @@ export class AiService {
     spec: ProjectSpec,
     tokens: DesignTokens,
     designDescription: string,
-  ): Promise<{ mainTsx: string; stylesCss: string }> {
+  ): Promise<{ files: GeneratedCodeFile[] }> {
     this.logger.log('Generating frontend code via AI');
 
-    const result = await this.provider.chat({
+    const result = await this.providers.chat('code', {
       messages: buildGenerateCodeMessages(
         brief,
         spec,
@@ -204,7 +206,7 @@ export class AiService {
       maxTokens: 8192,
     });
 
-    return this.parseJson<{ mainTsx: string; stylesCss: string }>(
+    return this.parseJson<{ files: GeneratedCodeFile[] }>(
       result.content,
       'GeneratedCode',
     );
@@ -221,7 +223,7 @@ export class AiService {
   ): Promise<string> {
     this.logger.log('Generating reference SVG via AI');
 
-    const result = await this.provider.chat({
+    const result = await this.providers.chat('analysis', {
       messages: buildGenerateSvgMessages(
         brief,
         spec,

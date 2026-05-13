@@ -54,7 +54,7 @@ export default function LoginPage() {
         onChange={(e) => setPassword(e.target.value)}
       />
       <Button type="submit" fullWidth isLoading={isLoading}>
-        Продолжить
+        Войти
       </Button>
     </AuthCard>
   );

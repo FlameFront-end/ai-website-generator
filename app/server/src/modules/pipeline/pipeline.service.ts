@@ -6,6 +6,7 @@ import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { AiService } from '../ai/ai.service';
 import { CodeGeneratorService } from '../code-generator/code-generator.service';
+import { ImagesService } from '../images/images.service';
 import { PipelineStateService } from './pipeline-state.service';
 import { BuildService } from './build.service';
 import { ScreenshotService } from './screenshot.service';
@@ -23,6 +24,7 @@ export class PipelineService {
     private readonly storageService: StorageService,
     private readonly aiService: AiService,
     private readonly codeGeneratorService: CodeGeneratorService,
+    private readonly imagesService: ImagesService,
   ) {}
 
   async processRun(run: RunEntity, userId: string): Promise<void> {
@@ -205,34 +207,24 @@ export class PipelineService {
     await this.state.addLog(run.id, 'Начата подготовка визуального референса');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const referenceSvg = await this.codeGeneratorService.generateReferenceSvg(
-      run.brief,
+    const referenceImage = await this.generateFluxReferenceImage(
+      referenceRun.brief,
       projectSpec,
       tokens,
       designDescription,
-    );
-    const referenceRelativePath = this.state.getRunRelativePath(
       userId,
       referenceRun.slug,
-      'reference',
-      'reference.svg',
     );
-    const referenceAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      referenceRun.slug,
-      'reference',
-      'reference.svg',
-    );
-    await this.state.writeGeneratedFile(referenceAbsolutePath, referenceSvg);
 
     await this.state.saveArtifact(
       referenceRun.id,
       ArtifactType.ReferenceImage,
-      referenceRelativePath,
-      'image/svg+xml',
+      referenceImage.relativePath,
+      referenceImage.mimeType,
     );
     await this.state.addLog(referenceRun.id, 'Визуальный референс сохранен', {
-      path: referenceRelativePath,
+      model: referenceImage.model,
+      path: referenceImage.relativePath,
     });
 
     await this.state.updateRunStatus(
@@ -468,9 +460,7 @@ export class PipelineService {
     }
 
     // Проверяем, что файл существует на диске
-    const referencePath = this.state.getRunAbsolutePath(
-      userId,
-      run.slug,
+    const referencePath = this.state.getArtifactAbsolutePath(
       referenceArtifact.path,
     );
 
@@ -595,12 +585,87 @@ export class PipelineService {
     }
   }
 
+  async restartStep(
+    run: RunEntity,
+    step: 'spec' | 'design' | 'reference' | 'code',
+    userId: string,
+  ): Promise<void> {
+    const stepTitleMap: Record<typeof step, string> = {
+      spec: 'спецификации',
+      design: 'дизайна',
+      reference: 'визуального референса',
+      code: 'кода проекта',
+    };
+    const runningStepMap: Record<typeof step, string> = {
+      spec: 'prepare_brief',
+      design: 'prepare_design_artifacts',
+      reference: 'prepare_reference_image',
+      code: 'prepare_frontend_project',
+    };
+
+    await this.state.updateRunStatus(
+      run,
+      RunStatus.Running,
+      runningStepMap[step],
+      userId,
+    );
+    await this.state.addLog(
+      run.id,
+      `Запущен перезапуск шага ${stepTitleMap[step]}`,
+    );
+
+    void this.finishRestartStep(run, step, userId);
+  }
+
+  private async finishRestartStep(
+    run: RunEntity,
+    step: 'spec' | 'design' | 'reference' | 'code',
+    userId: string,
+  ): Promise<void> {
+    const awaitingStatusMap: Record<typeof step, RunStatus> = {
+      spec: RunStatus.AwaitingSpecApproval,
+      design: RunStatus.AwaitingDesignApproval,
+      reference: RunStatus.AwaitingReferenceApproval,
+      code: RunStatus.AwaitingCodeApproval,
+    };
+
+    try {
+      switch (step) {
+        case 'spec':
+          await this.regenerateSpec(run, '', userId);
+          break;
+        case 'design':
+          await this.regenerateDesign(run, '', userId);
+          break;
+        case 'reference':
+          await this.regenerateReference(run, '', userId);
+          break;
+        case 'code':
+          await this.regenerateCode(run, '', userId);
+          break;
+      }
+
+      await this.state.updateRunStatus(
+        run,
+        awaitingStatusMap[step],
+        `awaiting_${step}_approval`,
+        userId,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Ошибка при перезапуске шага';
+      await this.state.failRun(run, message);
+    }
+  }
+
   private async regenerateSpec(
     run: RunEntity,
     instruction: string,
     userId: string,
   ): Promise<void> {
-    const updatedBrief = `${run.brief}\n\nПравка: ${instruction}`;
+    const updatedBrief = instruction
+      ? `${run.brief}\n\nПравка: ${instruction}`
+      : run.brief;
     await this.state.updateRun(run, { brief: updatedBrief });
 
     const projectSpec: ProjectSpec =
@@ -740,34 +805,113 @@ export class PipelineService {
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as DesignTokens;
 
-    const referenceSvg = await this.codeGeneratorService.generateReferenceSvg(
+    const referenceImage = await this.generateFluxReferenceImage(
       run.brief,
       projectSpec,
       tokens,
       designDescription,
-    );
-    const referenceRelativePath = this.state.getRunRelativePath(
       userId,
       run.slug,
-      'reference',
-      'reference.svg',
     );
-    const referenceAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      run.slug,
-      'reference',
-      'reference.svg',
-    );
-    await this.state.writeGeneratedFile(referenceAbsolutePath, referenceSvg);
 
     await this.state.updateArtifact(
       run.id,
       ArtifactType.ReferenceImage,
-      referenceRelativePath,
+      referenceImage.relativePath,
+      referenceImage.mimeType,
     );
     await this.state.addLog(run.id, 'Визуальный референс перегенерирован', {
       instruction,
+      model: referenceImage.model,
     });
+  }
+
+  private async generateFluxReferenceImage(
+    brief: string,
+    projectSpec: ProjectSpec,
+    tokens: DesignTokens,
+    designDescription: string,
+    userId: string,
+    slug: string,
+  ): Promise<{ relativePath: string; mimeType: string; model: string }> {
+    const prompt = this.buildReferenceImagePrompt(
+      brief,
+      projectSpec,
+      tokens,
+      designDescription,
+    );
+    const result = await this.imagesService.generateImage(prompt);
+    const response = await fetch(result.image);
+
+    if (!response.ok) {
+      throw new Error(
+        `Не удалось скачать Flux reference image: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    const mimeType = this.normalizeImageMimeType(
+      response.headers.get('content-type'),
+    );
+    const extension = this.getImageExtension(mimeType);
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
+    const relativePath = this.state.getRunRelativePath(
+      userId,
+      slug,
+      'reference',
+      `reference.${extension}`,
+    );
+    const absolutePath = this.state.getRunAbsolutePath(
+      userId,
+      slug,
+      'reference',
+      `reference.${extension}`,
+    );
+
+    await this.state.writeGeneratedFile(absolutePath, imageBuffer);
+
+    return { relativePath, mimeType, model: result.model };
+  }
+
+  private buildReferenceImagePrompt(
+    brief: string,
+    projectSpec: ProjectSpec,
+    tokens: DesignTokens,
+    designDescription: string,
+  ): string {
+    return [
+      'Generate a polished visual reference mockup for the first viewport of a website hero section.',
+      'Format: 1440x900 desktop web screenshot, 16:10 aspect ratio, no browser chrome, no device frame.',
+      'Style: production-ready UI design, crisp typography, realistic spacing, coherent layout, high fidelity.',
+      'Use the provided copy and design system. Text must be readable and resemble the requested Russian/English content, but avoid adding unrelated text.',
+      '',
+      `Brief:\n${brief}`,
+      '',
+      `Project spec:\n${JSON.stringify(projectSpec, null, 2)}`,
+      '',
+      `Design tokens:\n${JSON.stringify(tokens, null, 2)}`,
+      '',
+      `Design description:\n${designDescription}`,
+    ].join('\n');
+  }
+
+  private normalizeImageMimeType(contentType: string | null): string {
+    const mimeType = contentType?.split(';')[0]?.trim().toLowerCase();
+
+    if (
+      mimeType === 'image/png' ||
+      mimeType === 'image/jpeg' ||
+      mimeType === 'image/webp'
+    ) {
+      return mimeType;
+    }
+
+    return 'image/png';
+  }
+
+  private getImageExtension(mimeType: string): 'png' | 'jpg' | 'webp' {
+    if (mimeType === 'image/jpeg') return 'jpg';
+    if (mimeType === 'image/webp') return 'webp';
+    return 'png';
   }
 
   private async regenerateCode(

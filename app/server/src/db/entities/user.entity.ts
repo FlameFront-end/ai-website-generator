@@ -20,6 +20,9 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 255, name: 'password_hash' })
   passwordHash!: string;
 
+  @Column({ type: 'text', name: 'avatar_url', nullable: true })
+  avatarUrl!: string | null;
+
   @OneToMany(() => RunEntity, (run) => run.user)
   runs!: RunEntity[];
 

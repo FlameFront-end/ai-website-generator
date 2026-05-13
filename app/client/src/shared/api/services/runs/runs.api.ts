@@ -12,6 +12,7 @@ import type {
   DeleteRunResponse,
   Run,
   RunStatus,
+  UpdateRunPinnedRequest,
   UpdateRunRequest,
 } from "./types";
 
@@ -62,6 +63,17 @@ export const runsApi = {
     return data;
   },
 
+  async updateRunPinned(
+    runId: string,
+    payload: UpdateRunPinnedRequest,
+  ): Promise<Run> {
+    const { data } = await axiosInstance.patch<Run>(
+      `${API_ENDPOINTS.run(runId)}/pinned`,
+      payload,
+    );
+    return data;
+  },
+
   async deleteRun(runId: string): Promise<DeleteRunResponse> {
     const { data } = await axiosInstance.delete<DeleteRunResponse>(
       API_ENDPOINTS.run(runId),
@@ -74,6 +86,16 @@ export const runsApi = {
       id: string;
       status: RunStatus;
     }>(API_ENDPOINTS.rebuildRun(runId));
+    return data;
+  },
+
+  async restartCurrentStep(
+    runId: string,
+  ): Promise<{ id: string; status: RunStatus }> {
+    const { data } = await axiosInstance.post<{
+      id: string;
+      status: RunStatus;
+    }>(API_ENDPOINTS.restartCurrentStep(runId));
     return data;
   },
 

@@ -28,6 +28,9 @@ export class RunEntity {
   @Column({ type: 'varchar', length: 160, nullable: true })
   displayName!: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  isPinned!: boolean;
+
   @Column({ type: 'text' })
   brief!: string;
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useCreateRunMutation } from "@/api/services/runs";
@@ -13,9 +13,18 @@ import { BriefForm } from "@/features/runs/components/BriefForm";
 import { Button } from "@/kit";
 import { ROUTES } from "@/model";
 
+import {
+  createBriefDraftId,
+  deleteBriefDraft,
+  readBriefDraft,
+  saveBriefDraft,
+  type BriefDraft,
+  type DraftAnswerMap,
+} from "../../lib/brief-drafts";
+
 import styles from "./new-run.module.scss";
 
-type AnswerMap = Record<string, string | string[] | number | boolean>;
+type AnswerMap = DraftAnswerMap;
 const MAX_CLARIFICATION_STEPS = 5;
 
 function normalizeAnswerValue(
@@ -53,17 +62,85 @@ function getSuggestedAnswer(question: BriefClarificationQuestion) {
 }
 
 export default function NewRunPage() {
+  const [searchParams] = useSearchParams();
+  const requestedDraftId = searchParams.get("draft");
+
+  return (
+    <NewRunDraftPage key={requestedDraftId ?? "new"} draftId={requestedDraftId} />
+  );
+}
+
+function NewRunDraftPage({ draftId: requestedDraftId }: { draftId: string | null }) {
   const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
   const createRunMutation = useCreateRunMutation();
-  const [rawBrief, setRawBrief] = useState("");
-  const [finalBrief, setFinalBrief] = useState<string | null>(null);
+  const [initialDraft] = useState(() => {
+    return requestedDraftId ? readBriefDraft(requestedDraftId) : null;
+  });
+  const [draftId] = useState(
+    () => initialDraft?.id ?? requestedDraftId ?? createBriefDraftId(),
+  );
+  const [rawBrief, setRawBrief] = useState(initialDraft?.rawBrief ?? "");
+  const [finalBrief, setFinalBrief] = useState<string | null>(
+    initialDraft?.finalBrief ?? null,
+  );
   const [clarification, setClarification] =
-    useState<ClarifyBriefResponse | null>(null);
-  const [answers, setAnswers] = useState<BriefClarificationAnswer[]>([]);
-  const [answerMap, setAnswerMap] = useState<AnswerMap>({});
-  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+    useState<ClarifyBriefResponse | null>(initialDraft?.clarification ?? null);
+  const [answers, setAnswers] = useState<BriefClarificationAnswer[]>(
+    initialDraft?.answers ?? [],
+  );
+  const [answerMap, setAnswerMap] = useState<AnswerMap>(
+    initialDraft?.answerMap ?? {},
+  );
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(
+    initialDraft?.isHistoryExpanded ?? false,
+  );
   const [isClarifying, setIsClarifying] = useState(false);
   const historyEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const hasDraft =
+      rawBrief.trim() ||
+      finalBrief?.trim() ||
+      clarification ||
+      answers.length > 0 ||
+      Object.keys(answerMap).length > 0;
+
+    if (!hasDraft) {
+      return;
+    }
+
+    if (!requestedDraftId) {
+      setSearchParams({ draft: draftId }, { replace: true });
+    }
+
+    const draft: BriefDraft = {
+      id: draftId,
+      title: initialDraft?.title ?? null,
+      rawBrief,
+      finalBrief,
+      clarification,
+      answers,
+      answerMap,
+      isHistoryExpanded,
+      createdAt: initialDraft?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveBriefDraft(draft);
+  }, [
+    draftId,
+    initialDraft?.createdAt,
+    initialDraft?.title,
+    requestedDraftId,
+    rawBrief,
+    finalBrief,
+    clarification,
+    answers,
+    answerMap,
+    isHistoryExpanded,
+    setSearchParams,
+  ]);
 
   const runClarification = async (
     brief: string,
@@ -159,10 +236,24 @@ export default function NewRunPage() {
     createRunMutation.mutate(
       { brief },
       {
-        onSuccess: (run) => navigate(ROUTES.runDetails(run.id)),
+        onSuccess: (run) => {
+          deleteBriefDraft(draftId);
+          navigate(ROUTES.runDetails(run.id));
+        },
         onError: () => toast.error("Не удалось создать проект"),
       },
     );
+  };
+
+  const resetDraft = () => {
+    deleteBriefDraft(draftId);
+    setSearchParams({}, { replace: true });
+    setRawBrief("");
+    setFinalBrief(null);
+    setClarification(null);
+    setAnswers([]);
+    setAnswerMap({});
+    setIsHistoryExpanded(false);
   };
 
   const updateAnswer = (
@@ -323,7 +414,12 @@ export default function NewRunPage() {
       </div>
 
       {!clarification && !finalBrief && (
-        <BriefForm isSubmitting={isClarifying} onSubmit={handleInitialBrief} />
+        <BriefForm
+          brief={rawBrief}
+          isSubmitting={isClarifying}
+          onDraftChange={setRawBrief}
+          onSubmit={handleInitialBrief}
+        />
       )}
 
       {clarification?.status === "needs_clarification" && (
@@ -460,7 +556,7 @@ export default function NewRunPage() {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setClarification(null)}
+              onClick={resetDraft}
             >
               Вернуться к началу
             </Button>

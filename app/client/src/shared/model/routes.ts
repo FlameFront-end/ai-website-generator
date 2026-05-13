@@ -14,9 +14,11 @@ export const API_ENDPOINTS = {
   AUTH_LOGIN: "/auth/login",
   AUTH_REGISTER: "/auth/register",
   AUTH_ME: "/auth/me",
+  GENERATE_IMAGE: "/generate-image",
   RUNS: "/runs",
   run: (runId: string) => `/runs/${runId}`,
   rebuildRun: (runId: string) => `/runs/${runId}/rebuild`,
+  restartCurrentStep: (runId: string) => `/runs/${runId}/restart-current-step`,
   artifactContent: (runId: string, artifactId: string) =>
     `/runs/${runId}/artifacts/${artifactId}/content`,
   artifactFile: (runId: string, artifactId: string) =>

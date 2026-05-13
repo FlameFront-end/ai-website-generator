@@ -21,6 +21,7 @@ import { ApproveStepDto } from './dto/approve-step.dto';
 import { ClarifyBriefDto } from './dto/clarify-brief.dto';
 import { CreateRunDto } from './dto/create-run.dto';
 import { EditRequestDto } from './dto/edit-request.dto';
+import { UpdateRunPinnedDto } from './dto/update-run-pinned.dto';
 import { UpdateRunDto } from './dto/update-run.dto';
 import { RunsService } from './runs.service';
 
@@ -65,6 +66,15 @@ export class RunsController {
     @Request() req: RequestWithUser,
   ) {
     return this.runsService.updateRun(id, body, req.user.id);
+  }
+
+  @Patch(':id/pinned')
+  updateRunPinned(
+    @Param('id') id: string,
+    @Body() body: UpdateRunPinnedDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.runsService.updateRunPinned(id, body.isPinned, req.user.id);
   }
 
   @Delete(':id')
@@ -128,6 +138,14 @@ export class RunsController {
   @Post(':id/rebuild')
   rebuild(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.runsService.rebuildRun(id, req.user.id);
+  }
+
+  @Post(':id/restart-current-step')
+  restartCurrentStep(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.runsService.restartCurrentStep(id, req.user.id);
   }
 
   @Post(':id/approve')

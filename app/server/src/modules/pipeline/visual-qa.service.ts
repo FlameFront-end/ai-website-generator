@@ -27,11 +27,17 @@ export class VisualQAService {
     await this.state.addLog(run.id, 'Начат визуальный анализ');
 
     try {
-      const referencePath = this.state.getRunAbsolutePath(
-        userId,
-        slug,
-        'reference',
-        'reference.svg',
+      const referenceArtifact = await this.state.getArtifactByType(
+        runId,
+        ArtifactType.ReferenceImage,
+      );
+
+      if (!referenceArtifact) {
+        throw new Error('Артефакт визуального референса не найден');
+      }
+
+      const referencePath = this.state.getArtifactAbsolutePath(
+        referenceArtifact.path,
       );
       const renderedPath = this.state.getRunAbsolutePath(
         userId,

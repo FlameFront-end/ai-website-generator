@@ -153,6 +153,10 @@ export class PipelineStateService {
     return fs.readFile(absolutePath, 'utf8');
   }
 
+  getArtifactAbsolutePath(relativePath: string): string {
+    return path.resolve(this.storageService.getGeneratedRootPath(), relativePath);
+  }
+
   async getRun(runId: string): Promise<RunEntity | null> {
     return this.runsRepository.findOne({
       where: { id: runId },
@@ -184,10 +188,11 @@ export class PipelineStateService {
     runId: string,
     type: ArtifactType,
     relativePath: string,
+    mimeType?: string,
   ): Promise<void> {
     await this.artifactsRepository.update(
       { runId, type },
-      { path: relativePath },
+      { path: relativePath, ...(mimeType ? { mimeType } : {}) },
     );
   }
 

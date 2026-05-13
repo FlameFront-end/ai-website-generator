@@ -13,11 +13,12 @@ interface RunHeaderProps {
   isRenaming: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
-  isRebuilding: boolean;
+  isRestartingStep: boolean;
+  canRestartStep: boolean;
   onRename: (displayName: string | null) => void;
   onDelete: () => void;
   onDownload: () => void;
-  onRebuild: () => void;
+  onRestartStep: () => void;
   styles: Record<string, string>;
 }
 
@@ -27,11 +28,12 @@ export const RunHeader: FC<RunHeaderProps> = ({
   isRenaming,
   isDeleting,
   isDownloading,
-  isRebuilding,
+  isRestartingStep,
+  canRestartStep,
   onRename,
   onDelete,
   onDownload,
-  onRebuild,
+  onRestartStep,
   styles,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -75,16 +77,13 @@ export const RunHeader: FC<RunHeaderProps> = ({
               </Button>
             </div>
           ) : (
-            <h1>{getRunTitle(run)}</h1>
+            <div className={styles.titleRow}>
+              <h1>{getRunTitle(run)}</h1>
+            </div>
           )}
         </div>
+
         <div className={styles.headerRight}>
-          <div className={styles.headerMeta}>
-            <RunStatusBadge status={run.status} />
-            {run.score !== null && run.score !== undefined && (
-              <span className={styles.scoreBadge}>Score: {run.score}/100</span>
-            )}
-          </div>
           <div className={styles.headerActions}>
             <Button variant="secondary" onClick={startRename}>
               Переименовать
@@ -100,16 +99,27 @@ export const RunHeader: FC<RunHeaderProps> = ({
             )}
             <Button
               variant="secondary"
-              isLoading={isRebuilding}
-              onClick={onRebuild}
-              title="Пересобрать проект"
+              isLoading={isRestartingStep}
+              onClick={onRestartStep}
+              disabled={!canRestartStep}
+              title={
+                canRestartStep
+                  ? "Перезапустить текущий шаг"
+                  : "Перезапуск доступен только на шаге ожидания подтверждения"
+              }
             >
-              Пересобрать
+              Перезапустить шаг
             </Button>
             <div className={styles.headerDivider} />
             <Button variant="danger" isLoading={isDeleting} onClick={onDelete}>
               Удалить
             </Button>
+          </div>
+          <div className={styles.headerMeta}>
+            <RunStatusBadge status={run.status} />
+            {run.score !== null && run.score !== undefined && (
+              <span className={styles.scoreBadge}>Score: {run.score}/100</span>
+            )}
           </div>
         </div>
       </div>

@@ -85,6 +85,24 @@ export function useUpdateRunMutation() {
   });
 }
 
+export function useUpdateRunPinnedMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      runId,
+      isPinned,
+    }: {
+      runId: string;
+      isPinned: boolean;
+    }) => runsApi.updateRunPinned(runId, { isPinned }),
+    onSuccess: (run) => {
+      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
+      void queryClient.setQueryData(runsQueryKeys.detail(run.id), run);
+    },
+  });
+}
+
 export function useDeleteRunMutation() {
   const queryClient = useQueryClient();
 
@@ -138,6 +156,18 @@ export function useRebuildRunMutation() {
     mutationFn: runsApi.rebuildRun,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["runs"] });
+    },
+  });
+}
+
+export function useRestartCurrentStepMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: runsApi.restartCurrentStep,
+    onSuccess: (_result, runId) => {
+      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.detail(runId) });
     },
   });
 }

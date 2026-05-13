@@ -28,6 +28,13 @@ const STATUS_TO_TAB = {
   awaiting_final_approval: "result",
 } as const;
 
+const RESTARTABLE_STATUSES = new Set([
+  "awaiting_spec_approval",
+  "awaiting_design_approval",
+  "awaiting_reference_approval",
+  "awaiting_code_approval",
+]);
+
 export default function RunDetailsPage() {
   const { runId = "" } = useParams();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -111,21 +118,18 @@ export default function RunDetailsPage() {
 
   return (
     <section className={styles.page}>
-      <Link className={styles.backLink} to={ROUTES.RUNS}>
-        Назад к проектам
-      </Link>
-
       <RunHeader
         run={run}
         hasFrontendProject={!!artifacts.frontend_project}
         isRenaming={actions.isRenaming}
         isDeleting={actions.isDeleting}
         isDownloading={actions.isDownloading}
-        isRebuilding={actions.isRebuilding}
+        isRestartingStep={actions.isRestartingStep}
+        canRestartStep={RESTARTABLE_STATUSES.has(run.status)}
         onRename={(displayName) => actions.rename(run.id, displayName)}
         onDelete={() => setShowDeleteModal(true)}
         onDownload={() => actions.download(run.id)}
-        onRebuild={() => actions.rebuild(run.id)}
+        onRestartStep={() => actions.restartCurrentStep(run.id)}
         styles={styles}
       />
 

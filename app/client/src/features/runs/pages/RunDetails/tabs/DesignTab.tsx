@@ -1,5 +1,7 @@
 import type { FC } from "react";
 
+import ReactMarkdown from "react-markdown";
+
 import { Skeleton } from "@/kit";
 import { useArtifactContentQuery } from "@/api/services/runs";
 import type { RunArtifact } from "@/api/services/runs";
@@ -34,7 +36,11 @@ export const DesignTab: FC<DesignTabProps> = ({
         {descriptionQuery.isError && (
           <p>Не удалось загрузить описание дизайна.</p>
         )}
-        {descriptionQuery.data && <pre>{descriptionQuery.data.content}</pre>}
+        {descriptionQuery.data && (
+          <div className={styles.markdownContent}>
+            <ReactMarkdown>{descriptionQuery.data.content}</ReactMarkdown>
+          </div>
+        )}
       </div>
 
       <div className={styles.panel}>

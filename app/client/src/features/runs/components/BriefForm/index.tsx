@@ -1,5 +1,4 @@
 import type { FC, FormEvent, KeyboardEvent } from "react";
-import { useState } from "react";
 
 import { ArrowRight } from "lucide-react";
 
@@ -8,13 +7,18 @@ import { Button } from "@/kit";
 import styles from "./BriefForm.module.scss";
 
 interface BriefFormProps {
+  brief: string;
   isSubmitting: boolean;
+  onDraftChange: (brief: string) => void;
   onSubmit: (brief: string) => void;
 }
 
-export const BriefForm: FC<BriefFormProps> = ({ isSubmitting, onSubmit }) => {
-  const [brief, setBrief] = useState("");
-
+export const BriefForm: FC<BriefFormProps> = ({
+  brief,
+  isSubmitting,
+  onDraftChange,
+  onSubmit,
+}) => {
   const submitBrief = () => {
     const trimmed = brief.trim();
     if (trimmed) onSubmit(trimmed);
@@ -51,7 +55,7 @@ export const BriefForm: FC<BriefFormProps> = ({ isSubmitting, onSubmit }) => {
       <textarea
         id="brief"
         value={brief}
-        onChange={(event) => setBrief(event.target.value)}
+        onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Опишите, что хотите сгенерировать..."
       />

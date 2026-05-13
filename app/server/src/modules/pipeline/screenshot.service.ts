@@ -39,8 +39,8 @@ export class ScreenshotService {
     let serverProcess: ReturnType<typeof exec> | undefined;
 
     try {
-      await this.state.addLog(run.id, 'Запуск preview сервера...');
-      serverProcess = exec('npm run preview', {
+      await this.state.addLog(run.id, 'Запуск production сервера...');
+      serverProcess = exec('npm run start', {
         cwd: codePath,
         env: { ...process.env, PORT: PREVIEW_PORT },
       });

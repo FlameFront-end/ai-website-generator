@@ -41,6 +41,7 @@ export interface Run {
   id: string;
   slug: string;
   displayName: string | null;
+  isPinned: boolean;
   brief: string;
   status: RunStatus;
   currentStep: string | null;
@@ -113,6 +114,10 @@ export interface ClarifyBriefResponse {
 
 export interface UpdateRunRequest {
   displayName: string | null;
+}
+
+export interface UpdateRunPinnedRequest {
+  isPinned: boolean;
 }
 
 export interface DeleteRunResponse {

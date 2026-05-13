@@ -22,9 +22,14 @@
       border-color 0.15s ease;
 
     &:hover {
-      border-color: var(--border-solid);
-      background: var(--bg-subtle);
+      border-color: var(--button-secondary-hover-border);
+      background: var(--button-secondary-hover-bg);
       color: var(--text-heading);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--button-focus-ring);
     }
   }
 }
@@ -295,10 +300,14 @@
       transform 0.15s ease;
 
     &:hover {
-      border-color: var(--border-solid);
-      background: var(--bg-subtle);
+      border-color: var(--button-secondary-hover-border);
+      background: var(--button-secondary-hover-bg);
       color: var(--text-heading);
-      transform: translateY(-1px);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--button-focus-ring);
     }
   }
 }

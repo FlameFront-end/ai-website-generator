@@ -21,7 +21,16 @@ export interface ChatCompletionResult {
   };
 }
 
-export const AI_PROVIDER = Symbol('AI_PROVIDER');
+export type AiProviderRole = 'analysis' | 'image' | 'code';
+
+export interface AiProviderConfig {
+  provider: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  timeout: number;
+  strictJson: boolean;
+}
 
 export interface AiProvider {
   chat(options: ChatCompletionOptions): Promise<ChatCompletionResult>;

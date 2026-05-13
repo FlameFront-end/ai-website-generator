@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import {
   useDeleteRunMutation,
   useDownloadCodeMutation,
-  useRebuildRunMutation,
+  useRestartCurrentStepMutation,
   useUpdateRunMutation,
 } from "@/api/services/runs";
 import { ROUTES } from "@/model";
@@ -15,11 +15,11 @@ interface UseRunActionsResult {
   rename: (runId: string, displayName: string | null) => void;
   remove: (runId: string) => void;
   download: (runId: string) => void;
-  rebuild: (runId: string) => void;
+  restartCurrentStep: (runId: string) => void;
   isRenaming: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
-  isRebuilding: boolean;
+  isRestartingStep: boolean;
 }
 
 interface UseRunActionsOptions {
@@ -33,7 +33,7 @@ export function useRunActions({
   const updateRunMutation = useUpdateRunMutation();
   const deleteRunMutation = useDeleteRunMutation();
   const downloadCodeMutation = useDownloadCodeMutation();
-  const rebuildRunMutation = useRebuildRunMutation();
+  const restartCurrentStepMutation = useRestartCurrentStepMutation();
 
   const rename = useCallback(
     (runId: string, displayName: string | null) => {
@@ -66,19 +66,24 @@ export function useRunActions({
     [downloadCodeMutation],
   );
 
-  const rebuild = useCallback(
-    (runId: string) => rebuildRunMutation.mutate(runId),
-    [rebuildRunMutation],
+  const restartCurrentStep = useCallback(
+    (runId: string) => {
+      restartCurrentStepMutation.mutate(runId, {
+        onSuccess: () => toast.success("Текущий шаг перезапущен"),
+        onError: () => toast.error("Не удалось перезапустить текущий шаг"),
+      });
+    },
+    [restartCurrentStepMutation],
   );
 
   return {
     rename,
     remove,
     download,
-    rebuild,
+    restartCurrentStep,
     isRenaming: updateRunMutation.isPending,
     isDeleting: deleteRunMutation.isPending,
     isDownloading: downloadCodeMutation.isPending,
-    isRebuilding: rebuildRunMutation.isPending,
+    isRestartingStep: restartCurrentStepMutation.isPending,
   };
 }

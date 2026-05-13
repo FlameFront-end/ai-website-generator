@@ -50,14 +50,28 @@
   align-items: center;
   gap: 8px;
   min-height: 36px;
-  border: 1px solid var(--text-heading);
+  border: 1px solid var(--button-primary-border);
   border-radius: 6px;
   padding: 0 12px;
-  background: var(--text-heading);
-  color: var(--bg-page);
+  background: var(--button-primary-bg);
+  color: var(--button-primary-color);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: var(--button-primary-hover-border);
+    background: var(--button-primary-hover-bg);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--button-focus-ring);
+  }
 }
 
 .grid {
@@ -138,7 +152,7 @@
 .runsList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   overflow-y: auto;
   padding-right: 4px;
   margin-right: -4px;
@@ -162,21 +176,18 @@
 }
 
 .runItem {
-  display: flex;
-  gap: 6px;
-  align-items: center;
+  display: block;
 
   .runButton {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
     flex: 1;
     min-width: 0;
-    min-height: 42px;
+    min-height: 104px;
     border: 1px solid var(--run-button-border);
     border-radius: 8px;
-    padding: 9px 10px;
+    padding: 14px;
     background: var(--run-button-bg);
     color: var(--text-primary);
     text-align: left;
@@ -186,20 +197,139 @@
       background 0.16s ease;
 
     &:hover {
-      border-color: var(--border-solid);
-      background: var(--bg-subtle);
+      border-color: var(--button-secondary-hover-border);
+      background: var(--button-secondary-hover-bg);
     }
 
-    span:first-child {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 13px;
-      font-weight: 500;
-      flex: 1;
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--button-focus-ring);
     }
   }
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cardHeaderRight {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.cardTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-heading);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardDescription {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.3;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.cardActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+
+  [role="button"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--button-ghost-hover-bg);
+      color: var(--text-heading);
+      outline: none;
+    }
+
+    &:last-child:hover,
+    &:last-child:focus-visible {
+      background: var(--danger-bg);
+      color: var(--danger-color);
+    }
+  }
+}
+
+.draftButton {
+  border-style: dashed !important;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent),
+    var(--run-button-bg) !important;
+}
+
+.pinnedCard {
+  border-color: var(--text-faint) !important;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)),
+    var(--run-button-bg) !important;
+
+  &:hover {
+    border-color: var(--text-muted) !important;
+  }
+}
+
+.draftBadge {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.2;
 }
 
 .deleteButton {
@@ -218,7 +348,12 @@
 
   &:hover:not(:disabled) {
     background: var(--danger-hover-bg);
-    border-color: var(--danger-border);
+    border-color: var(--danger-color);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--button-focus-ring);
   }
 
   &:disabled {
@@ -243,5 +378,31 @@
 
   .runs {
     position: static;
+  }
+
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .runItem {
+    display: block;
+  }
+
+  .cardMeta {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .cardHeader {
+    display: grid;
+    gap: 10px;
+  }
+
+  .cardHeaderRight {
+    justify-content: space-between;
+  }
+
+  .cardTitle {
+    white-space: normal;
   }
 }

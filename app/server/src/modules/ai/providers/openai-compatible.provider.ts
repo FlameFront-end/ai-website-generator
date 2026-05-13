@@ -1,12 +1,12 @@
 import {
-  Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 
-import { appConfig } from '../../../app/config';
 import type {
   AiProvider,
+  AiProviderConfig,
+  AiProviderRole,
   ChatCompletionOptions,
   ChatCompletionResult,
 } from './ai-provider.interface';
@@ -53,23 +53,26 @@ function getErrorCode(error: unknown) {
   return '';
 }
 
-@Injectable()
 export class OpenAiCompatibleProvider implements AiProvider {
   private readonly logger = new Logger(OpenAiCompatibleProvider.name);
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly timeout: number;
+  private readonly strictJson: boolean;
 
-  constructor() {
-    const cfg = appConfig.ai;
+  constructor(
+    private readonly role: AiProviderRole,
+    cfg: AiProviderConfig,
+  ) {
     this.baseUrl = cfg.baseUrl.replace(/\/+$/, '');
     this.apiKey = cfg.apiKey;
     this.model = cfg.model;
     this.timeout = cfg.timeout;
+    this.strictJson = cfg.strictJson;
 
     this.logger.log(
-      `AI provider: ${cfg.provider} | base: ${this.baseUrl} | model: ${this.model || '(default)'}`,
+      `AI ${this.role}: ${cfg.provider} | base: ${this.baseUrl} | model: ${this.model || '(default)'}`,
     );
   }
 
@@ -81,6 +84,10 @@ export class OpenAiCompatibleProvider implements AiProvider {
       temperature: options.temperature ?? 0.4,
       max_tokens: options.maxTokens ?? 4096,
     };
+
+    if (options.json && this.strictJson) {
+      body.response_format = { type: 'json_object' };
+    }
 
     if (this.model) {
       body.model = this.model;

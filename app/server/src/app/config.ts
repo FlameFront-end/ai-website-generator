@@ -25,14 +25,33 @@ const env = cleanEnv(process.env, {
   GENERATED_ROOT: str({ default: 'generated' }),
   JWT_SECRET: str({ default: 'default-secret-change-in-production' }),
   JWT_EXPIRES_IN: str({ default: '7d' }),
-  AI_PROVIDER: str({
+  AI_ANALYSIS_PROVIDER: str({
     default: 'lmstudio',
     choices: ['lmstudio', 'openai', 'openrouter', 'llm7'],
   }),
-  AI_BASE_URL: str({ default: 'http://localhost:1234/v1' }),
-  AI_API_KEY: str({ default: '' }),
-  AI_MODEL: str({ default: '' }),
-  AI_TIMEOUT: num({ default: 120000 }),
+  AI_ANALYSIS_BASE_URL: str({ default: 'http://localhost:1234/v1' }),
+  AI_ANALYSIS_API_KEY: str({ default: '' }),
+  AI_ANALYSIS_MODEL: str({ default: '' }),
+  AI_ANALYSIS_TIMEOUT: str({ default: '' }),
+  AI_ANALYSIS_STRICT_JSON: str({ default: '' }),
+  AI_IMAGE_PROVIDER: str({
+    default: 'replicate',
+    choices: ['lmstudio', 'openai', 'openrouter', 'llm7', 'replicate'],
+  }),
+  AI_IMAGE_BASE_URL: str({ default: '' }),
+  AI_IMAGE_API_KEY: str({ default: '' }),
+  AI_IMAGE_MODEL: str({ default: '' }),
+  AI_IMAGE_TIMEOUT: str({ default: '' }),
+  AI_IMAGE_STRICT_JSON: str({ default: '' }),
+  AI_CODE_PROVIDER: str({
+    default: 'lmstudio',
+    choices: ['lmstudio', 'openai', 'openrouter', 'llm7'],
+  }),
+  AI_CODE_BASE_URL: str({ default: 'http://localhost:1234/v1' }),
+  AI_CODE_API_KEY: str({ default: '' }),
+  AI_CODE_MODEL: str({ default: '' }),
+  AI_CODE_TIMEOUT: str({ default: '' }),
+  AI_CODE_STRICT_JSON: str({ default: '' }),
 });
 
 function buildDatabaseUrl(): string {
@@ -49,7 +68,61 @@ function buildDatabaseUrl(): string {
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
 
-export type AiProviderType = 'lmstudio' | 'openai' | 'openrouter' | 'llm7';
+export type AiProviderType =
+  | 'lmstudio'
+  | 'openai'
+  | 'openrouter'
+  | 'llm7'
+  | 'replicate';
+export type AiProviderRole = 'analysis' | 'image' | 'code';
+
+function normalizeTimeout(timeout: string): number | undefined {
+  if (!timeout.trim()) {
+    return undefined;
+  }
+
+  const parsed = Number(timeout);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function normalizeBoolean(value: string): boolean | undefined {
+  const normalized = value.trim().toLowerCase();
+
+  if (['true', '1', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+
+  if (['false', '0', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  return undefined;
+}
+
+function defaultStrictJson(provider: AiProviderType): boolean {
+  return provider !== 'llm7' && provider !== 'replicate';
+}
+
+function buildAiRoleConfig(role: AiProviderRole) {
+  const prefix = `AI_${role.toUpperCase()}` as
+    | 'AI_ANALYSIS'
+    | 'AI_IMAGE'
+    | 'AI_CODE';
+
+  const provider = env[`${prefix}_PROVIDER`];
+  const strictJson =
+    normalizeBoolean(env[`${prefix}_STRICT_JSON`]) ??
+    defaultStrictJson(provider);
+
+  return Object.freeze({
+    provider,
+    baseUrl: env[`${prefix}_BASE_URL`],
+    apiKey: env[`${prefix}_API_KEY`],
+    model: env[`${prefix}_MODEL`],
+    timeout: normalizeTimeout(env[`${prefix}_TIMEOUT`]) ?? 120000,
+    strictJson,
+  });
+}
 
 export type AppConfig = Readonly<{
   server: Readonly<{
@@ -69,11 +142,19 @@ export type AppConfig = Readonly<{
     expiresIn: string;
   }>;
   ai: Readonly<{
-    provider: AiProviderType;
-    baseUrl: string;
-    apiKey: string;
-    model: string;
-    timeout: number;
+    roles: Readonly<
+      Record<
+        AiProviderRole,
+        Readonly<{
+          provider: AiProviderType;
+          baseUrl: string;
+          apiKey: string;
+          model: string;
+          timeout: number;
+          strictJson: boolean;
+        }>
+      >
+    >;
   }>;
 }>;
 
@@ -95,10 +176,10 @@ export const appConfig: AppConfig = Object.freeze({
     expiresIn: env.JWT_EXPIRES_IN,
   }),
   ai: Object.freeze({
-    provider: env.AI_PROVIDER,
-    baseUrl: env.AI_BASE_URL,
-    apiKey: env.AI_API_KEY,
-    model: env.AI_MODEL,
-    timeout: env.AI_TIMEOUT,
+    roles: Object.freeze({
+      analysis: buildAiRoleConfig('analysis'),
+      image: buildAiRoleConfig('image'),
+      code: buildAiRoleConfig('code'),
+    }),
   }),
 });

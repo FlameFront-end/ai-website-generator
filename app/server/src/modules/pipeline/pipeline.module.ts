@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module';
 import { CodeGeneratorModule } from '../code-generator/code-generator.module';
+import { ImagesModule } from '../images/images.module';
 import { StorageModule } from '../storage/storage.module';
 import { RunArtifactEntity, RunEntity, RunLogEntity } from '../../db/entities';
 import { PipelineService } from './pipeline.service';
@@ -15,6 +16,7 @@ import { VisualQAService } from './visual-qa.service';
     TypeOrmModule.forFeature([RunEntity, RunArtifactEntity, RunLogEntity]),
     AiModule,
     CodeGeneratorModule,
+    ImagesModule,
     StorageModule,
   ],
   providers: [

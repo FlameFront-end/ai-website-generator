@@ -92,20 +92,28 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      border: 0;
+      border: 1px solid var(--button-primary-border);
       border-radius: 6px;
       padding: 0 16px;
       min-height: 40px;
-      background: var(--text-heading);
-      color: var(--bg-page);
+      background: var(--button-primary-bg);
+      color: var(--button-primary-color);
       font-weight: 500;
       font-size: 14px;
       transition:
         background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
         opacity 0.15s ease;
 
       &:hover:not(:disabled) {
-        opacity: 0.86;
+        border-color: var(--button-primary-hover-border);
+        background: var(--button-primary-hover-bg);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--button-focus-ring);
       }
 
       &:disabled {

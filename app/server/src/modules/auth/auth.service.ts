@@ -43,6 +43,7 @@ export class AuthService {
     const user = await this.userRepository.save({
       email,
       passwordHash,
+      avatarUrl: dto.avatarUrl ?? null,
     });
 
     this.logger.log(`User registered: ${user.email}`);
@@ -85,6 +86,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        avatarUrl: user.avatarUrl,
       },
     };
   }
