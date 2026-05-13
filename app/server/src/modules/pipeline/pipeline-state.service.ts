@@ -79,6 +79,7 @@ export class PipelineStateService {
     await this.runsRepository.update(run.id, {
       status,
       currentStep,
+      errorMessage: null,
     });
 
     const updatedRun = await this.runsRepository.findOne({
@@ -190,10 +191,19 @@ export class PipelineStateService {
     relativePath: string,
     mimeType?: string,
   ): Promise<void> {
-    await this.artifactsRepository.update(
+    const result = await this.artifactsRepository.update(
       { runId, type },
       { path: relativePath, ...(mimeType ? { mimeType } : {}) },
     );
+
+    if (!result.affected) {
+      await this.saveArtifact(
+        runId,
+        type,
+        relativePath,
+        mimeType ?? 'application/octet-stream',
+      );
+    }
   }
 
   async fileExists(filePath: string): Promise<boolean> {

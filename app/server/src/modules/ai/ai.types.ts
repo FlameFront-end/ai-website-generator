@@ -3,13 +3,41 @@
  */
 
 export interface ProjectSpec {
-  siteType: string;
-  sectionType: string;
+  projectType: string;
+  idea: string;
+  industry?: string;
+  goal: string;
+  language: string;
+  stylePreference: string[];
+  siteType?: string;
+  sectionType?: string;
   productName: string;
   productDescription: string;
-  style: string[];
+  style?: string[];
   audience: string;
-  requiredElements: string[];
+  requiredElements?: string[];
+  contentNotes?: string[];
+  visualNotes?: string[];
+  assumptions?: string[];
+
+  sections: Array<{
+    id: string;
+    type:
+      | 'hero'
+      | 'benefits'
+      | 'features'
+      | 'how-it-works'
+      | 'trust'
+      | 'pricing'
+      | 'faq'
+      | 'final-cta-footer'
+      | 'custom';
+    title: string;
+    goal: string;
+    contentNotes: string[];
+    visualNotes: string[];
+    requiredElements: string[];
+  }>;
 
   copy: {
     badge?: string;
@@ -106,6 +134,21 @@ export interface DesignTokens {
     navSurface?: string;
     badgeSurface?: string;
     progressHeight?: string;
+  };
+  sections?: Record<
+    string,
+    {
+      background?: string;
+      spacing?: string;
+      layout?: string;
+      visualRole?: string;
+    }
+  >;
+  assets?: {
+    imageStyle?: string;
+    iconStyle?: string;
+    illustrationStyle?: string;
+    avoid?: string[];
   };
   effects?: {
     backdropBlur?: string;

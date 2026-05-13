@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { exec } from 'node:child_process';
 import { createServer } from 'node:net';
+import { promises as fs } from 'node:fs';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -45,6 +46,8 @@ export class ScreenshotService {
     let serverProcess: ReturnType<typeof exec> | undefined;
 
     try {
+      await fs.mkdir(screenshotsPath, { recursive: true });
+
       const previewPort = await this.findAvailablePort();
       const previewUrl = `http://127.0.0.1:${previewPort}`;
 

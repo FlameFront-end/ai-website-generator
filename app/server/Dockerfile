@@ -33,6 +33,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/app/server/node_modules ./app/server/node_modules
 COPY --from=build /app/app/server/dist ./app/server/dist
 
+RUN npx playwright install --with-deps chromium
+
 WORKDIR /app/app/server
 
 EXPOSE 3000

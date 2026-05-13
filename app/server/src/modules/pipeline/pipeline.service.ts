@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import path from 'node:path';
+import sharp from 'sharp';
 
 import type { ProjectSpec, DesignTokens } from '../ai/ai.types';
 import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
@@ -213,13 +214,14 @@ export class PipelineService {
     await this.state.addLog(run.id, 'Готовим визуальный референс');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const referenceImage = await this.generateFluxReferenceImage(
+    const referenceImage = await this.generateReferenceImageWithFallback(
       referenceRun.brief,
       projectSpec,
       tokens,
       designDescription,
       userId,
       referenceRun.slug,
+      referenceRun.id,
     );
 
     await this.state.saveArtifact(
@@ -265,11 +267,14 @@ export class PipelineService {
       this.storageService.getRunPath(userId, codeRun.slug),
       'code',
     );
+    const visualReferenceContext = await this.buildVisualReferenceContext(
+      codeRun.id,
+    );
     await this.codeGeneratorService.generateProjectFiles(
       run.brief,
       projectSpec,
       tokens,
-      designDescription,
+      `${designDescription}\n\n${visualReferenceContext}`,
       codePath,
     );
 
@@ -811,13 +816,14 @@ export class PipelineService {
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as DesignTokens;
 
-    const referenceImage = await this.generateFluxReferenceImage(
+    const referenceImage = await this.generateReferenceImageWithFallback(
       run.brief,
       projectSpec,
       tokens,
       designDescription,
       userId,
       run.slug,
+      run.id,
     );
 
     await this.state.updateArtifact(
@@ -830,6 +836,55 @@ export class PipelineService {
       instruction,
       model: referenceImage.model,
     });
+    await this.state.updateRunStatus(
+      run,
+      RunStatus.AwaitingReferenceApproval,
+      'awaiting_reference_approval',
+      userId,
+    );
+  }
+
+  private async generateReferenceImageWithFallback(
+    brief: string,
+    projectSpec: ProjectSpec,
+    tokens: DesignTokens,
+    designDescription: string,
+    userId: string,
+    slug: string,
+    runId: string,
+  ): Promise<{ relativePath: string; mimeType: string; model: string }> {
+    try {
+      return await this.generateFluxReferenceImage(
+        brief,
+        projectSpec,
+        tokens,
+        designDescription,
+        userId,
+        slug,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Image generation failed';
+
+      if (!this.canFallbackToSvgReference(message)) {
+        throw error;
+      }
+
+      await this.state.addLog(
+        runId,
+        'Генерация raster-референса недоступна, создаём SVG fallback',
+        { reason: message },
+      );
+
+      return this.generateSvgReferenceImage(
+        brief,
+        projectSpec,
+        tokens,
+        designDescription,
+        userId,
+        slug,
+      );
+    }
   }
 
   private async generateFluxReferenceImage(
@@ -840,55 +895,287 @@ export class PipelineService {
     userId: string,
     slug: string,
   ): Promise<{ relativePath: string; mimeType: string; model: string }> {
-    const prompt = this.buildReferenceImagePrompt(
+    const sections = this.normalizeReferenceSections(projectSpec);
+    const generatedBlocks: Array<{
+      sectionId: string;
+      title: string;
+      relativePath: string;
+      absolutePath: string;
+      mimeType: string;
+      model: string;
+    }> = [];
+
+    for (const [index, section] of sections.entries()) {
+      const prompt = this.buildSectionImagePrompt(
+        brief,
+        projectSpec,
+        tokens,
+        designDescription,
+        section,
+        generatedBlocks.map((block) => ({
+          sectionId: block.sectionId,
+          title: block.title,
+        })),
+      );
+      const result = await this.imagesService.generateImage(prompt);
+      const image = await this.downloadGeneratedImage(result.image);
+      const extension = this.getImageExtension(image.mimeType);
+      const fileName = `${String(index + 1).padStart(2, '0')}-${this.slugifySectionId(section.id)}.${extension}`;
+      const relativePath = this.state.getRunRelativePath(
+        userId,
+        slug,
+        'reference',
+        'blocks',
+        fileName,
+      );
+      const absolutePath = this.state.getRunAbsolutePath(
+        userId,
+        slug,
+        'reference',
+        'blocks',
+        fileName,
+      );
+
+      await this.state.writeGeneratedFile(absolutePath, image.buffer);
+
+      generatedBlocks.push({
+        sectionId: section.id,
+        title: section.title,
+        relativePath,
+        absolutePath,
+        mimeType: image.mimeType,
+        model: result.model,
+      });
+    }
+
+    const fullPage = await this.createFullPagePreview(generatedBlocks);
+    const fullPageRelativePath = this.state.getRunRelativePath(
+      userId,
+      slug,
+      'reference',
+      'full-page-preview.png',
+    );
+    const fullPageAbsolutePath = this.state.getRunAbsolutePath(
+      userId,
+      slug,
+      'reference',
+      'full-page-preview.png',
+    );
+    await this.state.writeGeneratedFile(fullPageAbsolutePath, fullPage);
+
+    const manifestRelativePath = this.state.getRunRelativePath(
+      userId,
+      slug,
+      'reference',
+      'blocks-manifest.json',
+    );
+    const manifestAbsolutePath = this.state.getRunAbsolutePath(
+      userId,
+      slug,
+      'reference',
+      'blocks-manifest.json',
+    );
+    await this.state.writeGeneratedFile(
+      manifestAbsolutePath,
+      JSON.stringify(
+        {
+          workflow: 'one-section-one-image',
+          fullPagePreview: fullPageRelativePath,
+          blocks: generatedBlocks.map((block) => ({
+            sectionId: block.sectionId,
+            title: block.title,
+            path: block.relativePath,
+            mimeType: block.mimeType,
+            model: block.model,
+          })),
+        },
+        null,
+        2,
+      ),
+    );
+
+    return {
+      relativePath: fullPageRelativePath,
+      mimeType: 'image/png',
+      model: generatedBlocks[0]?.model ?? 'unknown',
+    };
+  }
+
+  private async generateSvgReferenceImage(
+    brief: string,
+    projectSpec: ProjectSpec,
+    tokens: DesignTokens,
+    designDescription: string,
+    userId: string,
+    slug: string,
+  ): Promise<{ relativePath: string; mimeType: string; model: string }> {
+    const svg = await this.aiService.generateReferenceSvg(
       brief,
       projectSpec,
       tokens,
       designDescription,
     );
-    const result = await this.imagesService.generateImage(prompt);
-    const response = await fetch(result.image);
-
-    if (!response.ok) {
-      throw new Error(
-        `Не удалось скачать Flux reference image: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    const mimeType = this.normalizeImageMimeType(
-      response.headers.get('content-type'),
-    );
-    const extension = this.getImageExtension(mimeType);
-    const imageBuffer = Buffer.from(await response.arrayBuffer());
     const relativePath = this.state.getRunRelativePath(
       userId,
       slug,
       'reference',
-      `reference.${extension}`,
+      'full-page-preview.svg',
     );
     const absolutePath = this.state.getRunAbsolutePath(
       userId,
       slug,
       'reference',
-      `reference.${extension}`,
+      'full-page-preview.svg',
     );
 
-    await this.state.writeGeneratedFile(absolutePath, imageBuffer);
+    await this.state.writeGeneratedFile(absolutePath, svg);
 
-    return { relativePath, mimeType, model: result.model };
+    const manifestRelativePath = this.state.getRunRelativePath(
+      userId,
+      slug,
+      'reference',
+      'blocks-manifest.json',
+    );
+    const manifestAbsolutePath = this.state.getRunAbsolutePath(
+      userId,
+      slug,
+      'reference',
+      'blocks-manifest.json',
+    );
+
+    await this.state.writeGeneratedFile(
+      manifestAbsolutePath,
+      JSON.stringify(
+        {
+          workflow: 'svg-fallback',
+          fullPagePreview: relativePath,
+          blocks: this.normalizeReferenceSections(projectSpec).map(
+            (section) => ({
+              sectionId: section.id,
+              title: section.title,
+              path: relativePath,
+              mimeType: 'image/svg+xml',
+              model: 'analysis-svg-fallback',
+            }),
+          ),
+        },
+        null,
+        2,
+      ),
+    );
+
+    return {
+      relativePath,
+      mimeType: 'image/svg+xml',
+      model: 'analysis-svg-fallback',
+    };
   }
 
-  private buildReferenceImagePrompt(
+  private normalizeReferenceSections(projectSpec: ProjectSpec) {
+    if (projectSpec.sections?.length) {
+      return projectSpec.sections;
+    }
+
+    return [
+      {
+        id: '01-hero',
+        type: 'hero' as const,
+        title: 'Hero',
+        goal: 'Первый экран и основной CTA',
+        contentNotes: [
+          projectSpec.copy.headline,
+          projectSpec.copy.description,
+        ],
+        visualNotes: projectSpec.visualPreferences ?? [],
+        requiredElements: projectSpec.requiredElements ?? [
+          'navigation',
+          'headline',
+          'description',
+          'primary CTA',
+        ],
+      },
+    ];
+  }
+
+  private async downloadGeneratedImage(
+    imageUrl: string,
+  ): Promise<{ buffer: Buffer; mimeType: string }> {
+    const response = await fetch(imageUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Не удалось скачать reference image: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return {
+      buffer: Buffer.from(await response.arrayBuffer()),
+      mimeType: this.normalizeImageMimeType(
+        response.headers.get('content-type'),
+      ),
+    };
+  }
+
+  private async createFullPagePreview(
+    blocks: Array<{ absolutePath: string }>,
+  ): Promise<Buffer> {
+    const normalizedBlocks = await Promise.all(
+      blocks.map(async (block) => {
+        const { data, info } = await sharp(block.absolutePath)
+          .resize({
+            width: 1440,
+            withoutEnlargement: false,
+          })
+          .png()
+          .toBuffer({ resolveWithObject: true });
+
+        return {
+          buffer: data,
+          height: info.height,
+        };
+      }),
+    );
+    const totalHeight = normalizedBlocks.reduce(
+      (sum, block) => sum + block.height,
+      0,
+    );
+
+    return sharp({
+      create: {
+        width: 1440,
+        height: totalHeight,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      },
+    })
+      .composite(
+        normalizedBlocks.map((block, index) => ({
+          input: block.buffer,
+          left: 0,
+          top: normalizedBlocks
+            .slice(0, index)
+            .reduce((sum, previous) => sum + previous.height, 0),
+        })),
+      )
+      .png()
+      .toBuffer();
+  }
+
+  private buildSectionImagePrompt(
     brief: string,
     projectSpec: ProjectSpec,
     tokens: DesignTokens,
     designDescription: string,
+    section: ProjectSpec['sections'][number],
+    previousSections: Array<{ sectionId: string; title: string }>,
   ): string {
     return [
-      'Generate a polished visual reference mockup for the first viewport of a website hero section.',
-      'Format: 1440x900 desktop web screenshot, 16:10 aspect ratio, no browser chrome, no device frame.',
-      'Style: production-ready UI design, crisp typography, realistic spacing, coherent layout, high fidelity.',
-      'Use the provided copy and design system. Text must be readable and resemble the requested Russian/English content, but avoid adding unrelated text.',
+      'Create one production-ready desktop website section image.',
+      'Canvas: 1440px wide desktop website section, straight-on website screenshot.',
+      'Generate only the current section, not the full page.',
+      'Do not include browser chrome, device mockups, editor UI, annotations, or unrelated text.',
+      'The design must feel like a real shipped landing page section with strong typography, clear hierarchy, generous spacing, readable text, coherent style, and frontend-implementable layout.',
+      'Keep the same art direction as previous sections. Do not make each block a different style.',
       '',
       `Brief:\n${brief}`,
       '',
@@ -897,7 +1184,20 @@ export class PipelineService {
       `Design tokens:\n${JSON.stringify(tokens, null, 2)}`,
       '',
       `Design description:\n${designDescription}`,
+      '',
+      `Previous sections:\n${JSON.stringify(previousSections, null, 2)}`,
+      '',
+      `Current section:\n${JSON.stringify(section, null, 2)}`,
     ].join('\n');
+  }
+
+  private slugifySectionId(sectionId: string): string {
+    const slug = sectionId
+      .toLowerCase()
+      .replace(/[^a-z0-9а-яё-]+/gi, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return slug || 'section';
   }
 
   private normalizeImageMimeType(contentType: string | null): string {
@@ -918,6 +1218,50 @@ export class PipelineService {
     if (mimeType === 'image/jpeg') return 'jpg';
     if (mimeType === 'image/webp') return 'webp';
     return 'png';
+  }
+
+  private async buildVisualReferenceContext(runId: string): Promise<string> {
+    const referenceArtifact = await this.state.getArtifactByType(
+      runId,
+      ArtifactType.ReferenceImage,
+    );
+
+    if (!referenceArtifact) {
+      return 'Visual references: not generated yet.';
+    }
+
+    const manifestPath = referenceArtifact.path.replace(
+      /reference\/full-page-preview\.(png|svg)$/,
+      'reference/blocks-manifest.json',
+    );
+
+    try {
+      const manifest = await this.state.readArtifactFile(manifestPath);
+
+      return [
+        'Approved visual references:',
+        `Full-page preview: ${referenceArtifact.path}`,
+        `Blocks manifest:\n${manifest}`,
+        'Use these block references as the primary visual source. Match them with real HTML/CSS; do not rasterize whole sections.',
+      ].join('\n');
+    } catch {
+      return [
+        'Approved visual references:',
+        `Full-page preview: ${referenceArtifact.path}`,
+        'Blocks manifest is unavailable. Use the full-page preview path as the approved reference and keep code aligned with the design description.',
+      ].join('\n');
+    }
+  }
+
+  private canFallbackToSvgReference(message: string): boolean {
+    return [
+      'Image generation failed',
+      'AI_IMAGE_PROVIDER',
+      'AI_IMAGE_API_KEY',
+      'Insufficient credit',
+      'Payment Required',
+      'Replicate returned no image URL',
+    ].some((fragment) => message.includes(fragment));
   }
 
   private async regenerateCode(
@@ -961,7 +1305,7 @@ export class PipelineService {
       run.brief,
       projectSpec,
       tokens,
-      designDescription,
+      `${designDescription}\n\n${await this.buildVisualReferenceContext(run.id)}`,
       codePath,
     );
 

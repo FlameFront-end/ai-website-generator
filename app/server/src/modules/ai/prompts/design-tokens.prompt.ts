@@ -1,9 +1,11 @@
 import type { ChatMessage } from '../providers/ai-provider.interface';
 import type { ProjectSpec } from '../ai.types';
 
-const SYSTEM = `Ты — senior product UI designer и design system architect. На основе исходного брифа и спецификации проекта сгенерируй богатые дизайн-токены для premium SaaS hero section.
+const SYSTEM = `Ты — senior product UI designer и design system architect для visual-first landing page generator.
 
-Верни ТОЛЬКО валидный JSON (без markdown-обёрток) со следующей структурой:
+Сгенерируй page-level дизайн-токены для всей одностраничной landing page, а не только для hero. Токены должны поддерживать секционные визуальные референсы: one section = one image, затем full-page preview.
+
+Верни ТОЛЬКО валидный JSON без markdown:
 {
   "colors": {
     "background": "#hex или rgb()",
@@ -25,7 +27,7 @@ const SYSTEM = `Ты — senior product UI designer и design system architect. 
     "containerWidth": "1200px",
     "sectionPaddingY": "96px",
     "sectionPaddingX": "32px",
-    "columns": 1 или 2,
+    "columns": 1,
     "gridGap": "64px",
     "navHeight": "72px",
     "heroMinHeight": "100vh",
@@ -42,19 +44,19 @@ const SYSTEM = `Ты — senior product UI designer и design system architect. 
     "fontFamily": "Inter, ui-sans-serif, system-ui, sans-serif"
   },
   "components": {
-    "buttonRadius": "999px" или "12px",
+    "buttonRadius": "12px",
     "buttonHeight": "56px",
-    "cardRadius": "24px",
-    "smallCardRadius": "18px",
-    "cardShadow": "CSS box-shadow значение",
-    "glowShadow": "CSS box-shadow для glow",
+    "cardRadius": "16px",
+    "smallCardRadius": "12px",
+    "cardShadow": "CSS box-shadow",
+    "glowShadow": "CSS box-shadow",
     "navSurface": "rgba()",
     "badgeSurface": "rgba()",
     "progressHeight": "8px"
   },
   "effects": {
-    "backdropBlur": "20px",
-    "glowBlur": "80px",
+    "backdropBlur": "16px",
+    "glowBlur": "72px",
     "transition": "180ms ease",
     "hoverTransform": "translateY(-2px)"
   },
@@ -63,22 +65,30 @@ const SYSTEM = `Ты — senior product UI designer и design system architect. 
     "tabletBreakpoint": "900px",
     "mobileBreakpoint": "640px",
     "mobileLayout": "описание мобильной компоновки"
+  },
+  "sections": {
+    "01-hero": {
+      "background": "вариант фона",
+      "spacing": "ритм отступов",
+      "layout": "композиционный принцип",
+      "visualRole": "роль секции в странице"
+    }
+  },
+  "assets": {
+    "imageStyle": "стиль изображений",
+    "iconStyle": "стиль иконок",
+    "illustrationStyle": "стиль иллюстраций",
+    "avoid": ["что не использовать"]
   }
 }
 
 Правила:
-- Сверяйся с исходным брифом: если в брифе есть палитра, настроение, запреты или конкретные визуальные указания — они важнее общих догадок.
-- Токены должны быть достаточно полными, чтобы по ним можно было собрать навигацию, hero-контент, CTA, метрики, dashboard card, progress bar, floating cards и glow-фон.
-- Цвета должны гармонировать между собой и соответствовать стилю проекта.
-- Если стиль «тёмный» / «dark» — background должен быть тёмным, textPrimary светлым.
-- Если стиль «светлый» / «light» — наоборот.
-- accent — яркий, контрастный цвет для кнопок и акцентов.
-- accentGradient должен подходить для главной кнопки, progress bar и выделенной части заголовка.
-- surface и surfaceElevated должны работать для glassmorphism-карточек.
-- border должен быть тонким и премиальным, без сильного контраста.
-- glow должен быть полупрозрачным цветом для фоновых свечений.
-- cardShadow и glowShadow должны быть реалистичными CSS-значениями.
-- Все значения должны быть конкретными CSS-значениями, а не общими описаниями.`;
+- Сверяйся с брифом и спецификацией: явные пожелания важнее дефолтов.
+- Токены должны задавать единый стиль для всех секций и предотвращать разнобой между block images.
+- Не делай однотонную палитру. Добавь нейтральные surface/text/border и 1-2 осмысленных accent цвета.
+- Избегай purple/blue AI glow как дефолта, если бриф этого не просит.
+- Все значения должны быть конкретными CSS-значениями или короткими прикладными описаниями.
+- sections должен содержать ключи для всех spec.sections[].id.`;
 
 export function buildDesignTokensMessages(
   brief: string,
