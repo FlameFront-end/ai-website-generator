@@ -9,6 +9,7 @@ export interface BriefDraft {
   id: string;
   title: string | null;
   rawBrief: string;
+  siteLanguage: string;
   finalBrief: string | null;
   clarification: ClarifyBriefResponse | null;
   answers: BriefClarificationAnswer[];
@@ -36,6 +37,8 @@ function normalizeDraft(value: Partial<BriefDraft>): BriefDraft {
     id: typeof value.id === "string" ? value.id : createBriefDraftId(),
     title: typeof value.title === "string" ? value.title : null,
     rawBrief: typeof value.rawBrief === "string" ? value.rawBrief : "",
+    siteLanguage:
+      typeof value.siteLanguage === "string" ? value.siteLanguage : "ru",
     finalBrief: typeof value.finalBrief === "string" ? value.finalBrief : null,
     clarification: value.clarification ?? null,
     answers: Array.isArray(value.answers) ? value.answers : [],
@@ -113,3 +116,4 @@ export function deleteBriefDraft(id: string) {
   const drafts = readBriefDrafts().filter((draft) => draft.id !== id);
   localStorage.setItem(BRIEF_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
 }
+

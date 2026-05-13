@@ -168,6 +168,43 @@ export interface DesignDescription {
   markdown: string;
 }
 
+export interface ProjectSpecSummary {
+  projectType: string;
+  audience: string;
+  primaryGoal: string;
+  language: string;
+  productName: string;
+  sections: string[];
+  tone: string;
+  mustHave: string[];
+  visualDirection: string[];
+}
+
+export interface DesignContextSummary {
+  colorIntent: string;
+  typographyIntent: string;
+  layoutIntent: string;
+  componentRules: string[];
+  responsiveRules: string[];
+  sectionRules: Record<string, string>;
+  avoid: string[];
+}
+
+export interface ReferenceContextSummarySection {
+  sectionId: string;
+  title: string;
+  goal: string;
+  path: string;
+  mimeType: string;
+}
+
+export interface ReferenceContextSummary {
+  workflow: string;
+  fullPagePreview: string;
+  sections: ReferenceContextSummarySection[];
+  notes: string[];
+}
+
 export type BriefQuestionType =
   | 'text'
   | 'single_choice'

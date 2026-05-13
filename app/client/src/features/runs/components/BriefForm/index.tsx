@@ -8,14 +8,18 @@ import styles from "./BriefForm.module.scss";
 
 interface BriefFormProps {
   brief: string;
+  siteLanguage: string;
   isSubmitting: boolean;
+  onLanguageChange: (language: string) => void;
   onDraftChange: (brief: string) => void;
   onSubmit: (brief: string) => void;
 }
 
 export const BriefForm: FC<BriefFormProps> = ({
   brief,
+  siteLanguage,
   isSubmitting,
+  onLanguageChange,
   onDraftChange,
   onSubmit,
 }) => {
@@ -52,7 +56,25 @@ export const BriefForm: FC<BriefFormProps> = ({
         <span>Стиль и настроение</span>
         <span>Тексты и кнопки</span>
       </div>
-      <textarea
+      <div className={styles.languageSelector}>
+        <span>Язык сайта и вопросов</span>
+        <div>
+          <button
+            type="button"
+            className={siteLanguage === "ru" ? styles.selectedLanguage : ""}
+            onClick={() => onLanguageChange("ru")}
+          >
+            Русский
+          </button>
+          <button
+            type="button"
+            className={siteLanguage === "en" ? styles.selectedLanguage : ""}
+            onClick={() => onLanguageChange("en")}
+          >
+            English
+          </button>
+        </div>
+      </div>      <textarea
         id="brief"
         value={brief}
         onChange={(event) => onDraftChange(event.target.value)}
@@ -76,3 +98,4 @@ export const BriefForm: FC<BriefFormProps> = ({
     </form>
   );
 };
+

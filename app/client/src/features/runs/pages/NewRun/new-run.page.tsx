@@ -88,6 +88,9 @@ function NewRunDraftPage({
     () => initialDraft?.id ?? requestedDraftId ?? createBriefDraftId(),
   );
   const [rawBrief, setRawBrief] = useState(initialDraft?.rawBrief ?? "");
+  const [siteLanguage, setSiteLanguage] = useState(
+    initialDraft?.siteLanguage ?? "ru",
+  );
   const [finalBrief, setFinalBrief] = useState<string | null>(
     initialDraft?.finalBrief ?? null,
   );
@@ -126,6 +129,7 @@ function NewRunDraftPage({
       id: draftId,
       title: projectTitle.trim() || null,
       rawBrief,
+      siteLanguage,
       finalBrief,
       clarification,
       answers,
@@ -141,6 +145,7 @@ function NewRunDraftPage({
     initialDraft?.createdAt,
     requestedDraftId,
     rawBrief,
+    siteLanguage,
     finalBrief,
     projectTitle,
     clarification,
@@ -158,6 +163,7 @@ function NewRunDraftPage({
     try {
       const result = await runsApi.clarifyBrief({
         brief,
+        siteLanguage,
         answers: nextAnswers,
       });
       setClarification(result);
@@ -243,8 +249,9 @@ function NewRunDraftPage({
   };
 
   const handleCreateRun = (brief: string) => {
+    const localizedBrief = buildLocalizedBrief(brief, siteLanguage);
     createRunMutation.mutate(
-      { brief, displayName: projectTitle.trim() || null },
+      { brief: localizedBrief, displayName: projectTitle.trim() || null },
       {
         onSuccess: (run) => {
           deleteBriefDraft(draftId);
@@ -259,6 +266,7 @@ function NewRunDraftPage({
     deleteBriefDraft(draftId);
     setSearchParams({}, { replace: true });
     setRawBrief("");
+    setSiteLanguage("ru");
     setFinalBrief(null);
     setProjectTitle("");
     setClarification(null);
@@ -432,7 +440,9 @@ function NewRunDraftPage({
       {!clarification && !finalBrief && (
         <BriefForm
           brief={rawBrief}
+          siteLanguage={siteLanguage}
           isSubmitting={isClarifying}
+          onLanguageChange={setSiteLanguage}
           onDraftChange={setRawBrief}
           onSubmit={handleInitialBrief}
         />
@@ -591,4 +601,16 @@ function NewRunDraftPage({
       )}
     </section>
   );
+}
+
+function buildLocalizedBrief(brief: string, siteLanguage: string) {
+  const languageLabel = siteLanguage === "en" ? "English" : "Russian";
+
+  return [
+    `Target site language: ${languageLabel}.`,
+    "Generate all user-facing website copy, clarification-derived content, design text, sections, CTAs, metadata and UI labels in this language.",
+    "Keep internal reasoning and implementation instructions in English.",
+    "",
+    brief.trim(),
+  ].join("\n");
 }

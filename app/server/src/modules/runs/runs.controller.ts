@@ -141,10 +141,7 @@ export class RunsController {
   }
 
   @Post(':id/restart-current-step')
-  restartCurrentStep(
-    @Param('id') id: string,
-    @Request() req: RequestWithUser,
-  ) {
+  restartCurrentStep(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.runsService.restartCurrentStep(id, req.user.id);
   }
 

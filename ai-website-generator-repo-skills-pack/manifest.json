@@ -1,0 +1,38 @@
+{
+  "name": "ai-website-generator-repo-skills-pack",
+  "purpose": "Compact product skills and Taste Skill mapping for the user's current ai-website-generator repo",
+  "productSkills": [
+    "skills/product/00-global-product-rules.md",
+    "skills/product/01-brief-and-structure.md",
+    "skills/product/02-image-generation-workflow.md",
+    "skills/product/03-design-system-assets.md",
+    "skills/product/04-image-to-code.md",
+    "skills/product/05-build-qa-repair-export.md"
+  ],
+  "vendorSkills": [
+    "vendor/taste-skill/skills/image-to-code-skill/SKILL.md",
+    "vendor/taste-skill/skills/imagegen-frontend-mobile/SKILL.md",
+    "vendor/taste-skill/skills/imagegen-frontend-web/SKILL.md",
+    "vendor/taste-skill/skills/output-skill/SKILL.md",
+    "vendor/taste-skill/skills/redesign-skill/SKILL.md",
+    "vendor/taste-skill/skills/taste-skill/SKILL.md"
+  ],
+  "docs": [
+    "docs/IMAGE_GENERATION_INTEGRATION_RU.md",
+    "docs/PROJECT_REPO_ANALYSIS_RU.md",
+    "docs/SKILL_TO_REPO_MAPPING_RU.md",
+    "docs/SUGGESTED_PIPELINE_CHANGES_RU.md",
+    "docs/WHAT_TO_SEND_TO_FRIEND_RU.md"
+  ],
+  "mainImageGenerationSkill": "skills/product/02-image-generation-workflow.md",
+  "mainOpenSourceImageSkill": "vendor/taste-skill/skills/imagegen-frontend-web/SKILL.md",
+  "repoFilesToConnect": {
+    "clarifyBrief": "app/server/src/modules/ai/prompts/clarify-brief.prompt.ts",
+    "extractSpec": "app/server/src/modules/ai/prompts/extract-spec.prompt.ts",
+    "designTokens": "app/server/src/modules/ai/prompts/design-tokens.prompt.ts",
+    "designDescription": "app/server/src/modules/ai/prompts/design-description.prompt.ts",
+    "imageGeneration": "app/server/src/modules/pipeline/pipeline.service.ts + app/server/src/modules/images/images.service.ts",
+    "codeGeneration": "app/server/src/modules/ai/prompts/generate-code.prompt.ts + app/server/src/modules/code-generator/code-generator.service.ts",
+    "qa": "app/server/src/modules/pipeline/screenshot.service.ts + visual-qa.service.ts"
+  }
+}

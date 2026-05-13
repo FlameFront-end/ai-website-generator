@@ -1,8 +1,11 @@
 export enum ArtifactType {
   ReferenceImage = 'reference_image',
+  ReferenceContextSummary = 'reference_context_summary',
   ProjectSpec = 'project_spec',
+  ProjectSpecSummary = 'project_spec_summary',
   DesignDescription = 'design_description',
   DesignTokens = 'design_tokens',
+  DesignContextSummary = 'design_context_summary',
   FrontendProject = 'frontend_project',
   DesktopScreenshot = 'desktop_screenshot',
   MobileScreenshot = 'mobile_screenshot',

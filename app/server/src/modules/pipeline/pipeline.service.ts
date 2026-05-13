@@ -2,10 +2,22 @@ import { Injectable } from '@nestjs/common';
 import path from 'node:path';
 import sharp from 'sharp';
 
-import type { ProjectSpec, DesignTokens } from '../ai/ai.types';
+import type {
+  DesignContextSummary,
+  DesignTokens,
+  ProjectSpec,
+  ProjectSpecSummary,
+  ReferenceContextSummary,
+} from '../ai/ai.types';
 import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { AiService } from '../ai/ai.service';
+import { buildCodegenContext } from '../ai/codegen-context';
+import {
+  buildDesignContextSummary,
+  buildProjectSpecSummary,
+  buildReferenceContextSummary,
+} from '../ai/summary-builders';
 import { CodeGeneratorService } from '../code-generator/code-generator.service';
 import { ImagesService } from '../images/images.service';
 import { PipelineStateService } from './pipeline-state.service';
@@ -75,8 +87,34 @@ export class PipelineService {
       specRelativePath,
       'application/json',
     );
+
+    const specSummary = buildProjectSpecSummary(projectSpec);
+    const specSummaryRelativePath = this.state.getRunRelativePath(
+      userId,
+      briefRun.slug,
+      'spec',
+      'project-spec.summary.json',
+    );
+    const specSummaryAbsolutePath = this.state.getRunAbsolutePath(
+      userId,
+      briefRun.slug,
+      'spec',
+      'project-spec.summary.json',
+    );
+    await this.state.writeGeneratedFile(
+      specSummaryAbsolutePath,
+      JSON.stringify(specSummary, null, 2),
+    );
+    await this.state.saveArtifact(
+      briefRun.id,
+      ArtifactType.ProjectSpecSummary,
+      specSummaryRelativePath,
+      'application/json',
+    );
+
     await this.state.addLog(briefRun.id, 'Спецификация готова', {
       path: specRelativePath,
+      summaryPath: specSummaryRelativePath,
     });
 
     await this.state.updateRunStatus(
@@ -182,8 +220,34 @@ export class PipelineService {
       tokensRelativePath,
       'application/json',
     );
+
+    const designSummary = buildDesignContextSummary(projectSpec, tokens);
+    const designSummaryRelativePath = this.state.getRunRelativePath(
+      userId,
+      tokensRun.slug,
+      'design',
+      'design-context.summary.json',
+    );
+    const designSummaryAbsolutePath = this.state.getRunAbsolutePath(
+      userId,
+      tokensRun.slug,
+      'design',
+      'design-context.summary.json',
+    );
+    await this.state.writeGeneratedFile(
+      designSummaryAbsolutePath,
+      JSON.stringify(designSummary, null, 2),
+    );
+    await this.state.saveArtifact(
+      tokensRun.id,
+      ArtifactType.DesignContextSummary,
+      designSummaryRelativePath,
+      'application/json',
+    );
+
     await this.state.addLog(tokensRun.id, 'Дизайн-токены готовы', {
       path: tokensRelativePath,
+      summaryPath: designSummaryRelativePath,
     });
 
     await this.state.updateRunStatus(
@@ -192,10 +256,7 @@ export class PipelineService {
       'awaiting_design_approval',
       userId,
     );
-    await this.state.addLog(
-      tokensRun.id,
-      'Проверьте дизайн и подтвердите шаг',
-    );
+    await this.state.addLog(tokensRun.id, 'Проверьте дизайн и подтвердите шаг');
   }
 
   private async prepareReferenceImage(
@@ -230,9 +291,19 @@ export class PipelineService {
       referenceImage.relativePath,
       referenceImage.mimeType,
     );
+
+    const referenceSummaryRelativePath = await this.saveReferenceContextSummary(
+      referenceRun.id,
+      userId,
+      referenceRun.slug,
+      projectSpec,
+      referenceImage.relativePath,
+    );
+
     await this.state.addLog(referenceRun.id, 'Визуальный референс готов', {
       model: referenceImage.model,
       path: referenceImage.relativePath,
+      summaryPath: referenceSummaryRelativePath,
     });
 
     await this.state.updateRunStatus(
@@ -267,14 +338,15 @@ export class PipelineService {
       this.storageService.getRunPath(userId, codeRun.slug),
       'code',
     );
-    const visualReferenceContext = await this.buildVisualReferenceContext(
+    const codegenContext = await this.buildCodegenContextForRun(
       codeRun.id,
+      designDescription,
     );
     await this.codeGeneratorService.generateProjectFiles(
       run.brief,
       projectSpec,
       tokens,
-      `${designDescription}\n\n${visualReferenceContext}`,
+      codegenContext,
       codePath,
     );
 
@@ -620,10 +692,7 @@ export class PipelineService {
       runningStepMap[step],
       userId,
     );
-    await this.state.addLog(
-      run.id,
-      `Перезапускаем шаг: ${stepTitleMap[step]}`,
-    );
+    await this.state.addLog(run.id, `Перезапускаем шаг: ${stepTitleMap[step]}`);
 
     void this.finishRestartStep(run, step, userId);
   }
@@ -963,12 +1032,6 @@ export class PipelineService {
     );
     await this.state.writeGeneratedFile(fullPageAbsolutePath, fullPage);
 
-    const manifestRelativePath = this.state.getRunRelativePath(
-      userId,
-      slug,
-      'reference',
-      'blocks-manifest.json',
-    );
     const manifestAbsolutePath = this.state.getRunAbsolutePath(
       userId,
       slug,
@@ -1030,12 +1093,6 @@ export class PipelineService {
 
     await this.state.writeGeneratedFile(absolutePath, svg);
 
-    const manifestRelativePath = this.state.getRunRelativePath(
-      userId,
-      slug,
-      'reference',
-      'blocks-manifest.json',
-    );
     const manifestAbsolutePath = this.state.getRunAbsolutePath(
       userId,
       slug,
@@ -1082,10 +1139,7 @@ export class PipelineService {
         type: 'hero' as const,
         title: 'Hero',
         goal: 'Первый экран и основной CTA',
-        contentNotes: [
-          projectSpec.copy.headline,
-          projectSpec.copy.description,
-        ],
+        contentNotes: [projectSpec.copy.headline, projectSpec.copy.description],
         visualNotes: projectSpec.visualPreferences ?? [],
         requiredElements: projectSpec.requiredElements ?? [
           'navigation',
@@ -1220,7 +1274,71 @@ export class PipelineService {
     return 'png';
   }
 
+  private async buildCodegenContextForRun(
+    runId: string,
+    designDescription: string,
+  ): Promise<string> {
+    const [projectSpecSummary, designContextSummary, referenceContextSummary] =
+      await Promise.all([
+        this.readJsonArtifact<ProjectSpecSummary>(
+          runId,
+          ArtifactType.ProjectSpecSummary,
+        ),
+        this.readJsonArtifact<DesignContextSummary>(
+          runId,
+          ArtifactType.DesignContextSummary,
+        ),
+        this.readJsonArtifact<ReferenceContextSummary>(
+          runId,
+          ArtifactType.ReferenceContextSummary,
+        ),
+      ]);
+
+    return buildCodegenContext({
+      projectSpecSummary,
+      designContextSummary,
+      referenceContextSummary,
+      designDescription,
+      visualReferenceContext: await this.buildVisualReferenceContext(runId),
+    });
+  }
+
+  private async readJsonArtifact<T>(
+    runId: string,
+    type: ArtifactType,
+  ): Promise<T | undefined> {
+    const artifact = await this.state.getArtifactByType(runId, type);
+
+    if (!artifact) {
+      return undefined;
+    }
+
+    try {
+      return JSON.parse(await this.state.readArtifactFile(artifact.path)) as T;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async buildVisualReferenceContext(runId: string): Promise<string> {
+    const summaryArtifact = await this.state.getArtifactByType(
+      runId,
+      ArtifactType.ReferenceContextSummary,
+    );
+
+    if (summaryArtifact) {
+      try {
+        const summary = await this.state.readArtifactFile(summaryArtifact.path);
+        return [
+          'Approved visual reference summary (use as primary visual source):',
+          summary,
+          'Match layout, spacing, hierarchy and palette to the approved blocks. Do not redesign sections; do not rasterize whole sections in code.',
+        ].join('\n');
+      } catch {
+        // fall through to manifest/full-page handling
+      }
+    }
+
     const referenceArtifact = await this.state.getArtifactByType(
       runId,
       ArtifactType.ReferenceImage,
@@ -1251,6 +1369,70 @@ export class PipelineService {
         'Blocks manifest is unavailable. Use the full-page preview path as the approved reference and keep code aligned with the design description.',
       ].join('\n');
     }
+  }
+
+  private async saveReferenceContextSummary(
+    runId: string,
+    userId: string,
+    slug: string,
+    projectSpec: ProjectSpec,
+    fullPageReferencePath: string,
+  ): Promise<string> {
+    const manifestRelativePath = fullPageReferencePath.replace(
+      /reference\/full-page-preview\.(png|svg)$/,
+      'reference/blocks-manifest.json',
+    );
+
+    let manifest: {
+      workflow?: string;
+      fullPagePreview?: string;
+      blocks?: Array<{
+        sectionId: string;
+        title?: string;
+        path: string;
+        mimeType?: string;
+      }>;
+    } = {};
+
+    try {
+      const manifestRaw =
+        await this.state.readArtifactFile(manifestRelativePath);
+      manifest = JSON.parse(manifestRaw) as typeof manifest;
+    } catch {
+      manifest = {};
+    }
+
+    const summary = buildReferenceContextSummary(
+      projectSpec,
+      manifest,
+      fullPageReferencePath,
+    );
+
+    const summaryRelativePath = this.state.getRunRelativePath(
+      userId,
+      slug,
+      'reference',
+      'reference-context.summary.json',
+    );
+    const summaryAbsolutePath = this.state.getRunAbsolutePath(
+      userId,
+      slug,
+      'reference',
+      'reference-context.summary.json',
+    );
+
+    await this.state.writeGeneratedFile(
+      summaryAbsolutePath,
+      JSON.stringify(summary, null, 2),
+    );
+    await this.state.saveArtifact(
+      runId,
+      ArtifactType.ReferenceContextSummary,
+      summaryRelativePath,
+      'application/json',
+    );
+
+    return summaryRelativePath;
   }
 
   private canFallbackToSvgReference(message: string): boolean {
@@ -1305,7 +1487,7 @@ export class PipelineService {
       run.brief,
       projectSpec,
       tokens,
-      `${designDescription}\n\n${await this.buildVisualReferenceContext(run.id)}`,
+      await this.buildCodegenContextForRun(run.id, designDescription),
       codePath,
     );
 
@@ -1314,3 +1496,5 @@ export class PipelineService {
     });
   }
 }
+
+

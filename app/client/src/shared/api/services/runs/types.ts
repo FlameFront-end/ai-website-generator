@@ -100,6 +100,7 @@ export interface BriefClarificationAnswer {
 
 export interface ClarifyBriefRequest {
   brief: string;
+  siteLanguage?: string;
   answers?: BriefClarificationAnswer[];
 }
 

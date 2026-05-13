@@ -1,14 +1,22 @@
+import type { DesignTokens, ProjectSpec } from '../ai.types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
-import type { ProjectSpec } from '../ai.types';
+import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
 
-const SYSTEM = `Ты — senior product UI designer и design system architect для visual-first landing page generator.
+const SYSTEM = joinPromptSections(
+  buildSkillContext(
+    ['product-global-rules', 'design-system-assets', 'taste-visual-quality'],
+    6000,
+  ),
+  `You are a senior product UI designer and design-system architect.
 
-Сгенерируй page-level дизайн-токены для всей одностраничной landing page, а не только для hero. Токены должны поддерживать секционные визуальные референсы: one section = one image, затем full-page preview.
+Generate page-level design tokens for the whole one-page landing page, not only for the hero. Tokens must support a visual-first workflow: one section = one reference image, then a full-page preview.
 
-Верни ТОЛЬКО валидный JSON без markdown:
+Return ONLY valid JSON. No markdown.
+
+Required JSON shape:
 {
   "colors": {
-    "background": "#hex или rgb()",
+    "background": "#hex or rgb()",
     "backgroundGradient": "CSS background gradient",
     "textPrimary": "#hex",
     "textSecondary": "#hex",
@@ -16,10 +24,10 @@ const SYSTEM = `Ты — senior product UI designer и design system architect �
     "accent": "#hex",
     "accentSecondary": "#hex",
     "accentGradient": "CSS linear-gradient(...)",
-    "surface": "rgba() или #hex",
-    "surfaceElevated": "rgba() или #hex",
-    "border": "rgba() или #hex",
-    "glow": "rgba() цвет свечения",
+    "surface": "rgba() or #hex",
+    "surfaceElevated": "rgba() or #hex",
+    "border": "rgba() or #hex",
+    "glow": "rgba() glow color",
     "success": "#hex",
     "warning": "#hex"
   },
@@ -64,31 +72,32 @@ const SYSTEM = `Ты — senior product UI designer и design system architect �
     "desktopBreakpoint": "1200px",
     "tabletBreakpoint": "900px",
     "mobileBreakpoint": "640px",
-    "mobileLayout": "описание мобильной компоновки"
+    "mobileLayout": "short mobile layout rule"
   },
   "sections": {
     "01-hero": {
-      "background": "вариант фона",
-      "spacing": "ритм отступов",
-      "layout": "композиционный принцип",
-      "visualRole": "роль секции в странице"
+      "background": "section background rule",
+      "spacing": "section spacing rhythm",
+      "layout": "composition principle",
+      "visualRole": "role in the full page"
     }
   },
   "assets": {
-    "imageStyle": "стиль изображений",
-    "iconStyle": "стиль иконок",
-    "illustrationStyle": "стиль иллюстраций",
-    "avoid": ["что не использовать"]
+    "imageStyle": "image treatment",
+    "iconStyle": "icon style",
+    "illustrationStyle": "illustration style",
+    "avoid": ["things to avoid"]
   }
 }
 
-Правила:
-- Сверяйся с брифом и спецификацией: явные пожелания важнее дефолтов.
-- Токены должны задавать единый стиль для всех секций и предотвращать разнобой между block images.
-- Не делай однотонную палитру. Добавь нейтральные surface/text/border и 1-2 осмысленных accent цвета.
-- Избегай purple/blue AI glow как дефолта, если бриф этого не просит.
-- Все значения должны быть конкретными CSS-значениями или короткими прикладными описаниями.
-- sections должен содержать ключи для всех spec.sections[].id.`;
+Rules:
+- Explicit brief/spec preferences override defaults.
+- Keep one coherent style across all section reference images.
+- Avoid one-color palettes; include neutral background/surface/text/border plus 1-2 meaningful accents.
+- Avoid default purple/blue AI glow unless requested.
+- All values must be concrete CSS values or short implementation-ready descriptions.
+- sections must include every spec.sections[].id.`,
+);
 
 export function buildDesignTokensMessages(
   brief: string,
@@ -98,7 +107,7 @@ export function buildDesignTokensMessages(
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Исходный бриф:\n\n${brief}\n\nСпецификация проекта:\n\n${JSON.stringify(spec, null, 2)}`,
+      content: `Original brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}`,
     },
   ];
 }

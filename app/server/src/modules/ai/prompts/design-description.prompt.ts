@@ -1,28 +1,41 @@
-import type { ChatMessage } from '../providers/ai-provider.interface';
 import type { DesignTokens, ProjectSpec } from '../ai.types';
+import type { ChatMessage } from '../providers/ai-provider.interface';
+import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
 
-const SYSTEM = `Ты — senior UI/UX designer и art director. Напиши детальное визуальное описание всей landing page для visual-first workflow.
+const SYSTEM = joinPromptSections(
+  buildSkillContext(
+    [
+      'product-global-rules',
+      'design-system-assets',
+      'image-generation-workflow',
+      'taste-visual-quality',
+    ],
+    6500,
+  ),
+  `You are a senior UI/UX designer and art director.
 
-Описание будет использоваться для генерации отдельных изображений секций, поэтому оно должно задавать общий стиль и секционный ритм, а не только hero.
+Write a compact but concrete visual design description for the whole landing page. It will guide section-by-section reference image generation, so it must describe full-page rhythm and each section, not just the hero.
 
-Markdown должен содержать разделы:
-1. Общая концепция страницы
-2. Единая визуальная система
-3. Секционный ритм и композиция full page
-4. Навигация и hero
-5. Описание каждой секции из spec.sections
-6. CTA, доверие, метрики и социальное доказательство
-7. Design tokens usage
-8. Адаптивное поведение
-9. Anti-patterns: что нельзя рисовать и генерировать
+Return markdown only. Do not include code, JSX, CSS, Tailwind classes, markdown code fences, or developer handoff.
 
-Правила:
-- Используй конкретные значения из дизайн-токенов: цвета, градиенты, размеры, радиусы, тени, blur, breakpoints.
-- Для каждой секции укажи: цель, композицию, ключевой контент, визуальный фокус, фон, карточки/изображения/иконки, ритм отступов.
-- Помни правило one section = one image. Каждое описание секции должно быть самостоятельным промптом для картинки.
-- Не создавай full-page дизайн заново на этапе preview: preview должен складываться из секционных изображений.
-- Не пиши код, JSX, CSS, Tailwind-классы, markdown code fences или developer handoff.
-- Не добавляй сущности, конфликтующие с брифом.`;
+Required sections:
+1. Design concept
+2. Visual system
+3. Full-page section rhythm
+4. Navigation and hero
+5. Section-by-section image direction
+6. CTA, trust, metrics, proof
+7. Token usage
+8. Responsive behavior
+9. Do not generate
+
+Rules:
+- Use concrete token values: colors, gradients, sizes, radii, shadows, blur, breakpoints.
+- For every spec section, describe goal, composition, key content, visual focus, background, cards/images/icons, spacing rhythm.
+- Respect one section = one image. Each section description should be usable as an image prompt.
+- Full-page preview must be composed from section images, not redesigned.
+- Do not add entities that conflict with the brief.`,
+);
 
 export function buildDesignDescriptionMessages(
   brief: string,
@@ -33,7 +46,7 @@ export function buildDesignDescriptionMessages(
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Исходный бриф:\n${brief}\n\nСпецификация:\n${JSON.stringify(spec, null, 2)}\n\nДизайн-токены:\n${JSON.stringify(tokens, null, 2)}`,
+      content: `Original brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}`,
     },
   ];
 }

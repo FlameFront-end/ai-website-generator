@@ -1,20 +1,24 @@
-import type { ChatMessage } from '../providers/ai-provider.interface';
 import type { DesignTokens, ProjectSpec } from '../ai.types';
+import type { ChatMessage } from '../providers/ai-provider.interface';
+import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
 
-const SYSTEM = `Ты — дизайнер-иллюстратор. Сгенерируй SVG-reference для одной секции сайта на основе брифа, page-level спецификации, дизайн-токенов и описания дизайна.
+const SYSTEM = joinPromptSections(
+  buildSkillContext(['design-system-assets', 'image-generation-workflow'], 4000),
+  `You are a design illustrator creating a supporting SVG reference for one website section.
 
-SVG — вспомогательный артефакт, не главный источник макета. Основной visual-first workflow использует секционные изображения.
+SVG is a helper artifact, not the main layout source. The visual-first workflow uses section images as primary references.
 
-Верни ТОЛЬКО валидный SVG-код, начинающийся с <svg и заканчивающийся </svg>. Без markdown.
+Return ONLY valid SVG code starting with <svg and ending with </svg>. No markdown.
 
-Требования:
-- Размер: width="1440" height="900" viewBox="0 0 1440 900".
-- Покажи одну качественную desktop website section, а не весь сайт.
-- Не рисуй browser chrome и device frames.
-- Используй реальные тексты из copy/spec.
-- Отрази секционный ритм, цвета и компоненты из DesignTokens.
-- Не используй случайные blobs и generic AI glow, если они не указаны в стиле.
-- Все text-элементы должны быть читаемыми и не накладываться друг на друга.`;
+Requirements:
+- Use width="1440" height="900" viewBox="0 0 1440 900".
+- Show one high-quality desktop website section, not the full site.
+- Do not draw browser chrome or device frames.
+- Use real copy from ProjectSpec.
+- Reflect section rhythm, colors and components from DesignTokens.
+- Avoid random blobs and generic AI glow unless requested.
+- Text elements must be readable and must not overlap.`,
+);
 
 export function buildGenerateSvgMessages(
   brief: string,
@@ -26,7 +30,7 @@ export function buildGenerateSvgMessages(
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Исходный бриф:\n${brief}\n\nСпецификация:\n${JSON.stringify(spec, null, 2)}\n\nДизайн-токены:\n${JSON.stringify(tokens, null, 2)}\n\nОписание дизайна:\n${designDescription}`,
+      content: `Original brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}\n\nDesignDescription:\n${designDescription}`,
     },
   ];
 }
