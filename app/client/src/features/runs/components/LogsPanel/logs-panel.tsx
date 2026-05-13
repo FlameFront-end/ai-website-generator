@@ -110,6 +110,7 @@ export function LogsPanel({
             const hasMetadata =
               log.metadata && Object.keys(log.metadata).length > 0;
             const isExpanded = expandedLogId === log.id;
+            const title = translateLogMessage(log.message);
 
             return (
               <div key={log.id} className={styles.logItem}>
@@ -125,8 +126,8 @@ export function LogsPanel({
                       >
                         {LOG_LEVEL_ICONS[log.level]}
                       </span>
-                      <span className={styles.logTitle}>
-                        {translateLogMessage(log.message)}
+                      <span className={styles.logTitle} title={title}>
+                        {title}
                       </span>
                       <span className={styles.logTime}>
                         {new Date(log.createdAt).toLocaleString()}
@@ -148,8 +149,8 @@ export function LogsPanel({
                       >
                         {LOG_LEVEL_ICONS[log.level]}
                       </span>
-                      <span className={styles.logTitle}>
-                        {translateLogMessage(log.message)}
+                      <span className={styles.logTitle} title={title}>
+                        {title}
                       </span>
                       <span className={styles.logTime}>
                         {new Date(log.createdAt).toLocaleString()}

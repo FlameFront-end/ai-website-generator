@@ -36,10 +36,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      APP_ENV: docker
     ports:
       - "${API_PUBLIC_PORT}:${API_PORT}"
     volumes:
-      - generated-data:${GENERATED_ROOT}
+      - generated-data:/app/app/server/generated
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,7 +53,7 @@ services:
       context: .
       dockerfile: app/client/Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_URL: /api
     container_name: ai-website-generator-client
     restart: unless-stopped
     env_file:

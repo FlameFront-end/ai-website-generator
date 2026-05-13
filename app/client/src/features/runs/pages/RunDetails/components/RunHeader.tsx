@@ -14,11 +14,14 @@ interface RunHeaderProps {
   isDeleting: boolean;
   isDownloading: boolean;
   isRestartingStep: boolean;
+  isRestartingCodeStep: boolean;
   canRestartStep: boolean;
+  canRestartCodeStep: boolean;
   onRename: (displayName: string | null) => void;
   onDelete: () => void;
   onDownload: () => void;
   onRestartStep: () => void;
+  onRestartCodeStep: () => void;
   styles: Record<string, string>;
 }
 
@@ -29,11 +32,14 @@ export const RunHeader: FC<RunHeaderProps> = ({
   isDeleting,
   isDownloading,
   isRestartingStep,
+  isRestartingCodeStep,
   canRestartStep,
+  canRestartCodeStep,
   onRename,
   onDelete,
   onDownload,
   onRestartStep,
+  onRestartCodeStep,
   styles,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -109,6 +115,19 @@ export const RunHeader: FC<RunHeaderProps> = ({
               }
             >
               Перезапустить шаг
+            </Button>
+            <Button
+              variant="secondary"
+              isLoading={isRestartingCodeStep}
+              onClick={onRestartCodeStep}
+              disabled={!canRestartCodeStep}
+              title={
+                canRestartCodeStep
+                  ? "Перегенерировать код проекта"
+                  : "Перегенерация кода доступна после подготовки дизайна"
+              }
+            >
+              Перегенерировать код
             </Button>
             <div className={styles.headerDivider} />
             <Button variant="danger" isLoading={isDeleting} onClick={onDelete}>

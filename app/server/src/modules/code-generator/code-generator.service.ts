@@ -5,6 +5,9 @@ import path from 'node:path';
 import type { DesignTokens, ProjectSpec } from '../ai/ai.types';
 import { AiService } from '../ai/ai.service';
 
+const RESET_OUTPUT_ATTEMPTS = 6;
+const RESET_OUTPUT_RETRY_DELAY_MS = 1000;
+
 export interface GeneratedFile {
   path: string;
   content: string;
@@ -80,6 +83,7 @@ export class CodeGeneratorService {
       },
     ];
 
+    await this.resetOutputDirectory(codePath);
     await this.writeFiles(files, codePath);
 
     return files;
@@ -136,6 +140,35 @@ export class CodeGeneratorService {
     );
   }
 
+  private async resetOutputDirectory(basePath: string): Promise<void> {
+    for (let attempt = 1; attempt <= RESET_OUTPUT_ATTEMPTS; attempt += 1) {
+      try {
+        await fs.rm(basePath, { recursive: true, force: true });
+        await fs.mkdir(basePath, { recursive: true });
+        return;
+      } catch (error) {
+        const code =
+          error && typeof error === 'object' && 'code' in error
+            ? String(error.code)
+            : '';
+
+        if (
+          attempt >= RESET_OUTPUT_ATTEMPTS ||
+          !['EBUSY', 'ENOTEMPTY', 'EPERM'].includes(code)
+        ) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `Code output directory is busy, retrying reset ${attempt}/${RESET_OUTPUT_ATTEMPTS}: ${basePath}`,
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, RESET_OUTPUT_RETRY_DELAY_MS * attempt),
+        );
+      }
+    }
+  }
+
   private createPackageJson(projectSpec: ProjectSpec): string {
     const packageName = projectSpec.copy.headline
       .toLowerCase()
@@ -154,6 +187,8 @@ export class CodeGeneratorService {
           next: '^15.1.0',
           react: '^19.0.0',
           'react-dom': '^19.0.0',
+          clsx: '^2.1.1',
+          'tailwind-merge': '^2.6.0',
           '@types/react': '^19.0.0',
           '@types/react-dom': '^19.0.0',
           autoprefixer: '^10.4.20',
@@ -225,7 +260,43 @@ const config: Config = {
     './src/lib/**/*.{ts,tsx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        border: 'var(--border)',
+        input: 'var(--input, var(--border))',
+        ring: 'var(--ring, var(--accent))',
+        background: 'var(--background)',
+        foreground: 'var(--foreground, var(--text-primary))',
+        primary: {
+          DEFAULT: 'var(--primary, var(--accent))',
+          foreground: 'var(--primary-foreground, #ffffff)',
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary, var(--surface))',
+          foreground: 'var(--secondary-foreground, var(--text-primary))',
+        },
+        muted: {
+          DEFAULT: 'var(--muted, var(--surface))',
+          foreground: 'var(--muted-foreground, var(--text-muted))',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground, #ffffff)',
+        },
+        card: {
+          DEFAULT: 'var(--card, var(--surface-elevated))',
+          foreground: 'var(--card-foreground, var(--text-primary))',
+        },
+        popover: {
+          DEFAULT: 'var(--popover, var(--surface-elevated))',
+          foreground: 'var(--popover-foreground, var(--text-primary))',
+        },
+        destructive: {
+          DEFAULT: 'var(--destructive, #ef4444)',
+          foreground: 'var(--destructive-foreground, #ffffff)',
+        },
+      },
+    },
   },
   plugins: [],
 };

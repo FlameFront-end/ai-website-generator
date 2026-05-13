@@ -6,12 +6,13 @@ loadEnv({ path: path.resolve(process.cwd(), '..', '..', '.env'), quiet: true });
 loadEnv({ quiet: true });
 
 const env = cleanEnv(process.env, {
+  APP_ENV: str({ default: 'local', choices: ['local', 'docker'] }),
   API_PORT: num({ default: 3000 }),
   PORT: num({ default: undefined }),
-  CLIENT_ORIGIN: str({ default: 'http://localhost:5173' }),
+  CLIENT_ORIGIN: str({ default: '' }),
   DATABASE_URL: url({ default: undefined }),
   POSTGRES_HOST: str({ default: undefined }),
-  DB_HOST: str({ default: 'localhost' }),
+  DB_HOST: str({ default: '' }),
   POSTGRES_PORT: str({ default: undefined }),
   DB_PORT: str({ default: '5432' }),
   POSTGRES_USER: str({ default: undefined }),
@@ -22,7 +23,7 @@ const env = cleanEnv(process.env, {
   DB_NAME: str({ default: 'ai_website_generator' }),
   DB_SYNCHRONIZE: bool({ default: true }),
   DB_LOGGING: bool({ default: false }),
-  GENERATED_ROOT: str({ default: 'generated' }),
+  GENERATED_ROOT: str({ default: '' }),
   JWT_SECRET: str({ default: 'default-secret-change-in-production' }),
   JWT_EXPIRES_IN: str({ default: '7d' }),
   AI_ANALYSIS_PROVIDER: str({
@@ -54,12 +55,25 @@ const env = cleanEnv(process.env, {
   AI_CODE_STRICT_JSON: str({ default: '' }),
 });
 
+function defaultForEnvironment<T>(local: T, docker: T): T {
+  return env.APP_ENV === 'docker' ? docker : local;
+}
+
+function envOrDefault(value: string, fallback: string): string {
+  return value.trim() || fallback;
+}
+
 function buildDatabaseUrl(): string {
   if (env.DATABASE_URL) {
     return env.DATABASE_URL;
   }
 
-  const host = env.POSTGRES_HOST ?? env.DB_HOST;
+  const host =
+    env.POSTGRES_HOST ??
+    envOrDefault(
+      env.DB_HOST,
+      defaultForEnvironment('localhost', 'postgres'),
+    );
   const port = env.POSTGRES_PORT ?? env.DB_PORT;
   const user = env.POSTGRES_USER ?? env.DB_USER;
   const password = env.POSTGRES_PASSWORD ?? env.DB_PASSWORD;
@@ -161,7 +175,10 @@ export type AppConfig = Readonly<{
 export const appConfig: AppConfig = Object.freeze({
   server: Object.freeze({
     port: env.PORT ?? env.API_PORT,
-    corsOrigin: env.CLIENT_ORIGIN,
+    corsOrigin: envOrDefault(
+      env.CLIENT_ORIGIN,
+      defaultForEnvironment('http://localhost:5173', 'http://localhost:8080'),
+    ),
   }),
   database: Object.freeze({
     url: buildDatabaseUrl(),
@@ -169,7 +186,10 @@ export const appConfig: AppConfig = Object.freeze({
     logging: env.DB_LOGGING,
   }),
   storage: Object.freeze({
-    generatedRoot: env.GENERATED_ROOT,
+    generatedRoot: envOrDefault(
+      env.GENERATED_ROOT,
+      defaultForEnvironment('generated', '/app/app/server/generated'),
+    ),
   }),
   jwt: Object.freeze({
     secret: env.JWT_SECRET,

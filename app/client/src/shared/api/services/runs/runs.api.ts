@@ -99,6 +99,16 @@ export const runsApi = {
     return data;
   },
 
+  async restartCodeStep(
+    runId: string,
+  ): Promise<{ id: string; status: RunStatus }> {
+    const { data } = await axiosInstance.post<{
+      id: string;
+      status: RunStatus;
+    }>(API_ENDPOINTS.restartCodeStep(runId));
+    return data;
+  },
+
   getArtifactFileUrl(runId: string, artifactId: string): string {
     return `${axiosInstance.defaults.baseURL}${API_ENDPOINTS.artifactFileEncoded(runId, artifactId)}`;
   },

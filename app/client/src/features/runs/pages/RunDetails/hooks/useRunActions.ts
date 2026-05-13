@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import {
   useDeleteRunMutation,
   useDownloadCodeMutation,
+  useRestartCodeStepMutation,
   useRestartCurrentStepMutation,
   useUpdateRunMutation,
 } from "@/api/services/runs";
@@ -16,10 +17,12 @@ interface UseRunActionsResult {
   remove: (runId: string) => void;
   download: (runId: string) => void;
   restartCurrentStep: (runId: string) => void;
+  restartCodeStep: (runId: string) => void;
   isRenaming: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
   isRestartingStep: boolean;
+  isRestartingCodeStep: boolean;
 }
 
 interface UseRunActionsOptions {
@@ -34,6 +37,7 @@ export function useRunActions({
   const deleteRunMutation = useDeleteRunMutation();
   const downloadCodeMutation = useDownloadCodeMutation();
   const restartCurrentStepMutation = useRestartCurrentStepMutation();
+  const restartCodeStepMutation = useRestartCodeStepMutation();
 
   const rename = useCallback(
     (runId: string, displayName: string | null) => {
@@ -76,14 +80,26 @@ export function useRunActions({
     [restartCurrentStepMutation],
   );
 
+  const restartCodeStep = useCallback(
+    (runId: string) => {
+      restartCodeStepMutation.mutate(runId, {
+        onSuccess: () => toast.success("Генерация кода перезапущена"),
+        onError: () => toast.error("Не удалось перезапустить генерацию кода"),
+      });
+    },
+    [restartCodeStepMutation],
+  );
+
   return {
     rename,
     remove,
     download,
     restartCurrentStep,
+    restartCodeStep,
     isRenaming: updateRunMutation.isPending,
     isDeleting: deleteRunMutation.isPending,
     isDownloading: downloadCodeMutation.isPending,
     isRestartingStep: restartCurrentStepMutation.isPending,
+    isRestartingCodeStep: restartCodeStepMutation.isPending,
   };
 }

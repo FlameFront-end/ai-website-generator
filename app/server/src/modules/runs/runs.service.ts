@@ -11,6 +11,7 @@ import path from 'node:path';
 import { DataSource, Repository } from 'typeorm';
 
 import {
+  ArtifactType,
   RunArtifactEntity,
   RunEntity,
   RunLogEntity,
@@ -314,7 +315,7 @@ export class RunsService {
   ): Promise<{ id: string; status: string }> {
     const run = await this.getRunOrFail(runId, userId);
 
-    await this.addLog(run.id, 'Запущена ручная пересборка');
+    await this.addLog(run.id, 'Запущена повторная сборка');
 
     void this.pipelineService.rebuildRun(run, userId);
 
@@ -339,7 +340,7 @@ export class RunsService {
 
     await this.addLog(
       run.id,
-      `Запрошен перезапуск текущего шага "${this.formatPipelineStep(step)}"`,
+      `Запрос на перезапуск шага "${this.formatPipelineStep(step)}" принят`,
     );
 
     await this.pipelineService.restartStep(run, step, userId);
@@ -348,6 +349,48 @@ export class RunsService {
       id: run.id,
       status: RunStatus.Running,
     };
+  }
+
+  async restartCodeStep(
+    runId: string,
+    userId: string,
+  ): Promise<{ id: string; status: string }> {
+    const run = await this.getRunOrFail(runId, userId);
+
+    if (!this.canRestartCodeStep(run.status)) {
+      throw new BadRequestException(
+        'Перезапуск генерации кода доступен только после подготовки дизайна или для ошибок сборки/проверки',
+      );
+    }
+
+    await this.ensureCodeRestartArtifacts(run.id);
+
+    await this.addLog(run.id, 'Запрос на перегенерацию кода принят');
+    await this.pipelineService.restartStep(run, 'code', userId);
+
+    return {
+      id: run.id,
+      status: RunStatus.Running,
+    };
+  }
+
+  private async ensureCodeRestartArtifacts(runId: string): Promise<void> {
+    const requiredTypes: ArtifactType[] = [
+      ArtifactType.ProjectSpec,
+      ArtifactType.DesignTokens,
+      ArtifactType.DesignDescription,
+    ];
+    const artifacts = await this.artifactsRepository.find({
+      where: { runId },
+    });
+    const types = new Set(artifacts.map((artifact) => artifact.type));
+    const missingTypes = requiredTypes.filter((type) => !types.has(type));
+
+    if (missingTypes.length > 0) {
+      throw new BadRequestException(
+        `Нельзя перезапустить генерацию кода: не найдены артефакты ${missingTypes.join(', ')}`,
+      );
+    }
   }
 
   async getArtifactFile(runId: string, artifactId: string, userId: string) {
@@ -469,7 +512,7 @@ export class RunsService {
     await this.runsRepository.update(runId, { status: nextStatus });
     await this.addLog(
       run.id,
-      `Шаг "${this.formatPipelineStep(step)}" подтверждён`,
+      `Шаг подтверждён: ${this.formatPipelineStep(step)}`,
     );
 
     if (step !== 'final') {
@@ -514,6 +557,18 @@ export class RunsService {
     };
 
     return statusToStep[status] ?? null;
+  }
+
+  private canRestartCodeStep(status: RunStatus): boolean {
+    return [
+      RunStatus.AwaitingCodeApproval,
+      RunStatus.AwaitingFinalApproval,
+      RunStatus.BuildFailed,
+      RunStatus.VisualFailed,
+      RunStatus.NeedsManualReview,
+      RunStatus.Failed,
+      RunStatus.Completed,
+    ].includes(status);
   }
 
   private formatPipelineStep(step: string): string {

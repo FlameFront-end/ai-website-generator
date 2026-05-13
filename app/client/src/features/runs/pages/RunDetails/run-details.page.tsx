@@ -35,6 +35,16 @@ const RESTARTABLE_STATUSES = new Set([
   "awaiting_code_approval",
 ]);
 
+const CODE_RESTARTABLE_STATUSES = new Set([
+  "awaiting_code_approval",
+  "awaiting_final_approval",
+  "build_failed",
+  "visual_failed",
+  "needs_manual_review",
+  "failed",
+  "completed",
+]);
+
 export default function RunDetailsPage() {
   const { runId = "" } = useParams();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -125,11 +135,21 @@ export default function RunDetailsPage() {
         isDeleting={actions.isDeleting}
         isDownloading={actions.isDownloading}
         isRestartingStep={actions.isRestartingStep}
+        isRestartingCodeStep={actions.isRestartingCodeStep}
         canRestartStep={RESTARTABLE_STATUSES.has(run.status)}
+        canRestartCodeStep={
+          CODE_RESTARTABLE_STATUSES.has(run.status) &&
+          Boolean(
+            artifacts.project_spec &&
+              artifacts.design_tokens &&
+              artifacts.design_description,
+          )
+        }
         onRename={(displayName) => actions.rename(run.id, displayName)}
         onDelete={() => setShowDeleteModal(true)}
         onDownload={() => actions.download(run.id)}
         onRestartStep={() => actions.restartCurrentStep(run.id)}
+        onRestartCodeStep={() => actions.restartCodeStep(run.id)}
         styles={styles}
       />
 

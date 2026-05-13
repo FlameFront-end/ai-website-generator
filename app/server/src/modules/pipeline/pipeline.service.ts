@@ -45,7 +45,7 @@ export class PipelineService {
       'prepare_brief',
       userId,
     );
-    await this.state.addLog(briefRun.id, 'Начата обработка брифа');
+    await this.state.addLog(briefRun.id, 'Анализируем бриф');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
     const projectSpec: ProjectSpec = await this.aiService.extractProjectSpec(
@@ -74,7 +74,7 @@ export class PipelineService {
       specRelativePath,
       'application/json',
     );
-    await this.state.addLog(briefRun.id, 'Спецификация проекта сохранена', {
+    await this.state.addLog(briefRun.id, 'Спецификация готова', {
       path: specRelativePath,
     });
 
@@ -84,7 +84,10 @@ export class PipelineService {
       'awaiting_spec_approval',
       userId,
     );
-    await this.state.addLog(briefRun.id, 'Ожидание подтверждения спецификации');
+    await this.state.addLog(
+      briefRun.id,
+      'Проверьте спецификацию и подтвердите шаг',
+    );
   }
 
   private async prepareDesignArtifacts(
@@ -98,7 +101,7 @@ export class PipelineService {
       'prepare_design_artifacts',
       userId,
     );
-    await this.state.addLog(run.id, 'Начато описание дизайна');
+    await this.state.addLog(run.id, 'Формируем описание дизайна');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
     const tokens = await this.aiService.generateDesignTokens(
@@ -133,7 +136,7 @@ export class PipelineService {
       descRelativePath,
       'text/markdown',
     );
-    await this.state.addLog(designRun.id, 'Описание дизайна сохранено', {
+    await this.state.addLog(designRun.id, 'Описание дизайна готово', {
       path: descRelativePath,
     });
 
@@ -152,7 +155,7 @@ export class PipelineService {
       'prepare_design_tokens',
       userId,
     );
-    await this.state.addLog(run.id, 'Начата генерация дизайн-токенов');
+    await this.state.addLog(run.id, 'Подбираем дизайн-токены');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
     const tokensRelativePath = this.state.getRunRelativePath(
@@ -178,7 +181,7 @@ export class PipelineService {
       tokensRelativePath,
       'application/json',
     );
-    await this.state.addLog(tokensRun.id, 'Дизайн-токены сохранены', {
+    await this.state.addLog(tokensRun.id, 'Дизайн-токены готовы', {
       path: tokensRelativePath,
     });
 
@@ -188,7 +191,10 @@ export class PipelineService {
       'awaiting_design_approval',
       userId,
     );
-    await this.state.addLog(tokensRun.id, 'Ожидание подтверждения дизайна');
+    await this.state.addLog(
+      tokensRun.id,
+      'Проверьте дизайн и подтвердите шаг',
+    );
   }
 
   private async prepareReferenceImage(
@@ -204,7 +210,7 @@ export class PipelineService {
       'prepare_reference_image',
       userId,
     );
-    await this.state.addLog(run.id, 'Начата подготовка визуального референса');
+    await this.state.addLog(run.id, 'Готовим визуальный референс');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
     const referenceImage = await this.generateFluxReferenceImage(
@@ -222,7 +228,7 @@ export class PipelineService {
       referenceImage.relativePath,
       referenceImage.mimeType,
     );
-    await this.state.addLog(referenceRun.id, 'Визуальный референс сохранен', {
+    await this.state.addLog(referenceRun.id, 'Визуальный референс готов', {
       model: referenceImage.model,
       path: referenceImage.relativePath,
     });
@@ -235,7 +241,7 @@ export class PipelineService {
     );
     await this.state.addLog(
       referenceRun.id,
-      'Ожидание подтверждения визуального референса',
+      'Проверьте референс и подтвердите шаг',
     );
   }
 
@@ -252,7 +258,7 @@ export class PipelineService {
       'prepare_frontend_project',
       userId,
     );
-    await this.state.addLog(run.id, 'Начата генерация клиентского проекта');
+    await this.state.addLog(run.id, 'Генерируем код сайта');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
     const codePath = path.join(
@@ -267,7 +273,7 @@ export class PipelineService {
       codePath,
     );
 
-    await this.state.addLog(codeRun.id, 'Клиентский проект сгенерирован');
+    await this.state.addLog(codeRun.id, 'Код сайта готов');
 
     await this.state.updateRunStatus(
       codeRun,
@@ -275,7 +281,7 @@ export class PipelineService {
       'awaiting_code_approval',
       userId,
     );
-    await this.state.addLog(codeRun.id, 'Ожидание подтверждения кода');
+    await this.state.addLog(codeRun.id, 'Проверьте код и подтвердите шаг');
   }
 
   async rebuildRun(run: RunEntity, userId: string): Promise<void> {
@@ -313,7 +319,7 @@ export class PipelineService {
     );
     await this.state.addLog(
       screenshotRun.id,
-      'Ожидание финального подтверждения',
+      'Проверьте результат и завершите проект',
     );
   }
 
@@ -591,10 +597,10 @@ export class PipelineService {
     userId: string,
   ): Promise<void> {
     const stepTitleMap: Record<typeof step, string> = {
-      spec: 'спецификации',
-      design: 'дизайна',
-      reference: 'визуального референса',
-      code: 'кода проекта',
+      spec: 'Спецификация',
+      design: 'Дизайн',
+      reference: 'Визуальный референс',
+      code: 'Код сайта',
     };
     const runningStepMap: Record<typeof step, string> = {
       spec: 'prepare_brief',
@@ -611,7 +617,7 @@ export class PipelineService {
     );
     await this.state.addLog(
       run.id,
-      `Запущен перезапуск шага ${stepTitleMap[step]}`,
+      `Перезапускаем шаг: ${stepTitleMap[step]}`,
     );
 
     void this.finishRestartStep(run, step, userId);
@@ -692,7 +698,7 @@ export class PipelineService {
       ArtifactType.ProjectSpec,
       specRelativePath,
     );
-    await this.state.addLog(run.id, 'Спецификация перегенерирована', {
+    await this.state.addLog(run.id, 'Спецификация обновлена', {
       instruction,
     });
   }
@@ -769,7 +775,7 @@ export class PipelineService {
       ArtifactType.DesignTokens,
       tokensRelativePath,
     );
-    await this.state.addLog(run.id, 'Дизайн перегенерирован', { instruction });
+    await this.state.addLog(run.id, 'Дизайн обновлён', { instruction });
   }
 
   private async regenerateReference(
@@ -820,7 +826,7 @@ export class PipelineService {
       referenceImage.relativePath,
       referenceImage.mimeType,
     );
-    await this.state.addLog(run.id, 'Визуальный референс перегенерирован', {
+    await this.state.addLog(run.id, 'Визуальный референс обновлён', {
       instruction,
       model: referenceImage.model,
     });
@@ -959,6 +965,8 @@ export class PipelineService {
       codePath,
     );
 
-    await this.state.addLog(run.id, 'Код перегенерирован', { instruction });
+    await this.state.addLog(run.id, 'Код сайта перегенерирован', {
+      instruction,
+    });
   }
 }

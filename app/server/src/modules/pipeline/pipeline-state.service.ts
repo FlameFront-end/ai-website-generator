@@ -111,7 +111,7 @@ export class PipelineStateService {
       currentStep: 'pipeline_failed',
       errorMessage: message,
     });
-    await this.addLog(run.id, 'Пайплайн завершился ошибкой', {
+    await this.addLog(run.id, 'Процесс остановлен из-за ошибки', {
       error: message,
     });
   }

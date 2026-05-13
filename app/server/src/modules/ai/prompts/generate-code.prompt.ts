@@ -25,7 +25,7 @@ const SYSTEM = `Ты — senior frontend engineer и product designer. Сген�
 - SEO/site constants держи в src/config/site.ts и src/config/seo.ts. Metadata импортируй в layout, JSON-LD генерируй из config/content.
 - Общие UI-примитивы вынеси в src/components/ui: Container, SectionHeading, ButtonLink и, если нужно, Card/Badge.
 - Header/Footer/layout-компоненты держи отдельно в src/components/layout.
-- В src/lib/class-names.ts добавь маленький helper cn(...classes), если нужны условные className.
+- В src/lib/class-names.ts добавь маленький helper cn(...classes), если нужны условные className. Reference-вариант предпочтителен: без внешних зависимостей, например classes.filter(Boolean).join(" ").
 - Импорты можно писать через alias @/*, он настроен системой на src/*.
 - Компоненты должны быть обычными серверными компонентами, маленькими, типизированными, без бизнес-данных внутри JSX.
 - Не делай монолитный app/page.tsx на сотни строк и не дублируй одинаковые карточки вручную: данные map-ятся из content.
@@ -58,6 +58,7 @@ const SYSTEM = `Ты — senior frontend engineer и product designer. Сген�
 Требования к Tailwind:
 - Все основные стили через className и Tailwind utility-классы.
 - globals.css только для @tailwind base/components/utilities, CSS variables, body defaults, selection/focus styles и 2-4 reusable classes через @layer.
+- В globals.css не используй @apply для несуществующих Tailwind utility-классов. Semantic-классы border-border, bg-background, text-foreground и shadcn-like colors допустимы, но остальные кастомные значения лучше писать обычным CSS через var(...).
 - Никаких inline style.
 - Используй значения из дизайн-токенов: цвета, радиусы, тени, размеры, layout.
 - Не делай однотонную палитру: добавь контрастные neutral/surface/accent цвета из токенов.
@@ -71,6 +72,7 @@ const SYSTEM = `Ты — senior frontend engineer и product designer. Сген�
 - Избегай дублирования JSX.
 - Валидный TSX без псевдокода и без TODO.
 - Не импортируй библиотеки, которых нет в package.json generated project.
+- Не импортируй utility-библиотеки без необходимости. Для cn/className helper предпочитай локальную реализацию без clsx/tailwind-merge, если не нужна сложная дедупликация Tailwind-классов.
 
 SEO и доступность:
 - В src/app/layout.tsx экспортируй metadata: title, description, keywords, openGraph, twitter, robots.

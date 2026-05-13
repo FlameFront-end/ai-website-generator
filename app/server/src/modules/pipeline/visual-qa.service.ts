@@ -24,7 +24,7 @@ export class VisualQAService {
       'visual_qa',
       userId,
     );
-    await this.state.addLog(run.id, 'Начат визуальный анализ');
+    await this.state.addLog(run.id, 'Сравниваем результат с референсом');
 
     try {
       const referenceArtifact = await this.state.getArtifactByType(
@@ -123,13 +123,13 @@ export class VisualQAService {
 
       await this.state.addLog(
         runId,
-        `Визуальный анализ завершен. Score: ${Math.round(score)}/100`,
+        `Визуальная проверка завершена: ${Math.round(score)}/100`,
       );
 
       return this.state.completeRun(qaRun, Math.round(score), userId, slug);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.state.addLog(runId, 'Ошибка визуального анализа', {
+      await this.state.addLog(runId, 'Визуальная проверка завершилась ошибкой', {
         error: message,
       });
       return this.state.updateRunStatus(

@@ -1,14 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { exec } from 'node:child_process';
+import { createServer } from 'node:net';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import type { Page } from 'playwright';
 
 import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { PipelineStateService } from './pipeline-state.service';
 
-const PREVIEW_PORT = '4173';
-const SERVER_STARTUP_DELAY_MS = 5000;
+const SERVER_STARTUP_TIMEOUT_MS = 45_000;
+const SERVER_POLL_INTERVAL_MS = 500;
+const PAGE_LOAD_TIMEOUT_MS = 60_000;
+const PAGE_SETTLE_DELAY_MS = 1000;
+const execAsync = promisify(exec);
 
 @Injectable()
 export class ScreenshotService {
@@ -30,7 +36,7 @@ export class ScreenshotService {
       'take_screenshots',
       userId,
     );
-    await this.state.addLog(run.id, 'Начато создание скриншотов');
+    await this.state.addLog(run.id, 'Готовим скриншоты результата');
 
     const runPath = this.storageService.getRunPath(userId, slug);
     const codePath = path.join(runPath, 'code');
@@ -39,38 +45,46 @@ export class ScreenshotService {
     let serverProcess: ReturnType<typeof exec> | undefined;
 
     try {
-      await this.state.addLog(run.id, 'Запуск production сервера...');
+      const previewPort = await this.findAvailablePort();
+      const previewUrl = `http://127.0.0.1:${previewPort}`;
+
+      await this.state.addLog(run.id, 'Запускаем предпросмотр сайта');
       serverProcess = exec('npm run start', {
         cwd: codePath,
-        env: { ...process.env, PORT: PREVIEW_PORT },
+        env: {
+          ...process.env,
+          PORT: String(previewPort),
+          HOSTNAME: '127.0.0.1',
+          NEXT_TELEMETRY_DISABLED: '1',
+        },
       });
 
-      await this.state.sleep(SERVER_STARTUP_DELAY_MS);
+      await this.waitForServer(previewUrl);
 
       await this.state.addLog(
         run.id,
-        'Создание скриншотов через Playwright...',
+        'Создаём скриншоты страницы',
       );
       browser = await chromium.launch();
       const page = await browser.newPage();
+      page.setDefaultTimeout(PAGE_LOAD_TIMEOUT_MS);
+      page.setDefaultNavigationTimeout(PAGE_LOAD_TIMEOUT_MS);
 
       await page.setViewportSize({ width: 1440, height: 900 });
-      await page.goto(`http://localhost:${PREVIEW_PORT}`, {
-        waitUntil: 'networkidle',
-      });
+      await this.gotoReadyPage(page, previewUrl);
       await page.screenshot({
         path: path.join(screenshotsPath, 'rendered-desktop.png'),
         fullPage: false,
       });
-      await this.state.addLog(run.id, 'Desktop скриншот сохранен');
+      await this.state.addLog(run.id, 'Desktop-скриншот готов');
 
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.reload({ waitUntil: 'networkidle' });
+      await this.gotoReadyPage(page, previewUrl);
       await page.screenshot({
         path: path.join(screenshotsPath, 'rendered-mobile.png'),
         fullPage: false,
       });
-      await this.state.addLog(run.id, 'Mobile скриншот сохранен');
+      await this.state.addLog(run.id, 'Mobile-скриншот готов');
 
       const desktopRelativePath = this.state.getRunRelativePath(
         userId,
@@ -107,7 +121,7 @@ export class ScreenshotService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Screenshot capture failed: ${message}`);
-      await this.state.addLog(run.id, 'Ошибка создания скриншотов', {
+      await this.state.addLog(run.id, 'Не удалось создать скриншоты', {
         error: message,
       });
 
@@ -119,7 +133,79 @@ export class ScreenshotService {
       );
     } finally {
       if (browser) await browser.close().catch(() => undefined);
-      if (serverProcess) serverProcess.kill();
+      if (serverProcess?.pid) {
+        await this.killProcessTree(serverProcess.pid);
+      }
+    }
+  }
+
+  private findAvailablePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const server = createServer();
+
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        server.close(() => {
+          if (address && typeof address === 'object') {
+            resolve(address.port);
+            return;
+          }
+
+          reject(new Error('Не удалось выбрать порт для preview сервера'));
+        });
+      });
+    });
+  }
+
+  private async waitForServer(url: string): Promise<void> {
+    const startedAt = Date.now();
+    let lastError = '';
+
+    while (Date.now() - startedAt < SERVER_STARTUP_TIMEOUT_MS) {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+
+        if (response.ok || response.status < 500) {
+          return;
+        }
+
+        lastError = `${response.status} ${response.statusText}`;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+
+      await this.state.sleep(SERVER_POLL_INTERVAL_MS);
+    }
+
+    throw new Error(
+      `Preview server did not become ready in ${SERVER_STARTUP_TIMEOUT_MS}ms: ${lastError}`,
+    );
+  }
+
+  private async gotoReadyPage(page: Page, url: string): Promise<void> {
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: PAGE_LOAD_TIMEOUT_MS,
+    });
+    await page.waitForLoadState('load', { timeout: PAGE_LOAD_TIMEOUT_MS });
+    await page.waitForTimeout(PAGE_SETTLE_DELAY_MS);
+  }
+
+  private async killProcessTree(pid: number): Promise<void> {
+    try {
+      if (process.platform === 'win32') {
+        await execAsync(`taskkill /PID ${pid} /T /F`);
+        return;
+      }
+
+      process.kill(-pid, 'SIGTERM');
+    } catch {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        // Process is already gone.
+      }
     }
   }
 }

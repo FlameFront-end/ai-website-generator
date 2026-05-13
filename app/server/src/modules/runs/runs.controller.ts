@@ -148,6 +148,11 @@ export class RunsController {
     return this.runsService.restartCurrentStep(id, req.user.id);
   }
 
+  @Post(':id/restart-code-step')
+  restartCodeStep(@Param('id') id: string, @Request() req: RequestWithUser) {
+    return this.runsService.restartCodeStep(id, req.user.id);
+  }
+
   @Post(':id/approve')
   approveStep(
     @Param('id') id: string,

@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   run: (runId: string) => `/runs/${runId}`,
   rebuildRun: (runId: string) => `/runs/${runId}/rebuild`,
   restartCurrentStep: (runId: string) => `/runs/${runId}/restart-current-step`,
+  restartCodeStep: (runId: string) => `/runs/${runId}/restart-code-step`,
   artifactContent: (runId: string, artifactId: string) =>
     `/runs/${runId}/artifacts/${artifactId}/content`,
   artifactFile: (runId: string, artifactId: string) =>

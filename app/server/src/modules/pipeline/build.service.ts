@@ -33,7 +33,7 @@ export class BuildService {
       'build_project',
       userId,
     );
-    await this.state.addLog(run.id, `Попытка сборки ${attempt}`);
+    await this.state.addLog(run.id, `Проверка сборки: попытка ${attempt}`);
 
     const codePath = path.join(
       this.storageService.getRunPath(userId, slug),
@@ -41,19 +41,19 @@ export class BuildService {
     );
 
     try {
-      await this.state.addLog(run.id, 'Установка зависимостей...');
+      await this.state.addLog(run.id, 'Устанавливаем зависимости');
       await execAsync('npm install --include=dev', {
         cwd: codePath,
         timeout: BUILD_TIMEOUT_MS,
       });
 
-      await this.state.addLog(run.id, 'Сборка проекта...');
+      await this.state.addLog(run.id, 'Проверяем production-сборку');
       await execAsync('npm run build', {
         cwd: codePath,
         timeout: BUILD_TIMEOUT_MS,
       });
 
-      await this.state.addLog(run.id, 'Сборка завершена успешно');
+      await this.state.addLog(run.id, 'Сборка прошла успешно');
       return this.state.updateRunStatus(
         buildRun,
         RunStatus.Completed,
@@ -63,7 +63,9 @@ export class BuildService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Build failed (attempt ${attempt}): ${message}`);
-      await this.state.addLog(run.id, 'Ошибка сборки', { error: message });
+      await this.state.addLog(run.id, 'Сборка завершилась ошибкой', {
+        error: message,
+      });
 
       if (attempt < MAX_BUILD_ATTEMPTS) {
         await this.state.sleep(RETRY_DELAY_MS);

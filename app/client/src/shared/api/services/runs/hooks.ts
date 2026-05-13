@@ -171,3 +171,20 @@ export function useRestartCurrentStepMutation() {
     },
   });
 }
+
+export function useRestartCodeStepMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: runsApi.restartCodeStep,
+    onSuccess: (_result, runId) => {
+      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.detail(runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.codeFiles(runId),
+      });
+    },
+  });
+}
