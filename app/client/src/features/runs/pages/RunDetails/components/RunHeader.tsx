@@ -9,7 +9,7 @@ import { getRunTitle } from "../../../lib";
 
 interface RunHeaderProps {
   run: Run;
-  hasFrontendProject: boolean;
+  canDownloadCode: boolean;
   isRenaming: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
@@ -27,7 +27,7 @@ interface RunHeaderProps {
 
 export const RunHeader: FC<RunHeaderProps> = ({
   run,
-  hasFrontendProject,
+  canDownloadCode,
   isRenaming,
   isDeleting,
   isDownloading,
@@ -94,15 +94,19 @@ export const RunHeader: FC<RunHeaderProps> = ({
             <Button variant="secondary" onClick={startRename}>
               Переименовать
             </Button>
-            {hasFrontendProject && (
-              <Button
-                variant="secondary"
-                isLoading={isDownloading}
-                onClick={onDownload}
-              >
-                Скачать код
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              isLoading={isDownloading}
+              onClick={onDownload}
+              disabled={!canDownloadCode}
+              title={
+                canDownloadCode
+                  ? "Скачать проект ZIP-архивом"
+                  : "Код появится после генерации сайта"
+              }
+            >
+              Скачать код
+            </Button>
             <Button
               variant="secondary"
               isLoading={isRestartingStep}

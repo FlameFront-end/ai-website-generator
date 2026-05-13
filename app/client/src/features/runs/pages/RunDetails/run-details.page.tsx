@@ -45,6 +45,29 @@ const CODE_RESTARTABLE_STATUSES = new Set([
   "completed",
 ]);
 
+const CODE_DOWNLOAD_STATUSES = new Set([
+  "awaiting_code_approval",
+  "awaiting_final_approval",
+  "build_failed",
+  "visual_failed",
+  "needs_manual_review",
+  "completed",
+]);
+
+const CODE_DOWNLOAD_STEPS = new Set([
+  "awaiting_code_approval",
+  "build_project",
+  "built",
+  "take_screenshots",
+  "screenshots_ready",
+  "visual_qa",
+  "visual_qa_failed",
+  "awaiting_final_approval",
+  "completed",
+  "build_failed",
+  "screenshots_failed",
+]);
+
 export default function RunDetailsPage() {
   const { runId = "" } = useParams();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -130,7 +153,11 @@ export default function RunDetailsPage() {
     <section className={styles.page}>
       <RunHeader
         run={run}
-        hasFrontendProject={!!artifacts.frontend_project}
+        canDownloadCode={
+          Boolean(artifacts.frontend_project) ||
+          CODE_DOWNLOAD_STATUSES.has(run.status) ||
+          CODE_DOWNLOAD_STEPS.has(run.currentStep ?? "")
+        }
         isRenaming={actions.isRenaming}
         isDeleting={actions.isDeleting}
         isDownloading={actions.isDownloading}
