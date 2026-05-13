@@ -4,11 +4,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import AdmZip from 'adm-zip';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import {
   RunArtifactEntity,
@@ -33,6 +33,8 @@ export class RunsService {
   private readonly logger = new Logger(RunsService.name);
 
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(RunEntity)
     private readonly runsRepository: Repository<RunEntity>,
     @InjectRepository(RunArtifactEntity)
@@ -46,22 +48,17 @@ export class RunsService {
   async createRun(dto: CreateRunDto, userId: string) {
     const brief = dto.brief.trim();
     const displayName = dto.displayName?.trim() || null;
-    const runNumber = await this.getNextRunNumber(userId);
-    const slug = toRunSlug(runNumber);
-
-    const run = await this.runsRepository.save({
-      runNumber,
-      slug,
-      displayName,
+    const run = await this.createQueuedRun({
       brief,
-      status: RunStatus.Queued,
-      currentStep: 'queued',
+      displayName,
       userId,
-    } as RunEntity);
+    });
 
-    await this.storageService.createRunFolders(userId, slug);
-    await this.storageService.writeStatusFile(userId, slug, run);
-    await this.addLog(run.id, 'Запуск поставлен в очередь', { slug });
+    await this.storageService.createRunFolders(userId, run.slug);
+    await this.storageService.writeStatusFile(userId, run.slug, run);
+    await this.addLog(run.id, 'Запуск поставлен в очередь', {
+      slug: run.slug,
+    });
 
     void this.pipelineService.processRun(run, userId);
 
@@ -395,15 +392,39 @@ export class RunsService {
     return path.join(this.storageService.getGeneratedRootPath(), artifactPath);
   }
 
-  private async getNextRunNumber(userId: string): Promise<number> {
-    const lastRun = await this.runsRepository.findOne({
-      where: { userId },
-      order: {
-        runNumber: 'DESC',
-      },
-    });
+  private async createQueuedRun({
+    brief,
+    displayName,
+    userId,
+  }: {
+    brief: string;
+    displayName: string | null;
+    userId: string;
+  }): Promise<RunEntity> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        "SELECT pg_advisory_xact_lock(hashtext('runs:createQueuedRun'))",
+      );
 
-    return (lastRun?.runNumber ?? 0) + 1;
+      const raw = await manager
+        .getRepository(RunEntity)
+        .createQueryBuilder('run')
+        .select('COALESCE(MAX(run.runNumber), 0)', 'max')
+        .getRawOne<{ max: string | number }>();
+
+      const runNumber = Number(raw?.max ?? 0) + 1;
+      const slug = toRunSlug(runNumber);
+
+      return manager.getRepository(RunEntity).save({
+        runNumber,
+        slug,
+        displayName,
+        brief,
+        status: RunStatus.Queued,
+        currentStep: 'queued',
+        userId,
+      } as RunEntity);
+    });
   }
 
   private async getRunOrFail(id: string, userId: string): Promise<RunEntity> {
