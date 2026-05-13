@@ -68,7 +68,7 @@ const SYSTEM = `Ты — senior frontend engineer и product designer. Сген�
 - TypeScript без any.
 - Разделяй данные и представление.
 - Компоненты должны быть небольшими и читаемыми.
-- Используй const-массивы с as const там, где уместно.
+- Используй const-массивы с as const там, где уместно, но не передавай readonly-массивы напрямую в API Next.js/React, которые ждут mutable string[]. Для metadata.keywords используй [...siteConfig.keywords] или объявляй keywords как string[].
 - Избегай дублирования JSX.
 - Валидный TSX без псевдокода и без TODO.
 - Не импортируй библиотеки, которых нет в package.json generated project.

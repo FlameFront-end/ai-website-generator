@@ -209,8 +209,11 @@ export class CodeGeneratorService {
 
   private createNextConfig(): string {
     return `/** @type {import('next').NextConfig} */
+import path from 'node:path';
+
 const nextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: path.resolve(process.cwd()),
 };
 
 export default nextConfig;
