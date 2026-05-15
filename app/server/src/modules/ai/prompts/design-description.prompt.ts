@@ -1,6 +1,9 @@
 import type { DesignTokens, ProjectSpec } from '../ai.types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
-import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
+import {
+  buildSkillContext,
+  joinPromptSections,
+} from '../skills/prompt-context';
 
 const SYSTEM = joinPromptSections(
   buildSkillContext(
@@ -30,6 +33,9 @@ Required sections:
 9. Do not generate
 
 Rules:
+- Write the markdown in the target site language from the brief. If the brief says "Target site language: Russian", all headings and prose MUST be Russian Cyrillic.
+- Keep internal reasoning in English if needed, but never output English user-facing markdown when the target site language is Russian.
+- Technical token names, CSS values, color names, numbers, file-like identifiers and brand names may stay as-is.
 - Use concrete token values: colors, gradients, sizes, radii, shadows, blur, breakpoints.
 - For every spec section, describe goal, composition, key content, visual focus, background, cards/images/icons, spacing rhythm.
 - Respect one section = one image. Each section description should be usable as an image prompt.
@@ -42,11 +48,17 @@ export function buildDesignDescriptionMessages(
   spec: ProjectSpec,
   tokens: DesignTokens,
 ): ChatMessage[] {
+  const targetLanguage = brief.includes('Target site language: Russian')
+    ? 'Russian'
+    : brief.includes('Target site language: English')
+      ? 'English'
+      : 'the language of the brief';
+
   return [
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Original brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}`,
+      content: `Original brief:\n${brief}\n\nTarget output language for this markdown: ${targetLanguage}.\nLanguage rule: write all user-facing design description headings and prose in ${targetLanguage}. Keep only technical values/brand names as-is.\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}`,
     },
   ];
 }

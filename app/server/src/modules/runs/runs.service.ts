@@ -24,6 +24,7 @@ import type { CreateRunDto } from './dto/create-run.dto';
 import type { UpdateRunDto } from './dto/update-run.dto';
 
 const RUN_NUMBER_PAD = 3;
+const RUNNING_STEP_TIMEOUT_MS = 20 * 60 * 1000;
 
 function toRunSlug(runNumber: number): string {
   return `run-${String(runNumber).padStart(RUN_NUMBER_PAD, '0')}`;
@@ -55,8 +56,8 @@ export class RunsService {
       userId,
     });
 
-    await this.storageService.createRunFolders(userId, run.slug);
-    await this.storageService.writeStatusFile(userId, run.slug, run);
+    await this.storageService.createRunFolders(userId, run.id);
+    await this.storageService.writeStatusFile(userId, run.id, run);
     await this.addLog(run.id, 'Запуск поставлен в очередь', {
       slug: run.slug,
     });
@@ -70,7 +71,23 @@ export class RunsService {
     };
   }
 
-  getRuns(userId: string): Promise<RunEntity[]> {
+  async getRuns(userId: string): Promise<RunEntity[]> {
+    const runs = await this.runsRepository.find({
+      where: { userId },
+      relations: {
+        artifacts: true,
+        logs: true,
+      },
+      order: {
+        isPinned: 'DESC',
+        createdAt: 'DESC',
+        logs: {
+          createdAt: 'DESC',
+        },
+      },
+      take: 25,
+    });
+    await Promise.all(runs.map((run) => this.failRunIfStale(run)));
     return this.runsRepository.find({
       where: { userId },
       relations: {
@@ -88,8 +105,8 @@ export class RunsService {
     });
   }
 
-  getRun(id: string, userId: string): Promise<RunEntity | null> {
-    return this.runsRepository.findOne({
+  async getRun(id: string, userId: string): Promise<RunEntity | null> {
+    const run = await this.runsRepository.findOne({
       where: { id, userId },
       relations: {
         artifacts: true,
@@ -101,6 +118,24 @@ export class RunsService {
         },
       },
     });
+    await this.failRunIfStale(run);
+
+    if (run?.status === RunStatus.Running) {
+      return this.runsRepository.findOne({
+        where: { id, userId },
+        relations: {
+          artifacts: true,
+          logs: true,
+        },
+        order: {
+          logs: {
+            createdAt: 'DESC',
+          },
+        },
+      });
+    }
+
+    return run;
   }
 
   async getArtifactContent(runId: string, artifactId: string, userId: string) {
@@ -143,12 +178,12 @@ export class RunsService {
 
     await this.storageService.writeStatusFile(
       userId,
-      updatedRun.slug,
+      updatedRun.id,
       updatedRun,
     );
     await this.addLog(
       updatedRun.id,
-      displayName ? 'Запуск переименован' : 'Название запуска очищено',
+      `Проект переименован: ${displayName ?? '«Без названия»'}`,
       {
         displayName,
       },
@@ -165,7 +200,7 @@ export class RunsService {
     const updatedRun = await this.getRunOrFail(id, userId);
     await this.storageService.writeStatusFile(
       userId,
-      updatedRun.slug,
+      updatedRun.id,
       updatedRun,
     );
     await this.addLog(
@@ -179,7 +214,7 @@ export class RunsService {
 
   async deleteRun(id: string, userId: string) {
     const run = await this.getRunOrFail(id, userId);
-    const runPath = this.storageService.getRunPath(userId, run.slug);
+    const runPath = this.storageService.getRunPath(userId, run.id);
     const generatedRoot = this.storageService.getGeneratedRootPath();
 
     if (!runPath.startsWith(generatedRoot)) {
@@ -220,7 +255,7 @@ export class RunsService {
   ): Promise<{ path: string; size: number }[]> {
     const run = await this.getRunOrFail(runId, userId);
     const codePath = path.join(
-      this.storageService.getRunPath(userId, run.slug),
+      this.storageService.getRunPath(userId, run.id),
       'code',
     );
 
@@ -256,7 +291,7 @@ export class RunsService {
   ): Promise<{ path: string; content: string; mimeType: string }> {
     const run = await this.getRunOrFail(runId, userId);
     const codePath = path.join(
-      this.storageService.getRunPath(userId, run.slug),
+      this.storageService.getRunPath(userId, run.id),
       'code',
     );
     const absolutePath = path.resolve(codePath, filePath);
@@ -293,7 +328,7 @@ export class RunsService {
   async downloadCode(runId: string, userId: string): Promise<Buffer> {
     const run = await this.getRunOrFail(runId, userId);
     const codePath = path.join(
-      this.storageService.getRunPath(userId, run.slug),
+      this.storageService.getRunPath(userId, run.id),
       'code',
     );
 
@@ -330,7 +365,11 @@ export class RunsService {
     userId: string,
   ): Promise<{ id: string; status: string }> {
     const run = await this.getRunOrFail(runId, userId);
-    const step = this.getRestartableStep(run.status);
+    const step = await this.getRestartableStep(
+      run.status,
+      run.currentStep,
+      run.id,
+    );
 
     if (!step) {
       throw new BadRequestException(
@@ -351,6 +390,23 @@ export class RunsService {
     };
   }
 
+  async stopCurrentStep(
+    runId: string,
+    userId: string,
+  ): Promise<{ id: string; status: string }> {
+    const run = await this.getRunOrFail(runId, userId);
+
+    if (run.status !== RunStatus.Running && run.status !== RunStatus.Queued) {
+      throw new BadRequestException('Остановить можно только активный шаг');
+    }
+
+    await this.markRunStopped(run, 'Шаг остановлен пользователем');
+
+    return {
+      id: run.id,
+      status: RunStatus.Failed,
+    };
+  }
   async restartCodeStep(
     runId: string,
     userId: string,
@@ -493,6 +549,35 @@ export class RunsService {
     });
   }
 
+  private async failRunIfStale(run: RunEntity | null): Promise<void> {
+    if (!run || run.status !== RunStatus.Running) {
+      return;
+    }
+
+    const lastUpdateAt = new Date(run.updatedAt).getTime();
+    const isStale = Date.now() - lastUpdateAt > RUNNING_STEP_TIMEOUT_MS;
+
+    if (!isStale) {
+      return;
+    }
+
+    await this.markRunStopped(
+      run,
+      'Шаг превысил лимит ожидания и был остановлен автоматически',
+    );
+  }
+
+  private async markRunStopped(run: RunEntity, message: string): Promise<void> {
+    await this.runsRepository.update(run.id, {
+      status: RunStatus.Failed,
+      currentStep: run.currentStep || 'pipeline_failed',
+      errorMessage: `PIPELINE_STOPPED: ${message}`,
+    });
+
+    await this.addLog(run.id, message, {
+      currentStep: run.currentStep,
+    });
+  }
   async approveStep(
     runId: string,
     step: 'spec' | 'design' | 'reference' | 'code' | 'final',
@@ -503,13 +588,17 @@ export class RunsService {
     const stepToStatusMap: Record<typeof step, RunStatus> = {
       spec: RunStatus.AwaitingDesignApproval,
       design: RunStatus.AwaitingReferenceApproval,
-      reference: RunStatus.AwaitingCodeApproval,
+      reference: RunStatus.Running,
       code: RunStatus.AwaitingFinalApproval,
       final: RunStatus.Completed,
     };
 
     const nextStatus = stepToStatusMap[step];
-    await this.runsRepository.update(runId, { status: nextStatus });
+    await this.runsRepository.update(runId, {
+      status: nextStatus,
+      currentStep:
+        step === 'reference' ? 'prepare_frontend_project' : run.currentStep,
+    });
     await this.addLog(
       run.id,
       `Шаг подтверждён: ${this.formatPipelineStep(step)}`,
@@ -546,7 +635,9 @@ export class RunsService {
 
   private getRestartableStep(
     status: RunStatus,
-  ): 'spec' | 'design' | 'reference' | 'code' | null {
+    currentStep?: string | null,
+    runId?: string,
+  ): Promise<'spec' | 'design' | 'reference' | 'code' | null> {
     const statusToStep: Partial<
       Record<RunStatus, 'spec' | 'design' | 'reference' | 'code'>
     > = {
@@ -556,7 +647,57 @@ export class RunsService {
       [RunStatus.AwaitingCodeApproval]: 'code',
     };
 
-    return statusToStep[status] ?? null;
+    if (statusToStep[status]) {
+      return Promise.resolve(statusToStep[status]);
+    }
+
+    if (status === RunStatus.Failed) {
+      const step = this.getRestartableStepFromCurrentStep(currentStep);
+      if (step || !runId) {
+        return Promise.resolve(step);
+      }
+      return this.inferFailedRestartStepFromArtifacts(runId);
+    }
+
+    return Promise.resolve(null);
+  }
+
+  private getRestartableStepFromCurrentStep(
+    currentStep?: string | null,
+  ): 'spec' | 'design' | 'reference' | 'code' | null {
+    if (!currentStep) return null;
+    if (currentStep.includes('spec')) return 'spec';
+    if (currentStep.includes('design')) return 'design';
+    if (currentStep.includes('reference')) return 'reference';
+    if (
+      currentStep.includes('code') ||
+      currentStep.includes('frontend') ||
+      currentStep.includes('build') ||
+      currentStep.includes('screenshot') ||
+      currentStep.includes('visual')
+    ) {
+      return 'code';
+    }
+    return null;
+  }
+
+  private async inferFailedRestartStepFromArtifacts(
+    runId: string,
+  ): Promise<'spec' | 'design' | 'reference' | 'code'> {
+    const artifacts = await this.artifactsRepository.find({
+      where: { runId },
+    });
+    const types = new Set(artifacts.map((artifact) => artifact.type));
+
+    if (!types.has(ArtifactType.ProjectSpec)) return 'spec';
+    if (
+      !types.has(ArtifactType.DesignTokens) ||
+      !types.has(ArtifactType.DesignDescription)
+    ) {
+      return 'design';
+    }
+    if (!types.has(ArtifactType.ReferenceImage)) return 'reference';
+    return 'code';
   }
 
   private canRestartCodeStep(status: RunStatus): boolean {

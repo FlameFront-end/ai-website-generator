@@ -25,4 +25,8 @@ export class ClarifyBriefDto {
   @IsOptional()
   @IsArray()
   answers?: BriefClarificationAnswerDto[];
+
+  @IsOptional()
+  @IsString()
+  siteLanguage?: string;
 }

@@ -24,7 +24,6 @@ const STATUS_TO_TAB = {
   awaiting_spec_approval: "spec",
   awaiting_design_approval: "design",
   awaiting_reference_approval: "reference",
-  awaiting_code_approval: "code",
   awaiting_final_approval: "result",
 } as const;
 
@@ -32,7 +31,8 @@ const RESTARTABLE_STATUSES = new Set([
   "awaiting_spec_approval",
   "awaiting_design_approval",
   "awaiting_reference_approval",
-  "awaiting_code_approval",
+  "failed",
+  "pipeline_failed",
 ]);
 
 const CODE_RESTARTABLE_STATUSES = new Set([
@@ -43,29 +43,6 @@ const CODE_RESTARTABLE_STATUSES = new Set([
   "needs_manual_review",
   "failed",
   "completed",
-]);
-
-const CODE_DOWNLOAD_STATUSES = new Set([
-  "awaiting_code_approval",
-  "awaiting_final_approval",
-  "build_failed",
-  "visual_failed",
-  "needs_manual_review",
-  "completed",
-]);
-
-const CODE_DOWNLOAD_STEPS = new Set([
-  "awaiting_code_approval",
-  "build_project",
-  "built",
-  "take_screenshots",
-  "screenshots_ready",
-  "visual_qa",
-  "visual_qa_failed",
-  "awaiting_final_approval",
-  "completed",
-  "build_failed",
-  "screenshots_failed",
 ]);
 
 export default function RunDetailsPage() {
@@ -85,7 +62,6 @@ export default function RunDetailsPage() {
     if (status === "awaiting_spec_approval") return "spec";
     if (status === "awaiting_design_approval") return "design";
     if (status === "awaiting_reference_approval") return "reference";
-    if (status === "awaiting_code_approval") return "code";
     if (status === "awaiting_final_approval") return "final";
     return null;
   };
@@ -149,33 +125,41 @@ export default function RunDetailsPage() {
     );
   }
 
+  const effectiveCurrentStep = getEffectiveCurrentStep(run.currentStep, {
+    hasProjectSpec: Boolean(artifacts.project_spec),
+    hasDesignTokens: Boolean(artifacts.design_tokens),
+    hasDesignDescription: Boolean(artifacts.design_description),
+    hasReferenceImage: Boolean(artifacts.reference_image),
+    hasFrontendProject: Boolean(artifacts.frontend_project),
+  });
+
   return (
     <section className={styles.page}>
       <RunHeader
         run={run}
-        canDownloadCode={
-          Boolean(artifacts.frontend_project) ||
-          CODE_DOWNLOAD_STATUSES.has(run.status) ||
-          CODE_DOWNLOAD_STEPS.has(run.currentStep ?? "")
-        }
+        canDownloadCode={Boolean(artifacts.frontend_project)}
         isRenaming={actions.isRenaming}
         isDeleting={actions.isDeleting}
         isDownloading={actions.isDownloading}
         isRestartingStep={actions.isRestartingStep}
+        isStoppingStep={actions.isStoppingStep}
         isRestartingCodeStep={actions.isRestartingCodeStep}
         canRestartStep={RESTARTABLE_STATUSES.has(run.status)}
+        canStopStep={run.status === "running" || run.status === "queued"}
         canRestartCodeStep={
+          Boolean(artifacts.frontend_project) &&
           CODE_RESTARTABLE_STATUSES.has(run.status) &&
           Boolean(
             artifacts.project_spec &&
-              artifacts.design_tokens &&
-              artifacts.design_description,
+            artifacts.design_tokens &&
+            artifacts.design_description,
           )
         }
         onRename={(displayName) => actions.rename(run.id, displayName)}
         onDelete={() => setShowDeleteModal(true)}
         onDownload={() => actions.download(run.id)}
         onRestartStep={() => actions.restartCurrentStep(run.id)}
+        onStopStep={() => actions.stopCurrentStep(run.id)}
         onRestartCodeStep={() => actions.restartCodeStep(run.id)}
         styles={styles}
       />
@@ -187,7 +171,7 @@ export default function RunDetailsPage() {
         onChange={setActiveTab}
         styles={styles}
         status={run.status}
-        currentStep={run.currentStep ?? run.status}
+        currentStep={effectiveCurrentStep}
         onApprove={handleApprove}
         isApproving={isApproving}
       />
@@ -199,6 +183,7 @@ export default function RunDetailsPage() {
           <ReferenceTab
             runId={run.id}
             artifact={artifacts.reference_image}
+            blocks={artifacts.reference_blocks}
             styles={styles}
           />
         )}
@@ -259,4 +244,37 @@ export default function RunDetailsPage() {
       />
     </section>
   );
+}
+
+function getEffectiveCurrentStep(
+  currentStep: string | null | undefined,
+  artifacts: {
+    hasProjectSpec: boolean;
+    hasDesignTokens: boolean;
+    hasDesignDescription: boolean;
+    hasReferenceImage: boolean;
+    hasFrontendProject: boolean;
+  },
+): string {
+  if (currentStep && currentStep !== "pipeline_failed") {
+    return currentStep;
+  }
+
+  if (!artifacts.hasProjectSpec) {
+    return "queued";
+  }
+
+  if (!artifacts.hasDesignTokens || !artifacts.hasDesignDescription) {
+    return "awaiting_spec_approval";
+  }
+
+  if (!artifacts.hasReferenceImage) {
+    return "awaiting_design_approval";
+  }
+
+  if (!artifacts.hasFrontendProject) {
+    return "awaiting_reference_approval";
+  }
+
+  return "awaiting_code_approval";
 }

@@ -8,6 +8,7 @@ import {
   useDownloadCodeMutation,
   useRestartCodeStepMutation,
   useRestartCurrentStepMutation,
+  useStopCurrentStepMutation,
   useUpdateRunMutation,
 } from "@/api/services/runs";
 import { ROUTES } from "@/model";
@@ -17,11 +18,13 @@ interface UseRunActionsResult {
   remove: (runId: string) => void;
   download: (runId: string) => void;
   restartCurrentStep: (runId: string) => void;
+  stopCurrentStep: (runId: string) => void;
   restartCodeStep: (runId: string) => void;
   isRenaming: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
   isRestartingStep: boolean;
+  isStoppingStep: boolean;
   isRestartingCodeStep: boolean;
 }
 
@@ -37,6 +40,7 @@ export function useRunActions({
   const deleteRunMutation = useDeleteRunMutation();
   const downloadCodeMutation = useDownloadCodeMutation();
   const restartCurrentStepMutation = useRestartCurrentStepMutation();
+  const stopCurrentStepMutation = useStopCurrentStepMutation();
   const restartCodeStepMutation = useRestartCodeStepMutation();
 
   const rename = useCallback(
@@ -80,6 +84,15 @@ export function useRunActions({
     [restartCurrentStepMutation],
   );
 
+  const stopCurrentStep = useCallback(
+    (runId: string) => {
+      stopCurrentStepMutation.mutate(runId, {
+        onSuccess: () => toast.success("Шаг остановлен"),
+        onError: () => toast.error("Не удалось остановить текущий шаг"),
+      });
+    },
+    [stopCurrentStepMutation],
+  );
   const restartCodeStep = useCallback(
     (runId: string) => {
       restartCodeStepMutation.mutate(runId, {
@@ -95,11 +108,13 @@ export function useRunActions({
     remove,
     download,
     restartCurrentStep,
+    stopCurrentStep,
     restartCodeStep,
     isRenaming: updateRunMutation.isPending,
     isDeleting: deleteRunMutation.isPending,
     isDownloading: downloadCodeMutation.isPending,
     isRestartingStep: restartCurrentStepMutation.isPending,
+    isStoppingStep: stopCurrentStepMutation.isPending,
     isRestartingCodeStep: restartCodeStepMutation.isPending,
   };
 }

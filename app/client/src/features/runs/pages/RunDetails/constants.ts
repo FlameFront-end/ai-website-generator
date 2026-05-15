@@ -115,7 +115,6 @@ const STEP_ORDER: string[] = [
   "visual_qa_failed",
   "awaiting_final_approval",
   "completed",
-  "pipeline_failed",
   "build_failed",
   "screenshots_failed",
 ];
@@ -125,7 +124,7 @@ const TAB_MIN_STEP: Record<RunDetailsTab, number> = {
   overview: 0,
   spec: STEP_ORDER.indexOf("awaiting_spec_approval"),
   design: STEP_ORDER.indexOf("awaiting_design_approval"),
-  reference: STEP_ORDER.indexOf("awaiting_reference_approval"),
+  reference: STEP_ORDER.indexOf("prepare_reference_image"),
   code: STEP_ORDER.indexOf("awaiting_code_approval"),
   result: STEP_ORDER.indexOf("screenshots_ready"),
   artifacts: 0,
@@ -139,7 +138,7 @@ function getStepIndex(step: string): number {
 
 export function isTabAvailable(
   tabId: RunDetailsTab,
-  _status: string,
+  status: string,
   currentStep?: string,
 ): boolean {
   const alwaysAvailable: RunDetailsTab[] = ["overview", "artifacts", "logs"];
@@ -148,7 +147,10 @@ export function isTabAvailable(
     return true;
   }
 
-  const step = currentStep ?? _status;
+  const step =
+    status === "failed" || status === "pipeline_failed"
+      ? currentStep || "queued"
+      : currentStep || status;
   const currentIndex = getStepIndex(step);
   const requiredIndex = TAB_MIN_STEP[tabId];
 

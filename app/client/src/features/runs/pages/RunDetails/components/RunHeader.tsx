@@ -14,13 +14,16 @@ interface RunHeaderProps {
   isDeleting: boolean;
   isDownloading: boolean;
   isRestartingStep: boolean;
+  isStoppingStep: boolean;
   isRestartingCodeStep: boolean;
   canRestartStep: boolean;
+  canStopStep: boolean;
   canRestartCodeStep: boolean;
   onRename: (displayName: string | null) => void;
   onDelete: () => void;
   onDownload: () => void;
   onRestartStep: () => void;
+  onStopStep: () => void;
   onRestartCodeStep: () => void;
   styles: Record<string, string>;
 }
@@ -32,13 +35,16 @@ export const RunHeader: FC<RunHeaderProps> = ({
   isDeleting,
   isDownloading,
   isRestartingStep,
+  isStoppingStep,
   isRestartingCodeStep,
   canRestartStep,
+  canStopStep,
   canRestartCodeStep,
   onRename,
   onDelete,
   onDownload,
   onRestartStep,
+  onStopStep,
   onRestartCodeStep,
   styles,
 }) => {
@@ -94,19 +100,16 @@ export const RunHeader: FC<RunHeaderProps> = ({
             <Button variant="secondary" onClick={startRename}>
               Переименовать
             </Button>
-            <Button
-              variant="secondary"
-              isLoading={isDownloading}
-              onClick={onDownload}
-              disabled={!canDownloadCode}
-              title={
-                canDownloadCode
-                  ? "Скачать проект ZIP-архивом"
-                  : "Код появится после генерации сайта"
-              }
-            >
-              Скачать код
-            </Button>
+            {canDownloadCode && (
+              <Button
+                variant="secondary"
+                isLoading={isDownloading}
+                onClick={onDownload}
+                title="Скачать проект ZIP-архивом"
+              >
+                Скачать код
+              </Button>
+            )}
             <Button
               variant="secondary"
               isLoading={isRestartingStep}
@@ -120,19 +123,28 @@ export const RunHeader: FC<RunHeaderProps> = ({
             >
               Перезапустить шаг
             </Button>
-            <Button
-              variant="secondary"
-              isLoading={isRestartingCodeStep}
-              onClick={onRestartCodeStep}
-              disabled={!canRestartCodeStep}
-              title={
-                canRestartCodeStep
-                  ? "Перегенерировать код проекта"
-                  : "Перегенерация кода доступна после подготовки дизайна"
-              }
-            >
-              Перегенерировать код
-            </Button>
+
+            {canStopStep && (
+              <Button
+                variant="secondary"
+                isLoading={isStoppingStep}
+                onClick={onStopStep}
+                title="Остановить текущий зависший шаг"
+              >
+                Остановить шаг
+              </Button>
+            )}
+            {canRestartCodeStep && (
+
+              <Button
+                variant="secondary"
+                isLoading={isRestartingCodeStep}
+                onClick={onRestartCodeStep}
+                title="Перегенерировать код проекта"
+              >
+                Перегенерировать код
+              </Button>
+            )}
             <div className={styles.headerDivider} />
             <Button variant="danger" isLoading={isDeleting} onClick={onDelete}>
               Удалить
@@ -149,3 +161,5 @@ export const RunHeader: FC<RunHeaderProps> = ({
     </div>
   );
 };
+
+

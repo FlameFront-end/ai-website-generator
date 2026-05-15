@@ -1,6 +1,9 @@
 import type { BriefClarificationAnswer } from '../ai.types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
-import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
+import {
+  buildSkillContext,
+  joinPromptSections,
+} from '../skills/prompt-context';
 
 const SYSTEM = joinPromptSections(
   buildSkillContext(['product-global-rules', 'brief-and-structure'], 5000),
@@ -41,7 +44,9 @@ Rules:
 - If the user does not know, infer a reasonable direction and continue.
 - For needs_clarification: finalBrief=null and projectTitle may be null.
 - For ready: questions=[], finalBrief is a complete structured brief, projectTitle is 2-5 words.
-- Keep all user-facing output in siteLanguage: questions, descriptions, options, placeholders, suggestedAnswer, understoodSummary, projectTitle, and finalBrief.
+- Keep all user-facing output strictly in siteLanguage: questions, descriptions, options, placeholders, suggestedAnswer, understoodSummary, projectTitle, and finalBrief.
+- If siteLanguage is "ru", every user-facing value MUST be Russian Cyrillic. Do not write English summaries like "The brief outlines..." or "The goal is...".
+- If siteLanguage is "en", every user-facing value MUST be English.
 - Keep these instructions and internal task interpretation in English; only user-facing values must be localized.
 - suggestedAnswer must match the question type and be directly usable by the user.`,
 );
@@ -75,4 +80,3 @@ export function buildClarifyBriefMessages(
     },
   ];
 }
-

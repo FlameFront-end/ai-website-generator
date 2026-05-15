@@ -70,12 +70,35 @@ export class PipelineStateService {
     });
   }
 
+  async deleteArtifactsByType(
+    runId: string,
+    type: ArtifactType,
+  ): Promise<void> {
+    await this.artifactsRepository.delete({ runId, type });
+  }
+
+  async touchRun(runId: string): Promise<void> {
+    await this.runsRepository.update(runId, { updatedAt: new Date() });
+  }
+
   async updateRunStatus(
     run: RunEntity,
     status: RunStatus,
     currentStep: string,
     userId: string,
   ): Promise<RunEntity> {
+    const existingRun = await this.runsRepository.findOne({
+      where: { id: run.id },
+    });
+
+    if (
+      existingRun?.status === RunStatus.Failed &&
+      existingRun.errorMessage?.startsWith('PIPELINE_STOPPED:') &&
+      run.status !== RunStatus.Failed
+    ) {
+      return existingRun;
+    }
+
     await this.runsRepository.update(run.id, {
       status,
       currentStep,
@@ -87,7 +110,7 @@ export class PipelineStateService {
     });
 
     if (updatedRun) {
-      await this.storageService.writeStatusFile(userId, run.slug, updatedRun);
+      await this.storageService.writeStatusFile(userId, run.id, updatedRun);
     }
 
     return updatedRun || run;
@@ -109,7 +132,7 @@ export class PipelineStateService {
   async failRun(run: RunEntity, message: string): Promise<void> {
     await this.runsRepository.update(run.id, {
       status: RunStatus.Failed,
-      currentStep: 'pipeline_failed',
+      currentStep: run.currentStep || 'pipeline_failed',
       errorMessage: message,
     });
     await this.addLog(run.id, 'Процесс остановлен из-за ошибки', {
@@ -146,6 +169,16 @@ export class PipelineStateService {
     });
   }
 
+  async getArtifactsByType(
+    runId: string,
+    type: ArtifactType,
+  ): Promise<RunArtifactEntity[]> {
+    return this.artifactsRepository.find({
+      where: { runId, type },
+      order: { path: 'ASC' },
+    });
+  }
+
   async readArtifactFile(relativePath: string): Promise<string> {
     const absolutePath = path.resolve(
       this.storageService.getGeneratedRootPath(),
@@ -155,7 +188,10 @@ export class PipelineStateService {
   }
 
   getArtifactAbsolutePath(relativePath: string): string {
-    return path.resolve(this.storageService.getGeneratedRootPath(), relativePath);
+    return path.resolve(
+      this.storageService.getGeneratedRootPath(),
+      relativePath,
+    );
   }
 
   async getRun(runId: string): Promise<RunEntity | null> {

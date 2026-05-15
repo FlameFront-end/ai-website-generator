@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -12,12 +13,17 @@ import type {
 import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { AiService } from '../ai/ai.service';
+import { loadImageAsDataUrl } from '../ai/image-attachment';
 import { buildCodegenContext } from '../ai/codegen-context';
 import {
   buildDesignContextSummary,
   buildProjectSpecSummary,
   buildReferenceContextSummary,
 } from '../ai/summary-builders';
+import type {
+  CodegenArtifactKind,
+  CodegenArtifactPayload,
+} from '../code-generator/code-generator.service';
 import { CodeGeneratorService } from '../code-generator/code-generator.service';
 import { ImagesService } from '../images/images.service';
 import { PipelineStateService } from './pipeline-state.service';
@@ -26,6 +32,7 @@ import { ScreenshotService } from './screenshot.service';
 import { VisualQAService } from './visual-qa.service';
 
 const PIPELINE_STEP_DELAY_MS = 1200;
+const MAX_BUILD_REPAIR_ATTEMPTS = 3;
 
 @Injectable()
 export class PipelineService {
@@ -66,13 +73,13 @@ export class PipelineService {
     );
     const specRelativePath = this.state.getRunRelativePath(
       userId,
-      briefRun.slug,
+      briefRun.id,
       'spec',
       'project-spec.json',
     );
     const specAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      briefRun.slug,
+      briefRun.id,
       'spec',
       'project-spec.json',
     );
@@ -91,13 +98,13 @@ export class PipelineService {
     const specSummary = buildProjectSpecSummary(projectSpec);
     const specSummaryRelativePath = this.state.getRunRelativePath(
       userId,
-      briefRun.slug,
+      briefRun.id,
       'spec',
       'project-spec.summary.json',
     );
     const specSummaryAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      briefRun.slug,
+      briefRun.id,
       'spec',
       'project-spec.summary.json',
     );
@@ -154,13 +161,13 @@ export class PipelineService {
     );
     const descRelativePath = this.state.getRunRelativePath(
       userId,
-      designRun.slug,
+      designRun.id,
       'design',
       'design-description.md',
     );
     const descAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      designRun.slug,
+      designRun.id,
       'design',
       'design-description.md',
     );
@@ -199,13 +206,13 @@ export class PipelineService {
 
     const tokensRelativePath = this.state.getRunRelativePath(
       userId,
-      tokensRun.slug,
+      tokensRun.id,
       'design',
       'design-tokens.json',
     );
     const tokensAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      tokensRun.slug,
+      tokensRun.id,
       'design',
       'design-tokens.json',
     );
@@ -224,13 +231,13 @@ export class PipelineService {
     const designSummary = buildDesignContextSummary(projectSpec, tokens);
     const designSummaryRelativePath = this.state.getRunRelativePath(
       userId,
-      tokensRun.slug,
+      tokensRun.id,
       'design',
       'design-context.summary.json',
     );
     const designSummaryAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      tokensRun.slug,
+      tokensRun.id,
       'design',
       'design-context.summary.json',
     );
@@ -281,7 +288,7 @@ export class PipelineService {
       tokens,
       designDescription,
       userId,
-      referenceRun.slug,
+      referenceRun.id,
       referenceRun.id,
     );
 
@@ -295,7 +302,7 @@ export class PipelineService {
     const referenceSummaryRelativePath = await this.saveReferenceContextSummary(
       referenceRun.id,
       userId,
-      referenceRun.slug,
+      referenceRun.id,
       projectSpec,
       referenceImage.relativePath,
     );
@@ -335,12 +342,17 @@ export class PipelineService {
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
     const codePath = path.join(
-      this.storageService.getRunPath(userId, codeRun.slug),
+      this.storageService.getRunPath(userId, codeRun.id),
       'code',
     );
     const codegenContext = await this.buildCodegenContextForRun(
       codeRun.id,
       designDescription,
+    );
+    const codegenImages = await this.buildCodegenImageContext(codeRun.id);
+    await this.state.addLog(
+      codeRun.id,
+      `Codegen visual input: full-page=${codegenImages.fullPageImageDataUrl ? 'yes' : 'no'}, section blocks=${codegenImages.sectionImageMap.size}`,
     );
     await this.codeGeneratorService.generateProjectFiles(
       run.brief,
@@ -348,17 +360,31 @@ export class PipelineService {
       tokens,
       codegenContext,
       codePath,
+      {
+        onCodegenArtifact: (payload: CodegenArtifactPayload) =>
+          this.saveCodegenArtifact(
+            codeRun.id,
+            userId,
+            codeRun.id,
+            payload.kind,
+            payload.data,
+          ),
+        fullPageImageDataUrl: codegenImages.fullPageImageDataUrl,
+        sectionImageMap: codegenImages.sectionImageMap,
+      },
     );
 
     await this.state.addLog(codeRun.id, 'Код сайта готов');
 
-    await this.state.updateRunStatus(
+    await this.runBuildAndQAWithRepair(
       codeRun,
-      RunStatus.AwaitingCodeApproval,
-      'awaiting_code_approval',
+      codeRun.id,
       userId,
+      projectSpec,
+      tokens,
+      codegenContext,
+      codePath,
     );
-    await this.state.addLog(codeRun.id, 'Проверьте код и подтвердите шаг');
   }
 
   async rebuildRun(run: RunEntity, userId: string): Promise<void> {
@@ -368,7 +394,7 @@ export class PipelineService {
       'build_project',
       userId,
     );
-    void this.runBuildAndQA(rebuildRun, rebuildRun.slug, userId);
+    void this.runBuildAndQA(rebuildRun, rebuildRun.id, userId);
   }
 
   private async runBuildAndQA(
@@ -398,6 +424,76 @@ export class PipelineService {
       screenshotRun.id,
       'Проверьте результат и завершите проект',
     );
+  }
+
+  private async runBuildAndQAWithRepair(
+    run: RunEntity,
+    slug: string,
+    userId: string,
+    projectSpec: ProjectSpec,
+    tokens: DesignTokens,
+    codegenContext: string,
+    codePath: string,
+  ): Promise<void> {
+    let currentRun = run;
+
+    for (
+      let attempt = 1;
+      attempt <= MAX_BUILD_REPAIR_ATTEMPTS + 1;
+      attempt += 1
+    ) {
+      const result = await this.buildService.buildProjectOnce(
+        currentRun,
+        slug,
+        userId,
+        attempt,
+      );
+      currentRun = result.run;
+
+      if (currentRun.status !== RunStatus.BuildFailed) {
+        const screenshotRun = await this.screenshotService.takeScreenshots(
+          currentRun,
+          slug,
+          userId,
+        );
+        await this.visualQAService.runVisualQA(
+          screenshotRun,
+          run.id,
+          slug,
+          userId,
+        );
+
+        await this.state.updateRunStatus(
+          screenshotRun,
+          RunStatus.AwaitingFinalApproval,
+          'awaiting_final_approval',
+          userId,
+        );
+        await this.state.addLog(
+          screenshotRun.id,
+          'Проверьте результат и завершите проект',
+        );
+        return;
+      }
+
+      if (attempt > MAX_BUILD_REPAIR_ATTEMPTS || !result.error) {
+        return;
+      }
+
+      await this.state.addLog(
+        run.id,
+        `Скармливаем ошибку сборки AI для исправления кода (${attempt}/${MAX_BUILD_REPAIR_ATTEMPTS})`,
+        { error: result.error },
+      );
+      await this.codeGeneratorService.repairProjectFilesAfterBuildFailure(
+        run.brief,
+        projectSpec,
+        tokens,
+        result.error,
+        codegenContext,
+        codePath,
+      );
+    }
   }
 
   async resumeRun(run: RunEntity, userId: string): Promise<void> {
@@ -600,7 +696,7 @@ export class PipelineService {
 
     const builtRun = await this.buildService.buildProject(
       run,
-      run.slug,
+      run.id,
       userId,
       1,
     );
@@ -612,12 +708,12 @@ export class PipelineService {
     if (screenshotRun) {
       await this.screenshotService.takeScreenshots(
         screenshotRun,
-        run.slug,
+        run.id,
         userId,
       );
       const qaRun = await this.state.getRun(run.id);
       if (qaRun) {
-        await this.visualQAService.runVisualQA(qaRun, run.id, run.slug, userId);
+        await this.visualQAService.runVisualQA(qaRun, run.id, run.id, userId);
       }
     }
   }
@@ -665,6 +761,83 @@ export class PipelineService {
           ? error.message
           : 'Ошибка при перегенерации шага';
       await this.state.failRun(run, message);
+    }
+  }
+
+  /**
+   * Wipe the on-disk workspace and DB artifacts produced by a previous attempt
+   * of the given step. Called at the start of every `regenerateXxx` flow so
+   * restart / edit-request always start from a clean slate and no stale files
+   * leak into the new attempt.
+   */
+  private async cleanStepWorkspace(
+    userId: string,
+    runId: string,
+    step: 'spec' | 'design' | 'reference' | 'code',
+  ): Promise<void> {
+    const folders = this.getStepFolders(step);
+    const types = this.getStepArtifactTypes(step);
+
+    for (const folder of folders) {
+      const dir = this.state.getRunAbsolutePath(userId, runId, folder);
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+
+    for (const type of types) {
+      await this.state.deleteArtifactsByType(runId, type);
+    }
+  }
+
+  private getStepFolders(
+    step: 'spec' | 'design' | 'reference' | 'code',
+  ): string[] {
+    switch (step) {
+      case 'spec':
+        return ['spec'];
+      case 'design':
+        return ['design'];
+      case 'reference':
+        return ['reference'];
+      case 'code':
+        // Code regeneration also re-runs build + screenshots + visual QA,
+        // so clean those workspaces too to avoid mixing old with new output.
+        return ['code', 'screenshots', 'qa'];
+    }
+  }
+
+  private getStepArtifactTypes(
+    step: 'spec' | 'design' | 'reference' | 'code',
+  ): ArtifactType[] {
+    switch (step) {
+      case 'spec':
+        return [ArtifactType.ProjectSpec, ArtifactType.ProjectSpecSummary];
+      case 'design':
+        return [
+          ArtifactType.DesignDescription,
+          ArtifactType.DesignTokens,
+          ArtifactType.DesignContextSummary,
+        ];
+      case 'reference':
+        return [
+          ArtifactType.ReferenceImage,
+          ArtifactType.ReferenceBlock,
+          ArtifactType.ReferenceContextSummary,
+          ArtifactType.ReferenceValidation,
+        ];
+      case 'code':
+        return [
+          ArtifactType.CodePlan,
+          ArtifactType.CodeContentModule,
+          ArtifactType.CodeLayoutModule,
+          ArtifactType.CodeSectionsModule,
+          ArtifactType.FrontendProject,
+          ArtifactType.BuildLog,
+          ArtifactType.BuildError,
+          ArtifactType.DesktopScreenshot,
+          ArtifactType.MobileScreenshot,
+          ArtifactType.DiffImage,
+          ArtifactType.VisualReport,
+        ];
     }
   }
 
@@ -722,7 +895,7 @@ export class PipelineService {
           break;
         case 'code':
           await this.regenerateCode(run, '', userId);
-          break;
+          return;
       }
 
       await this.state.updateRunStatus(
@@ -743,6 +916,8 @@ export class PipelineService {
     instruction: string,
     userId: string,
   ): Promise<void> {
+    await this.cleanStepWorkspace(userId, run.id, 'spec');
+
     const updatedBrief = instruction
       ? `${run.brief}\n\nПравка: ${instruction}`
       : run.brief;
@@ -752,13 +927,13 @@ export class PipelineService {
       await this.aiService.extractProjectSpec(updatedBrief);
     const specRelativePath = this.state.getRunRelativePath(
       userId,
-      run.slug,
+      run.id,
       'spec',
       'project-spec.json',
     );
     const specAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      run.slug,
+      run.id,
       'spec',
       'project-spec.json',
     );
@@ -791,6 +966,8 @@ export class PipelineService {
       return;
     }
 
+    await this.cleanStepWorkspace(userId, run.id, 'design');
+
     const specContent = await this.state.readArtifactFile(specArtifact.path);
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
 
@@ -806,13 +983,13 @@ export class PipelineService {
 
     const descRelativePath = this.state.getRunRelativePath(
       userId,
-      run.slug,
+      run.id,
       'design',
       'design-description.md',
     );
     const descAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      run.slug,
+      run.id,
       'design',
       'design-description.md',
     );
@@ -829,13 +1006,13 @@ export class PipelineService {
 
     const tokensRelativePath = this.state.getRunRelativePath(
       userId,
-      run.slug,
+      run.id,
       'design',
       'design-tokens.json',
     );
     const tokensAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      run.slug,
+      run.id,
       'design',
       'design-tokens.json',
     );
@@ -875,6 +1052,8 @@ export class PipelineService {
       return;
     }
 
+    await this.cleanStepWorkspace(userId, run.id, 'reference');
+
     const specContent = await this.state.readArtifactFile(specArtifact.path);
     const tokensContent = await this.state.readArtifactFile(
       tokensArtifact.path,
@@ -891,7 +1070,7 @@ export class PipelineService {
       tokens,
       designDescription,
       userId,
-      run.slug,
+      run.id,
       run.id,
     );
 
@@ -930,6 +1109,7 @@ export class PipelineService {
         designDescription,
         userId,
         slug,
+        runId,
       );
     } catch (error) {
       const message =
@@ -963,6 +1143,7 @@ export class PipelineService {
     designDescription: string,
     userId: string,
     slug: string,
+    runId: string,
   ): Promise<{ relativePath: string; mimeType: string; model: string }> {
     const sections = this.normalizeReferenceSections(projectSpec);
     const generatedBlocks: Array<{
@@ -974,18 +1155,40 @@ export class PipelineService {
       model: string;
     }> = [];
 
+    // Clear previously-emitted progressive blocks from any prior failed/restarted attempt
+    await this.state.deleteArtifactsByType(runId, ArtifactType.ReferenceBlock);
+
+    // Also remove any stale block PNGs from disk so the folder reflects only the
+    // current run's progress (otherwise leftover files mislead anyone inspecting
+    // the filesystem).
+    const blocksDir = this.state.getRunAbsolutePath(
+      userId,
+      slug,
+      'reference',
+      'blocks',
+    );
+    await fs.rm(blocksDir, { recursive: true, force: true });
+
+    // Build the shared art-direction primer once. The same string is used for
+    // every section so the model receives identical brand cues across chats,
+    // which is what keeps separately-generated blocks visually consistent.
+    const artDirection = this.buildArtDirectionSpec(projectSpec, tokens);
+
     for (const [index, section] of sections.entries()) {
       const prompt = this.buildSectionImagePrompt(
-        brief,
         projectSpec,
         tokens,
-        designDescription,
         section,
-        generatedBlocks.map((block) => ({
-          sectionId: block.sectionId,
-          title: block.title,
-        })),
+        artDirection,
       );
+
+      await this.state.addLog(
+        runId,
+        `Генерация блока ${index + 1}/${sections.length}: ${section.title}`,
+        { sectionId: section.id },
+      );
+      await this.state.touchRun(runId);
+
       const result = await this.imagesService.generateImage(prompt);
       const image = await this.downloadGeneratedImage(result.image);
       const extension = this.getImageExtension(image.mimeType);
@@ -1006,6 +1209,21 @@ export class PipelineService {
       );
 
       await this.state.writeGeneratedFile(absolutePath, image.buffer);
+
+      // Emit progressive artifact so the UI can show this block immediately,
+      // without waiting for remaining sections or the full-page preview.
+      await this.state.saveArtifact(
+        runId,
+        ArtifactType.ReferenceBlock,
+        relativePath,
+        image.mimeType,
+      );
+      await this.state.touchRun(runId);
+      await this.state.addLog(
+        runId,
+        `Блок ${index + 1}/${sections.length} готов: ${section.title}`,
+        { sectionId: section.id, path: relativePath },
+      );
 
       generatedBlocks.push({
         sectionId: section.id,
@@ -1072,12 +1290,21 @@ export class PipelineService {
     userId: string,
     slug: string,
   ): Promise<{ relativePath: string; mimeType: string; model: string }> {
-    const svg = await this.aiService.generateReferenceSvg(
-      brief,
-      projectSpec,
-      tokens,
-      designDescription,
-    );
+    let svg: string;
+    let model = 'analysis-svg-fallback';
+
+    try {
+      svg = await this.aiService.generateReferenceSvg(
+        brief,
+        projectSpec,
+        tokens,
+        designDescription,
+      );
+    } catch {
+      svg = this.createDeterministicReferenceSvg(projectSpec, tokens);
+      model = 'deterministic-svg-fallback';
+    }
+
     const relativePath = this.state.getRunRelativePath(
       userId,
       slug,
@@ -1112,7 +1339,7 @@ export class PipelineService {
               title: section.title,
               path: relativePath,
               mimeType: 'image/svg+xml',
-              model: 'analysis-svg-fallback',
+              model,
             }),
           ),
         },
@@ -1124,8 +1351,68 @@ export class PipelineService {
     return {
       relativePath,
       mimeType: 'image/svg+xml',
-      model: 'analysis-svg-fallback',
+      model,
     };
+  }
+
+  private createDeterministicReferenceSvg(
+    projectSpec: ProjectSpec,
+    tokens: DesignTokens,
+  ): string {
+    const colors = tokens.colors;
+    const sections = this.normalizeReferenceSections(projectSpec).slice(0, 6);
+    const background = this.escapeSvg(colors.background || '#09090b');
+    const surface = this.escapeSvg(colors.surface || '#18181b');
+    const border = this.escapeSvg(colors.border || '#27272a');
+    const textPrimary = this.escapeSvg(colors.textPrimary || '#fafafa');
+    const textSecondary = this.escapeSvg(colors.textSecondary || '#a1a1aa');
+    const accent = this.escapeSvg(colors.accent || '#f97316');
+    const accentSecondary = this.escapeSvg(
+      colors.accentSecondary || colors.accent || '#22c55e',
+    );
+    const headline = this.escapeSvg(projectSpec.copy.headline);
+    const description = this.escapeSvg(projectSpec.copy.description);
+    const primaryButton = this.escapeSvg(projectSpec.copy.primaryButton);
+    const secondaryButton = this.escapeSvg(projectSpec.copy.secondaryButton);
+    const sectionCards = sections
+      .map((section, index) => {
+        const x = 90 + (index % 3) * 420;
+        const y = 560 + Math.floor(index / 3) * 130;
+        return [
+          `<rect x="${x}" y="${y}" width="360" height="92" rx="22" fill="${surface}" stroke="${border}" />`,
+          `<text x="${x + 24}" y="${y + 38}" fill="${textPrimary}" font-size="24" font-weight="700">${this.escapeSvg(section.title)}</text>`,
+          `<text x="${x + 24}" y="${y + 68}" fill="${textSecondary}" font-size="16">${this.escapeSvg(section.goal).slice(0, 72)}</text>`,
+        ].join('\n');
+      })
+      .join('\n');
+
+    return `<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1440" height="900" fill="${background}"/>
+<circle cx="1190" cy="110" r="260" fill="${accent}" opacity="0.16"/>
+<circle cx="260" cy="760" r="240" fill="${accentSecondary}" opacity="0.12"/>
+<rect x="72" y="56" width="1296" height="788" rx="36" fill="${surface}" opacity="0.74" stroke="${border}"/>
+<text x="112" y="130" fill="${accent}" font-size="18" font-weight="700" letter-spacing="4">${this.escapeSvg(projectSpec.productName)}</text>
+<text x="112" y="230" fill="${textPrimary}" font-size="64" font-weight="800">${headline.slice(0, 44)}</text>
+<text x="112" y="292" fill="${textSecondary}" font-size="24">${description.slice(0, 92)}</text>
+<rect x="112" y="360" width="230" height="58" rx="18" fill="${accent}"/>
+<text x="142" y="397" fill="${background}" font-size="20" font-weight="700">${primaryButton.slice(0, 22)}</text>
+<rect x="366" y="360" width="230" height="58" rx="18" fill="transparent" stroke="${border}"/>
+<text x="396" y="397" fill="${textPrimary}" font-size="20" font-weight="700">${secondaryButton.slice(0, 22)}</text>
+<rect x="860" y="190" width="390" height="260" rx="34" fill="${background}" stroke="${border}"/>
+<rect x="902" y="236" width="306" height="32" rx="16" fill="${accent}" opacity="0.75"/>
+<rect x="902" y="296" width="230" height="22" rx="11" fill="${textSecondary}" opacity="0.45"/>
+<rect x="902" y="344" width="270" height="22" rx="11" fill="${textSecondary}" opacity="0.32"/>
+<rect x="902" y="392" width="190" height="22" rx="11" fill="${accentSecondary}" opacity="0.7"/>
+${sectionCards}
+</svg>`;
+  }
+
+  private escapeSvg(value: string): string {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
   }
 
   private normalizeReferenceSections(projectSpec: ProjectSpec) {
@@ -1215,34 +1502,134 @@ export class PipelineService {
       .toBuffer();
   }
 
-  private buildSectionImagePrompt(
-    brief: string,
+  /**
+   * Compact, deterministic art direction kit shared by every section of the
+   * same site. Keeping this short and identical across calls is what makes
+   * the generated blocks feel like a single coherent product, even when each
+   * is generated in its own ChatGPT chat.
+   */
+  private buildArtDirectionSpec(
     projectSpec: ProjectSpec,
     tokens: DesignTokens,
-    designDescription: string,
-    section: ProjectSpec['sections'][number],
-    previousSections: Array<{ sectionId: string; title: string }>,
   ): string {
+    const c = tokens.colors;
+    const t = tokens.typography;
+    const cmp = tokens.components;
+
+    const palette = [
+      `background ${c.background}`,
+      c.backgroundGradient ? `bg-gradient ${c.backgroundGradient}` : null,
+      `accent ${c.accent}`,
+      c.accentSecondary ? `accent-2 ${c.accentSecondary}` : null,
+      `text ${c.textPrimary}`,
+      `text-secondary ${c.textSecondary}`,
+      `surface ${c.surface}`,
+      `border ${c.border}`,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const fontFamily =
+      t.fontFamily?.replace(/['"]/g, '').split(',')[0]?.trim() ||
+      'modern sans-serif';
+
+    const mood =
+      (projectSpec.stylePreference ?? []).slice(0, 4).join(', ') ||
+      'modern, clean';
+    const visualPrefs = (projectSpec.visualPreferences ?? [])
+      .slice(0, 4)
+      .join('; ');
+    const avoid = (tokens.assets?.avoid ?? []).join(', ');
+
     return [
-      'Create one production-ready desktop website section image.',
-      'Canvas: 1440px wide desktop website section, straight-on website screenshot.',
-      'Generate only the current section, not the full page.',
-      'Do not include browser chrome, device mockups, editor UI, annotations, or unrelated text.',
-      'The design must feel like a real shipped landing page section with strong typography, clear hierarchy, generous spacing, readable text, coherent style, and frontend-implementable layout.',
-      'Keep the same art direction as previous sections. Do not make each block a different style.',
+      `SITE: ${projectSpec.productName} — ${projectSpec.productDescription}`,
+      `INDUSTRY: ${projectSpec.industry ?? 'general'} | AUDIENCE: ${projectSpec.audience}`,
+      `MOOD: ${mood}`,
+      visualPrefs ? `VISUAL PREFERENCES: ${visualPrefs}` : '',
+      `PALETTE: ${palette}`,
+      `TYPOGRAPHY: headline ${t.headlineSize}/${t.headlineWeight} ${fontFamily}, body ${t.bodySize}, line-height ${t.lineHeight}`,
+      `COMPONENTS: button radius ${cmp.buttonRadius}${cmp.buttonHeight ? ` (h ${cmp.buttonHeight})` : ''}, card radius ${cmp.cardRadius} with shadow ${cmp.cardShadow}; dark surfaces with thin borders; subtle glow accents`,
+      avoid ? `AVOID: ${avoid}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  /**
+   * Build a focused image-generation prompt for a single section.
+   * Each section is rendered in its own fresh ChatGPT chat, so the prompt
+   * must be self-contained but as small as possible.
+   */
+  private buildSectionImagePrompt(
+    projectSpec: ProjectSpec,
+    tokens: DesignTokens,
+    section: ProjectSpec['sections'][number],
+    artDirection: string,
+  ): string {
+    const sectionTokens = tokens.sections?.[section.id];
+    const isHero = section.type === 'hero';
+    const nav = projectSpec.navigation;
+
+    const navLine =
+      isHero && nav
+        ? `NAV (top of section): logo "${nav.logo}", menu [${(nav.menuItems ?? []).join(' | ')}]${nav.ctaButton ? `, CTA "${nav.ctaButton}"` : ''}.`
+        : 'Do NOT draw a navigation bar in this section — navigation appears only on the hero block.';
+
+    const heroCopyLines: string[] = [];
+    if (isHero) {
+      const copy = projectSpec.copy;
+      if (copy?.headline) heroCopyLines.push(`H1: "${copy.headline}"`);
+      if (copy?.headlineAccent)
+        heroCopyLines.push(`H1 accent: "${copy.headlineAccent}"`);
+      if (copy?.description)
+        heroCopyLines.push(`Lead paragraph: "${copy.description}"`);
+      if (copy?.primaryButton)
+        heroCopyLines.push(`Primary CTA: "${copy.primaryButton}"`);
+      if (copy?.secondaryButton)
+        heroCopyLines.push(`Secondary CTA: "${copy.secondaryButton}"`);
+      if (copy?.trustLine)
+        heroCopyLines.push(`Trust line: "${copy.trustLine}"`);
+    }
+
+    const sectionMeta = [
+      sectionTokens?.background
+        ? `Section background: ${sectionTokens.background}`
+        : '',
+      sectionTokens?.layout ? `Section layout: ${sectionTokens.layout}` : '',
+      sectionTokens?.spacing ? `Section spacing: ${sectionTokens.spacing}` : '',
+      sectionTokens?.visualRole
+        ? `Visual role: ${sectionTokens.visualRole}`
+        : '',
+    ].filter(Boolean);
+
+    return [
+      'Render ONE section of a desktop landing page as a clean 1440px-wide website screenshot.',
+      'No browser chrome, no device mockups, no annotations, no editor UI, no unrelated text.',
+      'Strong typography, clear hierarchy, generous spacing, readable text, frontend-implementable layout.',
       '',
-      `Brief:\n${brief}`,
+      '=== SHARED ART DIRECTION (must match every section of this site) ===',
+      artDirection,
       '',
-      `Project spec:\n${JSON.stringify(projectSpec, null, 2)}`,
+      `=== THIS SECTION (${section.id}) ===`,
+      `Type: ${section.type} — section title (in copy): "${section.title}"`,
+      `Goal: ${section.goal}`,
+      `Required elements: ${(section.requiredElements ?? []).join(', ') || '(use sensible defaults for this section type)'}`,
+      `Content to convey:\n  - ${(section.contentNotes ?? ['(use section title and goal)']).join('\n  - ')}`,
+      section.visualNotes && section.visualNotes.length > 0
+        ? `Visual hints:\n  - ${section.visualNotes.join('\n  - ')}`
+        : '',
+      ...sectionMeta,
+      heroCopyLines.length > 0
+        ? `Exact copy to include verbatim:\n  - ${heroCopyLines.join('\n  - ')}`
+        : '',
       '',
-      `Design tokens:\n${JSON.stringify(tokens, null, 2)}`,
+      navLine,
       '',
-      `Design description:\n${designDescription}`,
-      '',
-      `Previous sections:\n${JSON.stringify(previousSections, null, 2)}`,
-      '',
-      `Current section:\n${JSON.stringify(section, null, 2)}`,
-    ].join('\n');
+      `LANGUAGE: All visible UI text MUST be in "${projectSpec.language}" (e.g., "ru" → Russian).`,
+      'CRITICAL: Do NOT invent a different style. Use the exact palette, typography, button and card shapes from the SHARED ART DIRECTION above. Other sections of this site will be generated with the same tokens and must stack into one coherent product.',
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   private slugifySectionId(sectionId: string): string {
@@ -1435,6 +1822,149 @@ export class PipelineService {
     return summaryRelativePath;
   }
 
+  /**
+   * Load the approved reference images for a run as data URLs ready to pass
+   * to the multimodal code-generation prompts:
+   *   - `fullPageImageDataUrl`: the stitched full-page preview, used to anchor
+   *     the layout call.
+   *   - `sectionImageMap`: section.id → data URL of the per-section block,
+   *     used as the visual source of truth for each section codegen call.
+   *
+   * If a file is missing or unreadable we silently skip it — the prompt builder
+   * accepts `null` and falls back to a text-only prompt for that step.
+   */
+  private async buildCodegenImageContext(runId: string): Promise<{
+    fullPageImageDataUrl: string | null;
+    sectionImageMap: Map<string, string>;
+  }> {
+    const sectionImageMap = new Map<string, string>();
+    let fullPageImageDataUrl: string | null = null;
+
+    try {
+      const blockArtifacts = await this.state.getArtifactsByType(
+        runId,
+        ArtifactType.ReferenceBlock,
+      );
+      for (const block of blockArtifacts) {
+        const sectionId = this.parseSectionIdFromBlockPath(block.path);
+        if (!sectionId) continue;
+        try {
+          const absolutePath = this.state.getArtifactAbsolutePath(block.path);
+          const dataUrl = await loadImageAsDataUrl(absolutePath);
+          sectionImageMap.set(sectionId, dataUrl);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          await this.state.addLog(
+            runId,
+            `Не удалось загрузить картинку блока для codegen: ${block.path}`,
+            { error: message },
+          );
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.state.addLog(
+        runId,
+        'Не удалось получить артефакты блоков-референсов для codegen',
+        { error: message },
+      );
+    }
+
+    try {
+      const referenceArtifact = await this.state.getArtifactByType(
+        runId,
+        ArtifactType.ReferenceImage,
+      );
+      if (
+        referenceArtifact &&
+        (referenceArtifact.mimeType ?? '').startsWith('image/') &&
+        !referenceArtifact.path.endsWith('.svg')
+      ) {
+        const absolutePath = this.state.getArtifactAbsolutePath(
+          referenceArtifact.path,
+        );
+        fullPageImageDataUrl = await loadImageAsDataUrl(absolutePath);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.state.addLog(
+        runId,
+        'Не удалось загрузить full-page-preview для codegen',
+        { error: message },
+      );
+    }
+
+    return { fullPageImageDataUrl, sectionImageMap };
+  }
+
+  /**
+   * Reverse the filename convention used in `generateFluxReferenceImage`:
+   *   `<index>-<slugified-section-id>.<ext>` (e.g. `01-01-hero.png`).
+   * Strip the leading order prefix once so we get back the original section.id.
+   */
+  private parseSectionIdFromBlockPath(relativePath: string): string | null {
+    const fileName = relativePath.split('/').pop();
+    if (!fileName) return null;
+    const stem = fileName.replace(/\.[^.]+$/, '');
+    const withoutOrder = stem.replace(/^\d+-/, '');
+    return withoutOrder || null;
+  }
+
+  private async saveCodegenArtifact(
+    runId: string,
+    userId: string,
+    slug: string,
+    kind: CodegenArtifactKind,
+    data: unknown,
+  ): Promise<void> {
+    const config: Record<
+      CodegenArtifactKind,
+      { type: ArtifactType; fileName: string }
+    > = {
+      'code-plan': {
+        type: ArtifactType.CodePlan,
+        fileName: 'code-plan.json',
+      },
+      'content-module': {
+        type: ArtifactType.CodeContentModule,
+        fileName: 'content-module.json',
+      },
+      'layout-module': {
+        type: ArtifactType.CodeLayoutModule,
+        fileName: 'layout-module.json',
+      },
+      'sections-module': {
+        type: ArtifactType.CodeSectionsModule,
+        fileName: 'sections-module.json',
+      },
+    };
+    const item = config[kind];
+    const relativePath = this.state.getRunRelativePath(
+      userId,
+      slug,
+      'codegen',
+      item.fileName,
+    );
+    const absolutePath = this.state.getRunAbsolutePath(
+      userId,
+      slug,
+      'codegen',
+      item.fileName,
+    );
+
+    await this.state.writeGeneratedFile(
+      absolutePath,
+      JSON.stringify(data, null, 2),
+    );
+    await this.state.saveArtifact(
+      runId,
+      item.type,
+      relativePath,
+      'application/json',
+    );
+  }
+
   private canFallbackToSvgReference(message: string): boolean {
     return [
       'Image generation failed',
@@ -1469,6 +1999,8 @@ export class PipelineService {
       return;
     }
 
+    await this.cleanStepWorkspace(userId, run.id, 'code');
+
     const specContent = await this.state.readArtifactFile(specArtifact.path);
     const tokensContent = await this.state.readArtifactFile(
       tokensArtifact.path,
@@ -1480,21 +2012,50 @@ export class PipelineService {
     const tokens = JSON.parse(tokensContent) as unknown as DesignTokens;
 
     const codePath = path.join(
-      this.storageService.getRunPath(userId, run.slug),
+      this.storageService.getRunPath(userId, run.id),
       'code',
+    );
+    const codegenContext = await this.buildCodegenContextForRun(
+      run.id,
+      designDescription,
+    );
+    const codegenImages = await this.buildCodegenImageContext(run.id);
+    await this.state.addLog(
+      run.id,
+      `Codegen visual input: full-page=${codegenImages.fullPageImageDataUrl ? 'yes' : 'no'}, section blocks=${codegenImages.sectionImageMap.size}`,
     );
     await this.codeGeneratorService.generateProjectFiles(
       run.brief,
       projectSpec,
       tokens,
-      await this.buildCodegenContextForRun(run.id, designDescription),
+      codegenContext,
       codePath,
+      {
+        onCodegenArtifact: (payload: CodegenArtifactPayload) =>
+          this.saveCodegenArtifact(
+            run.id,
+            userId,
+            run.id,
+            payload.kind,
+            payload.data,
+          ),
+        fullPageImageDataUrl: codegenImages.fullPageImageDataUrl,
+        sectionImageMap: codegenImages.sectionImageMap,
+      },
     );
 
     await this.state.addLog(run.id, 'Код сайта перегенерирован', {
       instruction,
     });
+
+    await this.runBuildAndQAWithRepair(
+      run,
+      run.id,
+      userId,
+      projectSpec,
+      tokens,
+      codegenContext,
+      codePath,
+    );
   }
 }
-
-

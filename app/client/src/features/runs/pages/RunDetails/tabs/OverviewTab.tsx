@@ -31,7 +31,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({ run, styles }) => {
         <pre>{run.brief}</pre>
       </div>
 
-      <div className={styles.panel}>
+      <div className={`${styles.panel} ${styles.overviewArtifactsPanel}`}>
         <h2>Артефакты</h2>
         {run.artifacts.length === 0 ? (
           <OverviewArtifactsSkeleton styles={styles} />

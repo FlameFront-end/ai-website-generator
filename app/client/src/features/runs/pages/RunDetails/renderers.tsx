@@ -241,26 +241,54 @@ export function renderProjectSpec(content: string, className: string) {
 
 export function renderDesignTokens(content: string, className: string) {
   try {
-    const tokens = JSON.parse(content) as Record<
-      string,
-      Record<string, string | number>
-    >;
+    const tokens = JSON.parse(content) as Record<string, unknown>;
 
     return (
       <dl className={className}>
-        {Object.entries(tokens).flatMap(([groupName, group]) =>
-          Object.entries(group).map(([key, value]) => (
+        {Object.entries(tokens).flatMap(([groupName, group]) => {
+          if (!isRecord(group)) {
+            return [
+              <div key={groupName}>
+                <dt>{groupName}</dt>
+                <dd>{formatTokenValue(group)}</dd>
+              </div>,
+            ];
+          }
+
+          return Object.entries(group).map(([key, value]) => (
             <div key={`${groupName}-${key}`}>
               <dt>
                 {groupName} · {key}
               </dt>
-              <dd>{String(value)}</dd>
+              <dd>{formatTokenValue(value)}</dd>
             </div>
-          )),
-        )}
+          ));
+        })}
       </dl>
     );
   } catch {
     return <pre>{content}</pre>;
   }
+}
+
+function formatTokenValue(value: unknown): string {
+  if (value == null) {
+    return "—";
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(formatTokenValue).join(", ");
+  }
+
+  if (isRecord(value)) {
+    return Object.entries(value)
+      .map(([key, nestedValue]) => `${key}: ${formatTokenValue(nestedValue)}`)
+      .join("; ");
+  }
+
+  return String(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

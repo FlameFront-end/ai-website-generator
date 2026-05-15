@@ -595,6 +595,10 @@ p {
   align-items: start;
 }
 
+.overviewArtifactsPanel {
+  width: min(100%, 520px);
+}
+
 .list {
   display: grid;
   gap: 10px;

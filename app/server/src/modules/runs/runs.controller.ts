@@ -35,7 +35,11 @@ export class RunsController {
 
   @Post('brief/clarify')
   clarifyBrief(@Body() body: ClarifyBriefDto) {
-    return this.aiService.clarifyBrief(body.brief, body.answers ?? []);
+    return this.aiService.clarifyBrief(
+      body.brief,
+      body.answers ?? [],
+      body.siteLanguage,
+    );
   }
 
   @Post()
@@ -145,7 +149,13 @@ export class RunsController {
     return this.runsService.restartCurrentStep(id, req.user.id);
   }
 
+
+  @Post(':id/stop-current-step')
+  stopCurrentStep(@Param('id') id: string, @Request() req: RequestWithUser) {
+    return this.runsService.stopCurrentStep(id, req.user.id);
+  }
   @Post(':id/restart-code-step')
+
   restartCodeStep(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.runsService.restartCodeStep(id, req.user.id);
   }
@@ -173,3 +183,4 @@ export class RunsController {
     );
   }
 }
+

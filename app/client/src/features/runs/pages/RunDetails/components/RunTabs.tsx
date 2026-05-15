@@ -19,7 +19,6 @@ const STATUS_TO_TAB: Record<string, RunDetailsTab> = {
   awaiting_spec_approval: "spec",
   awaiting_design_approval: "design",
   awaiting_reference_approval: "reference",
-  awaiting_code_approval: "code",
   awaiting_final_approval: "result",
 };
 

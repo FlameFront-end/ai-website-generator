@@ -99,7 +99,18 @@ export const runsApi = {
     return data;
   },
 
+
+  async stopCurrentStep(
+    runId: string,
+  ): Promise<{ id: string; status: RunStatus }> {
+    const { data } = await axiosInstance.post<{
+      id: string;
+      status: RunStatus;
+    }>(API_ENDPOINTS.stopCurrentStep(runId));
+    return data;
+  },
   async restartCodeStep(
+
     runId: string,
   ): Promise<{ id: string; status: RunStatus }> {
     const { data } = await axiosInstance.post<{
@@ -174,3 +185,4 @@ export const runsApi = {
     return data;
   },
 };
+

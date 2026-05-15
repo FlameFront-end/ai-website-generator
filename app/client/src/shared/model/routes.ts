@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   run: (runId: string) => `/runs/${runId}`,
   rebuildRun: (runId: string) => `/runs/${runId}/rebuild`,
   restartCurrentStep: (runId: string) => `/runs/${runId}/restart-current-step`,
+  stopCurrentStep: (runId: string) => `/runs/${runId}/stop-current-step`,
   restartCodeStep: (runId: string) => `/runs/${runId}/restart-code-step`,
   artifactContent: (runId: string, artifactId: string) =>
     `/runs/${runId}/artifacts/${artifactId}/content`,
@@ -34,3 +35,4 @@ export const API_ENDPOINTS = {
   approveStep: (runId: string) => `/runs/${runId}/approve`,
   editRequest: (runId: string) => `/runs/${runId}/edit-request`,
 } as const;
+

@@ -16,7 +16,9 @@ type ArtifactType =
   | "diff_image"
   | "visual_report";
 
-export type RunArtifactsMap = Record<ArtifactType, RunArtifact | undefined>;
+export type RunArtifactsMap = Record<ArtifactType, RunArtifact | undefined> & {
+  reference_blocks: RunArtifact[];
+};
 
 const ARTIFACT_TYPES: ArtifactType[] = [
   "project_spec",
@@ -39,6 +41,10 @@ export function useRunArtifacts(run: Run | undefined): RunArtifactsMap {
     for (const type of ARTIFACT_TYPES) {
       map[type] = run?.artifacts.find((artifact) => artifact.type === type);
     }
+    map.reference_blocks = (run?.artifacts ?? [])
+      .filter((artifact) => artifact.type === "reference_block")
+      .slice()
+      .sort((a, b) => a.path.localeCompare(b.path));
     return map;
   }, [run]);
 }

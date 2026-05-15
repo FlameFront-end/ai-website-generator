@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import type { DesignTokens, ProjectSpec } from '../ai/ai.types';
+import type { CodePlan, DesignTokens, ProjectSpec } from '../ai/ai.types';
 import { AiService } from '../ai/ai.service';
 
 const RESET_OUTPUT_ATTEMPTS = 6;
@@ -25,6 +25,30 @@ export interface ProjectManifest {
   };
 }
 
+export type CodegenArtifactKind =
+  | 'code-plan'
+  | 'content-module'
+  | 'layout-module'
+  | 'sections-module';
+
+export interface CodegenArtifactPayload {
+  kind: CodegenArtifactKind;
+  data: unknown;
+}
+
+export interface GenerateProjectFilesOptions {
+  onCodegenArtifact?: (payload: CodegenArtifactPayload) => Promise<void>;
+  /** data URL of the full-page reference (used to anchor layout). */
+  fullPageImageDataUrl?: string | null;
+  /** Map of section.id → data URL of that section's reference image. */
+  sectionImageMap?: Map<string, string>;
+}
+
+type RepairableCodegenModule =
+  | 'content-module'
+  | 'layout-module'
+  | 'sections-module';
+
 @Injectable()
 export class CodeGeneratorService {
   private readonly logger = new Logger(CodeGeneratorService.name);
@@ -40,24 +64,44 @@ export class CodeGeneratorService {
     designTokens: DesignTokens,
     designDescription: string,
     codePath: string,
+    options: GenerateProjectFilesOptions = {},
   ): Promise<GeneratedFile[]> {
     this.logger.log('Generating project files (scaffolding + AI code)');
 
     let generatedUiFiles: GeneratedFile[];
     try {
-      const aiCode = await this.aiService.generateCode(
+      generatedUiFiles = await this.generateUiFilesWithSplitCodegen(
         brief,
         projectSpec,
         designTokens,
         designDescription,
+        options,
       );
-      generatedUiFiles = this.normalizeGeneratedFiles(aiCode.files);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    } catch (splitError) {
+      const splitMessage =
+        splitError instanceof Error ? splitError.message : String(splitError);
       this.logger.warn(
-        `AI code generation failed, using deterministic fallback: ${message}`,
+        `Split AI code generation failed, falling back to single prompt: ${splitMessage}`,
       );
-      generatedUiFiles = this.createFallbackUiFiles(projectSpec, designTokens);
+
+      try {
+        const aiCode = await this.aiService.generateCode(
+          brief,
+          projectSpec,
+          designTokens,
+          designDescription,
+        );
+        generatedUiFiles = this.normalizeGeneratedFiles(aiCode.files);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `AI code generation failed, using deterministic fallback: ${message}`,
+        );
+        generatedUiFiles = this.createFallbackUiFiles(
+          projectSpec,
+          designTokens,
+        );
+      }
     }
 
     const files: GeneratedFile[] = [
@@ -99,6 +143,287 @@ export class CodeGeneratorService {
     return files;
   }
 
+  private async generateUiFilesWithSplitCodegen(
+    brief: string,
+    projectSpec: ProjectSpec,
+    designTokens: DesignTokens,
+    codegenContext: string,
+    options: GenerateProjectFilesOptions,
+  ): Promise<GeneratedFile[]> {
+    const codePlan = await this.aiService.generateCodePlan(
+      brief,
+      projectSpec,
+      designTokens,
+      codegenContext,
+    );
+    const normalizedPlan = this.normalizeCodePlan(codePlan, projectSpec);
+    await options.onCodegenArtifact?.({
+      kind: 'code-plan',
+      data: normalizedPlan,
+    });
+
+    const contentModule = await this.aiService.generateCodeContent(
+      brief,
+      projectSpec,
+      designTokens,
+      normalizedPlan,
+      codegenContext,
+    );
+    await options.onCodegenArtifact?.({
+      kind: 'content-module',
+      data: contentModule,
+    });
+
+    const contentFiles = JSON.stringify(contentModule.files, null, 2);
+    const layoutModule = await this.aiService.generateCodeLayout(
+      brief,
+      projectSpec,
+      designTokens,
+      normalizedPlan,
+      contentFiles,
+      codegenContext,
+      options.fullPageImageDataUrl ?? null,
+    );
+    await options.onCodegenArtifact?.({
+      kind: 'layout-module',
+      data: layoutModule,
+    });
+
+    const sectionModules: GeneratedFile[] = [];
+    const sectionImageMap =
+      options.sectionImageMap ?? new Map<string, string>();
+
+    for (const section of normalizedPlan.sections) {
+      const sectionImage = sectionImageMap.get(section.id) ?? null;
+      if (sectionImage) {
+        this.logger.log(
+          `Section ${section.id}: attaching reference image (${Math.round(sectionImage.length / 1024)}KB data URL)`,
+        );
+      } else {
+        this.logger.warn(
+          `Section ${section.id}: no reference image available, falling back to text-only prompt`,
+        );
+      }
+
+      const sectionModule = await this.aiService.generateCodeSection(
+        brief,
+        projectSpec,
+        designTokens,
+        normalizedPlan,
+        section,
+        contentFiles,
+        codegenContext,
+        sectionImage,
+      );
+      sectionModules.push(...sectionModule.files);
+    }
+    await options.onCodegenArtifact?.({
+      kind: 'sections-module',
+      data: { files: sectionModules },
+    });
+
+    return this.normalizeGeneratedFilesWithRepair(
+      {
+        contentModuleFiles: contentModule.files,
+        layoutModuleFiles: layoutModule.files,
+        sectionModuleFiles: sectionModules,
+      },
+      brief,
+      projectSpec,
+      designTokens,
+      codegenContext,
+    );
+  }
+
+  private async normalizeGeneratedFilesWithRepair(
+    modules: {
+      contentModuleFiles: GeneratedFile[];
+      layoutModuleFiles: GeneratedFile[];
+      sectionModuleFiles: GeneratedFile[];
+    },
+    brief: string,
+    projectSpec: ProjectSpec,
+    designTokens: DesignTokens,
+    codegenContext: string,
+  ): Promise<GeneratedFile[]> {
+    const files = this.mergeGeneratedFiles([
+      ...modules.contentModuleFiles,
+      ...modules.layoutModuleFiles,
+      ...modules.sectionModuleFiles,
+    ]);
+
+    try {
+      return this.normalizeGeneratedFiles(files);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Split code validation failed, trying module repair: ${message}`,
+      );
+
+      const moduleRepair = await this.tryRepairGeneratedModule(
+        modules,
+        brief,
+        projectSpec,
+        designTokens,
+        message,
+        codegenContext,
+      );
+
+      if (moduleRepair) {
+        try {
+          return this.normalizeGeneratedFiles(moduleRepair);
+        } catch (repairError) {
+          const repairMessage =
+            repairError instanceof Error
+              ? repairError.message
+              : String(repairError);
+          this.logger.warn(
+            `Split module repair failed validation, trying full repair: ${repairMessage}`,
+          );
+        }
+      }
+
+      const repairedCode = await this.aiService.repairCodeFiles(
+        brief,
+        projectSpec,
+        designTokens,
+        message,
+        files,
+        codegenContext,
+      );
+
+      return this.normalizeGeneratedFiles(repairedCode.files);
+    }
+  }
+
+  private async tryRepairGeneratedModule(
+    modules: {
+      contentModuleFiles: GeneratedFile[];
+      layoutModuleFiles: GeneratedFile[];
+      sectionModuleFiles: GeneratedFile[];
+    },
+    brief: string,
+    projectSpec: ProjectSpec,
+    designTokens: DesignTokens,
+    validationError: string,
+    codegenContext: string,
+  ): Promise<GeneratedFile[] | null> {
+    const targetModule = this.inferRepairableModule(validationError);
+    const moduleFiles = this.getModuleFiles(modules, targetModule);
+    const contextFiles = this.mergeGeneratedFiles([
+      ...modules.contentModuleFiles,
+      ...modules.layoutModuleFiles,
+      ...modules.sectionModuleFiles,
+    ]).filter(
+      (file) =>
+        !moduleFiles.some((moduleFile) => moduleFile.path === file.path),
+    );
+
+    try {
+      const repairedModule = await this.aiService.repairCodeModule(
+        brief,
+        projectSpec,
+        designTokens,
+        targetModule,
+        validationError,
+        moduleFiles,
+        contextFiles,
+        codegenContext,
+      );
+
+      return this.mergeGeneratedFiles([
+        ...contextFiles,
+        ...repairedModule.files,
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Split module repair failed: ${message}`);
+      return null;
+    }
+  }
+
+  private inferRepairableModule(errorMessage: string): RepairableCodegenModule {
+    if (
+      errorMessage.includes('src/content/') ||
+      errorMessage.includes('src/config/')
+    ) {
+      return 'content-module';
+    }
+
+    if (
+      errorMessage.includes('src/app/') ||
+      errorMessage.includes('src/components/landing/landing-page.tsx') ||
+      errorMessage.includes('required Next.js files')
+    ) {
+      return 'layout-module';
+    }
+
+    return 'sections-module';
+  }
+
+  private getModuleFiles(
+    modules: {
+      contentModuleFiles: GeneratedFile[];
+      layoutModuleFiles: GeneratedFile[];
+      sectionModuleFiles: GeneratedFile[];
+    },
+    targetModule: RepairableCodegenModule,
+  ): GeneratedFile[] {
+    if (targetModule === 'content-module') {
+      return modules.contentModuleFiles;
+    }
+
+    if (targetModule === 'layout-module') {
+      return modules.layoutModuleFiles;
+    }
+
+    return modules.sectionModuleFiles;
+  }
+
+  private normalizeCodePlan(
+    codePlan: CodePlan,
+    projectSpec: ProjectSpec,
+  ): CodePlan {
+    const plannedSections =
+      codePlan.sections?.length > 0
+        ? codePlan.sections
+        : projectSpec.sections.map((section) => ({
+            id: section.id,
+            componentName: this.toPascalCase(`${section.id}-section`),
+            filePath: `src/components/landing/${section.id}.tsx`,
+            purpose: section.goal,
+          }));
+
+    return {
+      architecture:
+        codePlan.architecture || 'Next.js App Router landing page modules',
+      files: codePlan.files ?? [],
+      sections: plannedSections,
+      sharedComponents: codePlan.sharedComponents ?? [],
+    };
+  }
+
+  private mergeGeneratedFiles(files: GeneratedFile[]): GeneratedFile[] {
+    const byPath = new Map<string, GeneratedFile>();
+
+    for (const file of files) {
+      byPath.set(file.path.replaceAll('\\', '/'), {
+        path: file.path.replaceAll('\\', '/'),
+        content: file.content,
+      });
+    }
+
+    return [...byPath.values()];
+  }
+
+  private toPascalCase(value: string): string {
+    return value
+      .split(/[^a-zа-я0-9]+/gi)
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join('');
+  }
+
   /**
    * Generate project manifest
    */
@@ -134,6 +459,66 @@ export class CodeGeneratorService {
       designTokens,
       designDescription,
     );
+  }
+
+  async repairProjectFilesAfterBuildFailure(
+    brief: string,
+    projectSpec: ProjectSpec,
+    designTokens: DesignTokens,
+    buildError: string,
+    codegenContext: string,
+    codePath: string,
+  ): Promise<GeneratedFile[]> {
+    const currentFiles = await this.readGeneratedUiFiles(codePath);
+    const repairedCode = await this.aiService.repairCodeFiles(
+      brief,
+      projectSpec,
+      designTokens,
+      buildError,
+      currentFiles,
+      codegenContext,
+    );
+    const repairedFiles = this.normalizeGeneratedFiles(repairedCode.files);
+
+    await this.writeFiles(repairedFiles, codePath);
+
+    return repairedFiles;
+  }
+
+  private async readGeneratedUiFiles(
+    basePath: string,
+  ): Promise<GeneratedFile[]> {
+    const files: GeneratedFile[] = [];
+    const allowedExtensions = new Set(['.ts', '.tsx', '.css']);
+
+    const walk = async (dir: string): Promise<void> => {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const absolutePath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(absolutePath);
+          continue;
+        }
+
+        const relativePath = path
+          .relative(basePath, absolutePath)
+          .replaceAll('\\', '/');
+        if (
+          relativePath.startsWith('src/') &&
+          allowedExtensions.has(path.extname(relativePath))
+        ) {
+          files.push({
+            path: relativePath,
+            content: await fs.readFile(absolutePath, 'utf8'),
+          });
+        }
+      }
+    };
+
+    await walk(path.join(basePath, 'src'));
+
+    return files;
   }
 
   private async writeFiles(
@@ -253,7 +638,12 @@ export default nextConfig;
           },
           plugins: [{ name: 'next' }],
         },
-        include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+        include: [
+          'next-env.d.ts',
+          '**/*.ts',
+          '**/*.tsx',
+          '.next/types/**/*.ts',
+        ],
         exclude: ['node_modules'],
       },
       null,
@@ -455,16 +845,27 @@ npm run build
 
   private normalizeGeneratedFiles(files: GeneratedFile[]): GeneratedFile[] {
     const allowedExtensions = new Set(['.ts', '.tsx', '.css']);
+    const forbiddenPaths = new Set([
+      'package.json',
+      'next.config.mjs',
+      'tsconfig.json',
+      'tailwind.config.ts',
+      'postcss.config.mjs',
+      'next-env.d.ts',
+      'README.md',
+    ]);
 
     const normalizedFiles = files
       .filter((file) => {
         const normalizedPath = file.path.replaceAll('\\', '/');
+        const canonicalPath = this.canonicalizeGeneratedPath(normalizedPath);
         const extension = path.extname(normalizedPath);
 
         return (
           normalizedPath &&
           !path.isAbsolute(normalizedPath) &&
           !normalizedPath.split('/').includes('..') &&
+          !forbiddenPaths.has(canonicalPath) &&
           allowedExtensions.has(extension)
         );
       })
@@ -472,6 +873,20 @@ npm run build
         path: this.canonicalizeGeneratedPath(file.path.replaceAll('\\', '/')),
         content: file.content,
       }));
+
+    const duplicatePaths = this.findDuplicateGeneratedPaths(normalizedFiles);
+    if (duplicatePaths.length > 0) {
+      throw new Error(
+        `AI returned duplicate files after path normalization: ${duplicatePaths.join(', ')}`,
+      );
+    }
+
+    const emptyFiles = normalizedFiles
+      .filter((file) => !file.content.trim())
+      .map((file) => file.path);
+    if (emptyFiles.length > 0) {
+      throw new Error(`AI returned empty files: ${emptyFiles.join(', ')}`);
+    }
 
     const requiredPaths = [
       'src/app/page.tsx',
@@ -496,6 +911,20 @@ npm run build
     this.validateGeneratedFileReferences(normalizedFiles);
 
     return normalizedFiles;
+  }
+
+  private findDuplicateGeneratedPaths(files: GeneratedFile[]): string[] {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+
+    for (const file of files) {
+      if (seen.has(file.path)) {
+        duplicates.add(file.path);
+      }
+      seen.add(file.path);
+    }
+
+    return [...duplicates];
   }
 
   private canonicalizeGeneratedPath(filePath: string): string {
@@ -540,6 +969,12 @@ npm run build
           specifier,
           currentDir,
         );
+
+        if (specifier.startsWith('../')) {
+          throw new Error(
+            `AI returned ${file.path} with parent-directory import: ${specifier}`,
+          );
+        }
 
         if (!resolvedPath) {
           continue;

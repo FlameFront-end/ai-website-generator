@@ -70,10 +70,7 @@ function buildDatabaseUrl(): string {
 
   const host =
     env.POSTGRES_HOST ??
-    envOrDefault(
-      env.DB_HOST,
-      defaultForEnvironment('localhost', 'postgres'),
-    );
+    envOrDefault(env.DB_HOST, defaultForEnvironment('localhost', 'postgres'));
   const port = env.POSTGRES_PORT ?? env.DB_PORT;
   const user = env.POSTGRES_USER ?? env.DB_USER;
   const password = env.POSTGRES_PASSWORD ?? env.DB_PASSWORD;
@@ -87,7 +84,8 @@ export type AiProviderType =
   | 'openai'
   | 'openrouter'
   | 'llm7'
-  | 'replicate';
+  | 'replicate'
+  | 'chatgpt';
 export type AiProviderRole = 'analysis' | 'image' | 'code';
 
 function normalizeTimeout(timeout: string): number | undefined {

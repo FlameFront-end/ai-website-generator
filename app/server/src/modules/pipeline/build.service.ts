@@ -9,8 +9,6 @@ import { PipelineStateService } from './pipeline-state.service';
 
 const execAsync = promisify(exec);
 const BUILD_TIMEOUT_MS = 120_000;
-const MAX_BUILD_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 2000;
 
 @Injectable()
 export class BuildService {
@@ -27,6 +25,16 @@ export class BuildService {
     userId: string,
     attempt = 1,
   ): Promise<RunEntity> {
+    const result = await this.buildProjectOnce(run, slug, userId, attempt);
+    return result.run;
+  }
+
+  async buildProjectOnce(
+    run: RunEntity,
+    slug: string,
+    userId: string,
+    attempt = 1,
+  ): Promise<{ run: RunEntity; error?: string }> {
     const buildRun = await this.state.updateRunStatus(
       run,
       RunStatus.Running,
@@ -54,12 +62,13 @@ export class BuildService {
       });
 
       await this.state.addLog(run.id, 'Сборка прошла успешно');
-      return this.state.updateRunStatus(
+      const updatedRun = await this.state.updateRunStatus(
         buildRun,
         RunStatus.Completed,
         'built',
         userId,
       );
+      return { run: updatedRun };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Build failed (attempt ${attempt}): ${message}`);
@@ -67,17 +76,13 @@ export class BuildService {
         error: message,
       });
 
-      if (attempt < MAX_BUILD_ATTEMPTS) {
-        await this.state.sleep(RETRY_DELAY_MS);
-        return this.buildProject(run, slug, userId, attempt + 1);
-      }
-
-      return this.state.updateRunStatus(
+      const updatedRun = await this.state.updateRunStatus(
         buildRun,
         RunStatus.BuildFailed,
         'build_failed',
         userId,
       );
+      return { run: updatedRun, error: message };
     }
   }
 }

@@ -3,8 +3,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import type {
   BriefClarificationAnswer,
   BriefClarificationResult,
+  CodePlan,
+  CodePlanSection,
   DesignDescription,
   DesignTokens,
+  GeneratedContentModule,
+  GeneratedLayoutModule,
+  GeneratedSectionModule,
   ProjectSpec,
 } from './ai.types';
 import { AiProviderRegistry } from './providers/ai-provider.registry';
@@ -14,6 +19,12 @@ import { buildDesignDescriptionMessages } from './prompts/design-description.pro
 import { buildGenerateCodeMessages } from './prompts/generate-code.prompt';
 import { buildGenerateSvgMessages } from './prompts/generate-svg.prompt';
 import { buildClarifyBriefMessages } from './prompts/clarify-brief.prompt';
+import { buildCodePlanMessages } from './prompts/code-plan.prompt';
+import { buildGenerateContentMessages } from './prompts/generate-content.prompt';
+import { buildGenerateLayoutMessages } from './prompts/generate-layout.prompt';
+import { buildGenerateSectionMessages } from './prompts/generate-section.prompt';
+import { buildRepairCodeFilesMessages } from './prompts/repair-code-files.prompt';
+import { buildRepairCodeModuleMessages } from './prompts/repair-code-module.prompt';
 
 export type { DesignDescription, DesignTokens, ProjectSpec };
 
@@ -31,11 +42,12 @@ export class AiService {
   async clarifyBrief(
     brief: string,
     answers: BriefClarificationAnswer[] = [],
+    siteLanguage?: string,
   ): Promise<BriefClarificationResult> {
     this.logger.log('Clarifying brief via AI');
 
     const result = await this.providers.chat('analysis', {
-      messages: buildClarifyBriefMessages(brief, answers),
+      messages: buildClarifyBriefMessages(brief, answers, siteLanguage),
       json: true,
       temperature: 0.35,
       maxTokens: 4096,
@@ -46,26 +58,42 @@ export class AiService {
       'BriefClarificationResult',
     );
 
-    return this.sanitizeClarificationResult(brief, answers, parsed);
+    return this.sanitizeClarificationResult(
+      brief,
+      answers,
+      parsed,
+      siteLanguage,
+    );
   }
 
   private sanitizeClarificationResult(
     brief: string,
     answers: BriefClarificationAnswer[],
     result: BriefClarificationResult,
+    siteLanguage?: string,
   ): BriefClarificationResult {
-    if (result.status !== 'needs_clarification') {
+    const sanitizedResult = {
+      ...result,
+      understoodSummary: this.sanitizeUnderstoodSummary(
+        brief,
+        result.understoodSummary ?? '',
+        siteLanguage,
+      ),
+    };
+
+    if (sanitizedResult.status !== 'needs_clarification') {
       return {
-        ...result,
+        ...sanitizedResult,
         projectTitle:
-          result.projectTitle?.trim() || this.buildFallbackProjectTitle(brief),
+          sanitizedResult.projectTitle?.trim() ||
+          this.buildFallbackProjectTitle(brief),
       };
     }
 
     const previousQuestions = answers.map((answer) =>
       this.normalizeQuestion(answer.question),
     );
-    const questions = result.questions.filter((question) => {
+    const questions = sanitizedResult.questions.filter((question) => {
       const normalized = this.normalizeQuestion(question.question);
       return (
         !this.isBannedClarificationQuestion(normalized) &&
@@ -80,18 +108,47 @@ export class AiService {
 
     if (questions.length > 0) {
       return {
-        ...result,
+        ...sanitizedResult,
         questions: questions.slice(0, 1),
       };
     }
 
     return {
-      ...result,
+      ...sanitizedResult,
       status: 'ready',
       projectTitle: this.buildFallbackProjectTitle(brief),
       questions: [],
       finalBrief: this.buildFallbackFinalBrief(brief, answers),
     };
+  }
+
+  private sanitizeUnderstoodSummary(
+    brief: string,
+    understoodSummary: string,
+    siteLanguage?: string,
+  ): string {
+    if (siteLanguage !== 'ru' || !this.looksEnglish(understoodSummary)) {
+      return understoodSummary;
+    }
+
+    const firstSentence = brief
+      .trim()
+      .split(/(?<=[.!?。])\s+/u)
+      .find(Boolean);
+
+    return [
+      'Понятно, что нужно создать современный сайт на основе вашего брифа.',
+      firstSentence
+        ? `Основная идея: ${firstSentence}`
+        : 'Я учту аудиторию, цель, структуру, визуальный стиль и ключевое действие пользователя.',
+    ].join(' ');
+  }
+
+  private looksEnglish(value: string): boolean {
+    const latinMatches = value.match(/[a-z]/gi)?.length ?? 0;
+    const cyrillicMatches = value.match(/[а-яё]/gi)?.length ?? 0;
+
+    return latinMatches > cyrillicMatches;
   }
 
   private normalizeQuestion(question: string) {
@@ -257,6 +314,184 @@ export class AiService {
     return this.parseJson<{ files: GeneratedCodeFile[] }>(
       result.content,
       'GeneratedCode',
+    );
+  }
+
+  async generateCodePlan(
+    brief: string,
+    spec: ProjectSpec,
+    tokens: DesignTokens,
+    codegenContext: string,
+  ): Promise<CodePlan> {
+    this.logger.log('Generating frontend code plan via AI');
+
+    const result = await this.providers.chat('code', {
+      messages: buildCodePlanMessages(brief, spec, tokens, codegenContext),
+      json: true,
+      temperature: 0.2,
+      maxTokens: 4096,
+    });
+
+    return this.parseJson<CodePlan>(result.content, 'CodePlan');
+  }
+
+  async generateCodeContent(
+    brief: string,
+    spec: ProjectSpec,
+    tokens: DesignTokens,
+    codePlan: CodePlan,
+    codegenContext: string,
+  ): Promise<{ files: GeneratedContentModule[] }> {
+    this.logger.log('Generating frontend content files via AI');
+
+    const result = await this.providers.chat('code', {
+      messages: buildGenerateContentMessages(
+        brief,
+        spec,
+        tokens,
+        codePlan,
+        codegenContext,
+      ),
+      json: true,
+      temperature: 0.25,
+      maxTokens: 8192,
+    });
+
+    return this.parseJson<{ files: GeneratedContentModule[] }>(
+      result.content,
+      'GeneratedContent',
+    );
+  }
+
+  async generateCodeLayout(
+    brief: string,
+    spec: ProjectSpec,
+    tokens: DesignTokens,
+    codePlan: CodePlan,
+    contentFiles: string,
+    codegenContext: string,
+    fullPageImageDataUrl: string | null,
+  ): Promise<GeneratedLayoutModule> {
+    this.logger.log('Generating frontend layout files via AI');
+
+    const result = await this.providers.chat('code', {
+      messages: buildGenerateLayoutMessages(
+        brief,
+        spec,
+        tokens,
+        codePlan,
+        contentFiles,
+        codegenContext,
+        fullPageImageDataUrl,
+      ),
+      json: true,
+      temperature: 0.25,
+      maxTokens: 8192,
+    });
+
+    return this.parseJson<GeneratedLayoutModule>(
+      result.content,
+      'GeneratedLayout',
+    );
+  }
+
+  async generateCodeSection(
+    brief: string,
+    spec: ProjectSpec,
+    tokens: DesignTokens,
+    codePlan: CodePlan,
+    section: CodePlanSection,
+    contentFiles: string,
+    codegenContext: string,
+    sectionImageDataUrl: string | null,
+  ): Promise<GeneratedSectionModule> {
+    this.logger.log(`Generating frontend section via AI: ${section.id}`);
+
+    const result = await this.providers.chat('code', {
+      messages: buildGenerateSectionMessages(
+        brief,
+        spec,
+        tokens,
+        codePlan,
+        section,
+        contentFiles,
+        codegenContext,
+        sectionImageDataUrl,
+      ),
+      json: true,
+      temperature: 0.3,
+      maxTokens: 8192,
+    });
+
+    return this.parseJson<GeneratedSectionModule>(
+      result.content,
+      'GeneratedSection',
+    );
+  }
+
+  async repairCodeFiles(
+    brief: string,
+    spec: ProjectSpec,
+    tokens: DesignTokens,
+    validationError: string,
+    files: GeneratedCodeFile[],
+    codegenContext: string,
+  ): Promise<{ files: GeneratedCodeFile[] }> {
+    this.logger.log('Repairing generated frontend files via AI');
+
+    const result = await this.providers.chat('code', {
+      messages: buildRepairCodeFilesMessages(
+        brief,
+        spec,
+        tokens,
+        validationError,
+        files,
+        codegenContext,
+      ),
+      json: true,
+      temperature: 0.15,
+      maxTokens: 16384,
+    });
+
+    return this.parseJson<{ files: GeneratedCodeFile[] }>(
+      result.content,
+      'RepairedCodeFiles',
+    );
+  }
+
+  async repairCodeModule(
+    brief: string,
+    spec: ProjectSpec,
+    tokens: DesignTokens,
+    targetModule: string,
+    validationError: string,
+    moduleFiles: GeneratedCodeFile[],
+    contextFiles: GeneratedCodeFile[],
+    codegenContext: string,
+  ): Promise<{ files: GeneratedCodeFile[] }> {
+    this.logger.log(
+      `Repairing generated frontend module via AI: ${targetModule}`,
+    );
+
+    const result = await this.providers.chat('code', {
+      messages: buildRepairCodeModuleMessages(
+        brief,
+        spec,
+        tokens,
+        targetModule,
+        validationError,
+        moduleFiles,
+        contextFiles,
+        codegenContext,
+      ),
+      json: true,
+      temperature: 0.15,
+      maxTokens: 8192,
+    });
+
+    return this.parseJson<{ files: GeneratedCodeFile[] }>(
+      result.content,
+      'RepairedCodeModule',
     );
   }
 
