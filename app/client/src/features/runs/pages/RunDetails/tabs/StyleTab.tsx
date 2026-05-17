@@ -183,6 +183,7 @@ export const StyleTab: FC<StyleTabProps> = ({
   onSelected,
 }) => {
   const [selectingId, setSelectingId] = useState<string | null>(null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const canSelect = status === "awaiting_style_selection";
   const variantsQuery = useArtifactContentQuery(runId, variantsArtifact?.id);
@@ -199,6 +200,7 @@ export const StyleTab: FC<StyleTabProps> = ({
     () => parseSelectedStyle(selectedQuery.data?.content),
     [selectedQuery.data?.content],
   );
+  const selectedStyleId = localSelectedId ?? selectedStyle?.id ?? null;
 
   const imageByVariantId = useMemo(() => {
     const map = new Map<string, RunArtifact>();
@@ -213,10 +215,14 @@ export const StyleTab: FC<StyleTabProps> = ({
   }, [imageArtifacts]);
 
   const handleSelect = async (variantId: string) => {
+    setLocalSelectedId(variantId);
     setSelectingId(variantId);
     try {
       await runsApi.selectStyle(runId, { styleVariantId: variantId });
       onSelected?.();
+    } catch (error) {
+      setLocalSelectedId(selectedStyle?.id ?? null);
+      throw error;
     } finally {
       setSelectingId(null);
     }
@@ -298,7 +304,7 @@ export const StyleTab: FC<StyleTabProps> = ({
                     runId={runId}
                     variant={variant}
                     artifact={artifact}
-                    selected={selectedStyle?.id === variant.id}
+                    selected={selectedStyleId === variant.id}
                     isSelecting={selectingId === variant.id}
                     canSelect={canSelect}
                     index={index}

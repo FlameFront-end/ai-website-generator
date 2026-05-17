@@ -45,7 +45,7 @@ interface ReferenceBlockProps {
   runId: string;
   artifact: RunArtifact;
   index: number;
-  onClick?: () => void;
+  onClick?: (src: string) => void;
 }
 
 /**
@@ -97,19 +97,21 @@ const ReferenceBlock: FC<ReferenceBlockProps> = ({
         <span className={refStyles.blockMeta}>{meta.fileName}</span>
       </header>
 
-      {fileQuery.isError ? (
-        <div className={refStyles.blockError}>
-          Не удалось загрузить блок {index + 1}
-        </div>
-      ) : fileQuery.url ? (
-        <img
-          className={refStyles.blockImage}
-          src={fileQuery.url}
-          alt={`Блок ${index + 1} — ${meta.sectionId}`}
-          onClick={onClick}
-          style={{ cursor: "pointer" }}
-        />
-      ) : null}
+      <div className={refStyles.imageWrap}>
+        {fileQuery.isError ? (
+          <div className={refStyles.blockError}>
+            Не удалось загрузить блок {index + 1}
+          </div>
+        ) : fileQuery.url ? (
+          <img
+            className={refStyles.blockImage}
+            src={fileQuery.url}
+            alt={`Блок ${index + 1} — ${meta.sectionId}`}
+            onClick={() => onClick?.(fileQuery.url || "")}
+            style={{ cursor: "pointer" }}
+          />
+        ) : null}
+      </div>
     </figure>
   );
 };
@@ -149,85 +151,80 @@ export const ReferenceTab: FC<ReferenceTabProps> = ({
   ) : null;
 
   return (
-    <div className={styles.previewPanel}>
-      <div className={refStyles.root}>
-        <div className={refStyles.header}>
-          <h2>Визуальный референс</h2>
-          {headerStatus}
-        </div>
-
-        {!hasBlocks && !hasFullPage && (
-          <div className={refStyles.blocks}>
-            {Array.from({ length: PLACEHOLDER_BLOCKS_WHEN_EMPTY }).map(
-              (_, index) => (
-                <SkeletonBlock
-                  key={`placeholder-${index}`}
-                  index={index}
-                  pending={index === 0}
-                />
-              ),
-            )}
-          </div>
-        )}
-
-        {hasBlocks && (
-          <ImageViewerGallery
-            images={blocks.map((block, index) => {
-              const meta = parseBlockMeta(block.path, index);
-              return {
-                src: `/api/runs/${runId}/artifacts/${block.id}/file`,
-                alt: `Блок ${index + 1} — ${meta.sectionId}`,
-              };
-            })}
-          >
-            {({ openGallery }) => (
-              <div className={refStyles.blocks}>
-                {blocks.map((block, index) => (
-                  <ReferenceBlock
-                    key={block.id}
-                    runId={runId}
-                    artifact={block}
-                    index={index}
-                    onClick={() => openGallery(index)}
-                  />
-                ))}
-                {isGenerating && (
-                  <SkeletonBlock index={blocks.length} pending />
-                )}
-              </div>
-            )}
-          </ImageViewerGallery>
-        )}
-
-        {hasFullPage && !hasBlocks && (
-          <section className={refStyles.fullPage}>
-            {fullPageQuery.isError ? (
-              <p className={styles.error}>
-                Не удалось загрузить финальный референс. Возможно, файл не
-                найден.
-              </p>
-            ) : fullPageQuery.url ? (
-              <ImageViewerGallery
-                images={[
-                  {
-                    src: fullPageQuery.url || "",
-                    alt: "Визуальный референс — полная сборка",
-                  },
-                ]}
-              >
-                {({ openGallery }) => (
-                  <img
-                    src={fullPageQuery.url || ""}
-                    alt="Визуальный референс — полная сборка"
-                    onClick={() => openGallery(0)}
-                    style={{ cursor: "pointer", maxWidth: "100%" }}
-                  />
-                )}
-              </ImageViewerGallery>
-            ) : null}
-          </section>
-        )}
+    <div className={refStyles.root}>
+      <div className={refStyles.header}>
+        <h2>Визуальный референс</h2>
+        {headerStatus}
       </div>
+
+      {!hasBlocks && !hasFullPage && (
+        <div className={refStyles.blocks}>
+          {Array.from({ length: PLACEHOLDER_BLOCKS_WHEN_EMPTY }).map(
+            (_, index) => (
+              <SkeletonBlock
+                key={`placeholder-${index}`}
+                index={index}
+                pending={index === 0}
+              />
+            ),
+          )}
+        </div>
+      )}
+
+      {hasBlocks && (
+        <ImageViewerGallery
+          images={blocks.map((block, index) => {
+            const meta = parseBlockMeta(block.path, index);
+            return {
+              src: `/api/runs/${runId}/artifacts/${block.id}/file`,
+              alt: `Блок ${index + 1} — ${meta.sectionId}`,
+            };
+          })}
+        >
+          {({ openGallery }) => (
+            <div className={refStyles.blocks}>
+              {blocks.map((block, index) => (
+                <ReferenceBlock
+                  key={block.id}
+                  runId={runId}
+                  artifact={block}
+                  index={index}
+                  onClick={(src) => openGallery(index, src)}
+                />
+              ))}
+              {isGenerating && <SkeletonBlock index={blocks.length} pending />}
+            </div>
+          )}
+        </ImageViewerGallery>
+      )}
+
+      {hasFullPage && !hasBlocks && (
+        <section className={refStyles.fullPage}>
+          {fullPageQuery.isError ? (
+            <p className={styles.error}>
+              Не удалось загрузить финальный референс. Возможно, файл не найден.
+            </p>
+          ) : fullPageQuery.url ? (
+            <ImageViewerGallery
+              images={[
+                {
+                  src: fullPageQuery.url || "",
+                  alt: "Визуальный референс — полная сборка",
+                },
+              ]}
+            >
+              {({ openGallery }) => (
+                <img
+                  src={fullPageQuery.url || ""}
+                  alt="Визуальный референс — полная сборка"
+                  onClick={() => openGallery(0)}
+                  style={{ cursor: "pointer", maxWidth: "100%" }}
+                />
+              )}
+            </ImageViewerGallery>
+          ) : null}
+        </section>
+      )}
     </div>
   );
 };
