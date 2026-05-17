@@ -15,12 +15,21 @@ export function getProgress(step: string | null, status: string): number {
 }
 
 export function formatArtifactType(artifact: RunArtifact): string {
+  if (artifact.type === "style_variant_image") {
+    return `Превью стиля: ${humanizeTechnicalKey(getArtifactFileStem(artifact.path))}`;
+  }
+
   return ARTIFACT_LABELS[artifact.type] || humanizeTechnicalKey(artifact.type);
 }
 
 export function humanizeTechnicalKey(value: string): string {
   const normalized = value.replace(/[_-]+/g, " ");
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function getArtifactFileStem(path: string): string {
+  const fileName = path.split("/").pop() ?? path;
+  return fileName.replace(/\.[^.]+$/, "");
 }
 
 const LOG_MESSAGE_LABELS: Record<string, string> = {
@@ -41,7 +50,7 @@ const LOG_MESSAGE_LABELS: Record<string, string> = {
   "Начата генерация клиентского проекта": "Генерируем код сайта",
   "Клиентский проект сгенерирован": "Код сайта готов",
   "Ожидание подтверждения кода": "Проверьте код и подтвердите шаг",
-  "Шаг \"Код\" подтверждён": "Код подтверждён",
+  'Шаг "Код" подтверждён': "Код подтверждён",
   "Установка зависимостей...": "Устанавливаем зависимости",
   "Сборка проекта...": "Проверяем production-сборку",
   "Сборка завершена успешно": "Сборка прошла успешно",
@@ -58,8 +67,7 @@ const LOG_MESSAGE_LABELS: Record<string, string> = {
   "Ожидание финального подтверждения": "Проверьте результат и завершите проект",
   "Проект завершён": "Проект завершён",
   "Пайплайн завершился ошибкой": "Процесс остановлен из-за ошибки",
-  "Запрошен перезапуск генерации кода":
-    "Запрос на перегенерацию кода принят",
+  "Запрошен перезапуск генерации кода": "Запрос на перегенерацию кода принят",
   "Запущен перезапуск шага кода проекта": "Перегенерируем код сайта",
   "Код перегенерирован": "Код сайта перегенерирован",
   "Запущена ручная пересборка": "Запущена повторная сборка",
@@ -68,10 +76,13 @@ const LOG_MESSAGE_LABELS: Record<string, string> = {
 export function translateLogMessage(message: string): string {
   const translated = LOG_MESSAGE_LABELS[message] ?? message;
 
-  const withStepLabels = translated.replace(/"([^"]+)"/g, (match, key: string) => {
-    const label = STEP_LABELS[key];
-    return label ? `"${label}"` : match;
-  });
+  const withStepLabels = translated.replace(
+    /"([^"]+)"/g,
+    (match, key: string) => {
+      const label = STEP_LABELS[key];
+      return label ? `"${label}"` : match;
+    },
+  );
 
   return withStepLabels
     .replace(/^Попытка сборки (\d+)$/, "Проверка сборки: попытка $1")

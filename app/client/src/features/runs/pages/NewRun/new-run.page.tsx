@@ -619,6 +619,14 @@ function NewRunDraftPage({
   );
 }
 
-function buildLocalizedBrief(brief: string, _siteLanguage: string) {
-  return brief.trim();
+function buildLocalizedBrief(brief: string, siteLanguage: string) {
+  const languageName = siteLanguage === "en" ? "English" : "Russian";
+
+  return [
+    `Target site language: ${languageName}`,
+    `Generate all user-facing website copy, style option names, style option descriptions, design labels, metadata, and UI labels in ${languageName}.`,
+    "Keep internal technical instructions in English.",
+    "",
+    brief.trim(),
+  ].join("\n");
 }

@@ -21,7 +21,7 @@ import {
   useUpdateRunMutation,
 } from "@/api/services/runs";
 import type { Run } from "@/api/services/runs";
-import { Input, Modal, Spinner } from "@/kit";
+import { Input, Modal } from "@/kit";
 import { ROUTES } from "@/model";
 
 import { formatStep } from "../RunDetails/utils";
@@ -31,6 +31,7 @@ import {
   saveBriefDraft,
   type BriefDraft,
 } from "../../lib/brief-drafts";
+import { stripTechnicalBriefPrefix } from "../../lib/brief-display";
 import { getRunTitle } from "../../lib/run-title";
 
 import styles from "./runs-list.module.scss";
@@ -188,9 +189,10 @@ export default function RunsListPage() {
       <div className={styles.projectsGrid}>
         <aside className={styles.runs}>
           {runsQuery.isLoading && (
-            <div className={styles.emptyState}>
-              <Spinner size={18} />
-              Загружаем проекты...
+            <div className={styles.runsList} aria-label="Загружаем проекты">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <ProjectCardSkeleton key={index} />
+              ))}
             </div>
           )}
           {runsQuery.isError && (
@@ -488,6 +490,46 @@ function getDraftTitle(draft: BriefDraft) {
   return firstLine ?? "Новый проект";
 }
 
+function ProjectCardSkeleton() {
+  return (
+    <div className={styles.runItem} aria-hidden="true">
+      <div className={`${styles.runButton} ${styles.skeletonCard}`}>
+        <div className={styles.cardHeader}>
+          <span className={`${styles.skeletonLine} ${styles.skeletonTitle}`} />
+          <div className={styles.cardHeaderRight}>
+            <span
+              className={`${styles.skeletonLine} ${styles.skeletonBadge}`}
+            />
+            <span className={styles.skeletonActions}>
+              <span />
+              <span />
+              <span />
+            </span>
+          </div>
+        </div>
+        <div className={styles.skeletonDescription}>
+          <span className={styles.skeletonLine} />
+          <span className={styles.skeletonLine} />
+        </div>
+        <div className={styles.cardMeta}>
+          <span>
+            <span className={styles.skeletonIcon} />
+            <span
+              className={`${styles.skeletonLine} ${styles.skeletonMetaLine}`}
+            />
+          </span>
+          <span>
+            <span className={styles.skeletonIcon} />
+            <span
+              className={`${styles.skeletonLine} ${styles.skeletonMetaLine}`}
+            />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getDraftCardId(draftId: string) {
   return `draft:${draftId}`;
 }
@@ -553,7 +595,7 @@ function getDraftDescription(draft: BriefDraft) {
 
 function getRunDescription(run: Run) {
   const title = getRunTitle(run);
-  const preview = getBriefPreview(run.brief);
+  const preview = getBriefPreview(stripTechnicalBriefPrefix(run.brief));
 
   if (isSameText(title, preview)) return getRunMeta(run);
   return preview;

@@ -2,6 +2,8 @@ import type { FC } from "react";
 
 import type { Run } from "@/api/services/runs";
 
+import { stripTechnicalBriefPrefix } from "@/features/runs/lib";
+
 import { formatArtifactType } from "../utils";
 
 interface OverviewTabProps {
@@ -28,7 +30,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({ run, styles }) => {
     <div className={styles.overviewGrid}>
       <div className={styles.panel}>
         <h2>Бриф</h2>
-        <pre>{run.brief}</pre>
+        <pre>{stripTechnicalBriefPrefix(run.brief)}</pre>
       </div>
 
       <div className={`${styles.panel} ${styles.overviewArtifactsPanel}`}>

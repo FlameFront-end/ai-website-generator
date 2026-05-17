@@ -3,9 +3,8 @@ import type { RunDetailsTab } from "./types";
 export const STEP_LABELS: Record<string, string> = {
   queued: "В очереди",
   prepare_brief: "Подготовка брифа",
-  project_spec_ready: "Спецификация проекта готова",
-  prepare_design_artifacts: "Подготовка описания дизайна",
-  design_artifacts_ready: "Описание дизайна и токены готовы",
+  generate_style_variants: "Подбираем визуальные направления",
+  awaiting_style_selection: "Выберите визуальный стиль",
   prepare_reference_image: "Подготовка визуального референса",
   reference_ready: "Визуальный референс готов",
   prepare_frontend_project: "Генерация клиентского проекта",
@@ -24,25 +23,21 @@ export const STEP_LABELS: Record<string, string> = {
   build_failed: "Ошибка сборки",
   screenshots_failed: "Ошибка создания скриншотов",
   visual_qa_failed: "Ошибка визуального анализа",
-  awaiting_spec_approval: "Ожидание подтверждения спецификации",
-  awaiting_design_approval: "Ожидание подтверждения дизайна",
   awaiting_reference_approval: "Ожидание подтверждения референса",
   awaiting_code_approval: "Ожидание подтверждения кода",
   awaiting_final_approval: "Ожидание финального подтверждения",
-  spec: "Спецификация",
-  design: "Дизайн",
+  style: "Визуальный стиль",
   reference: "Референс",
   final: "Финальная проверка",
 };
 
 export const STEP_PROGRESS: Record<string, number> = {
   queued: 5,
-  prepare_brief: 15,
-  project_spec_ready: 25,
-  prepare_design_artifacts: 35,
-  design_artifacts_ready: 45,
-  prepare_reference_image: 55,
-  reference_ready: 65,
+  prepare_brief: 10,
+  generate_style_variants: 20,
+  awaiting_style_selection: 25,
+  prepare_reference_image: 50,
+  reference_ready: 60,
   prepare_frontend_project: 75,
   build_project: 80,
   build_success: 85,
@@ -55,18 +50,18 @@ export const STEP_PROGRESS: Record<string, number> = {
   build_failed: 100,
   screenshots_failed: 100,
   visual_qa_failed: 100,
-  awaiting_spec_approval: 25,
-  awaiting_design_approval: 45,
-  awaiting_reference_approval: 65,
+  awaiting_reference_approval: 60,
   awaiting_code_approval: 75,
   awaiting_final_approval: 98,
 };
 
 export const ARTIFACT_LABELS: Record<string, string> = {
-  project_spec: "Спецификация проекта",
+  style_variants: "Варианты визуального стиля",
+  style_variant_image: "Превью варианта стиля",
+  selected_style: "Выбранный визуальный стиль",
   reference_image: "Визуальный референс",
-  design_description: "Описание дизайна",
-  design_tokens: "Дизайн-токены",
+  reference_block: "Блоки референса",
+  reference_context_summary: "Контекст референса",
   frontend_project: "Клиентский проект",
   desktop_screenshot: "Скриншот desktop",
   mobile_screenshot: "Скриншот mobile",
@@ -75,12 +70,15 @@ export const ARTIFACT_LABELS: Record<string, string> = {
   build_error: "Ошибка сборки",
   build_log: "Логи сборки",
   reference_validation: "Проверка референса",
+  code_plan: "План кодогенерации",
+  code_content_module: "Контент-модуль",
+  code_layout_module: "Layout-модуль",
+  code_sections_module: "Секции-модуль",
 };
 
 export const TABS: Array<{ id: RunDetailsTab; label: string }> = [
   { id: "overview", label: "Обзор" },
-  { id: "spec", label: "Спецификация" },
-  { id: "design", label: "Дизайн" },
+  { id: "style", label: "Стилистика" },
   { id: "reference", label: "Референс" },
   { id: "code", label: "Код" },
   { id: "result", label: "Результат" },
@@ -94,12 +92,9 @@ export const TABS: Array<{ id: RunDetailsTab; label: string }> = [
 const STEP_ORDER: string[] = [
   "queued",
   "prepare_brief",
-  // spec tab unlocks here
-  "awaiting_spec_approval",
-  "prepare_design_artifacts",
-  // design tab unlocks here
-  "prepare_design_tokens",
-  "awaiting_design_approval",
+  "generate_style_variants",
+  // style tab unlocks here
+  "awaiting_style_selection",
   "prepare_reference_image",
   // reference tab unlocks here
   "awaiting_reference_approval",
@@ -122,8 +117,7 @@ const STEP_ORDER: string[] = [
 /** Minimum step index at which each tab becomes available */
 const TAB_MIN_STEP: Record<RunDetailsTab, number> = {
   overview: 0,
-  spec: STEP_ORDER.indexOf("awaiting_spec_approval"),
-  design: STEP_ORDER.indexOf("awaiting_design_approval"),
+  style: STEP_ORDER.indexOf("generate_style_variants"),
   reference: STEP_ORDER.indexOf("prepare_reference_image"),
   code: STEP_ORDER.indexOf("awaiting_code_approval"),
   result: STEP_ORDER.indexOf("screenshots_ready"),

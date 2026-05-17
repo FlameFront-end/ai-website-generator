@@ -12,6 +12,8 @@ import type {
   DeleteRunResponse,
   Run,
   RunStatus,
+  SelectStyleRequest,
+  StyleVariantsResponse,
   UpdateRunPinnedRequest,
   UpdateRunRequest,
 } from "./types";
@@ -99,7 +101,6 @@ export const runsApi = {
     return data;
   },
 
-
   async stopCurrentStep(
     runId: string,
   ): Promise<{ id: string; status: RunStatus }> {
@@ -110,7 +111,6 @@ export const runsApi = {
     return data;
   },
   async restartCodeStep(
-
     runId: string,
   ): Promise<{ id: string; status: RunStatus }> {
     const { data } = await axiosInstance.post<{
@@ -164,7 +164,7 @@ export const runsApi = {
 
   async approveStep(
     runId: string,
-    step: "spec" | "design" | "reference" | "code" | "final",
+    step: "style" | "reference" | "code" | "final",
   ): Promise<{ id: string; status: RunStatus }> {
     const { data } = await axiosInstance.post<{
       id: string;
@@ -175,7 +175,7 @@ export const runsApi = {
 
   async requestEdit(
     runId: string,
-    step: "spec" | "design" | "reference" | "code" | "final",
+    step: "style" | "reference" | "code" | "final",
     instruction: string,
   ): Promise<{ id: string; status: RunStatus }> {
     const { data } = await axiosInstance.post<{
@@ -184,5 +184,22 @@ export const runsApi = {
     }>(API_ENDPOINTS.editRequest(runId), { step, instruction });
     return data;
   },
-};
 
+  async getStyleVariants(runId: string): Promise<StyleVariantsResponse> {
+    const { data } = await axiosInstance.get<StyleVariantsResponse>(
+      API_ENDPOINTS.artifactContent(runId, "style-variants"),
+    );
+    return data;
+  },
+
+  async selectStyle(
+    runId: string,
+    payload: SelectStyleRequest,
+  ): Promise<{ id: string; status: RunStatus }> {
+    const { data } = await axiosInstance.post<{
+      id: string;
+      status: RunStatus;
+    }>(`${API_ENDPOINTS.run(runId)}/select-style`, payload);
+    return data;
+  },
+};

@@ -3,10 +3,10 @@ import { useMemo } from "react";
 import type { Run, RunArtifact } from "@/api/services/runs";
 
 type ArtifactType =
-  | "project_spec"
+  | "style_variants"
+  | "style_variant_image"
+  | "selected_style"
   | "reference_image"
-  | "design_description"
-  | "design_tokens"
   | "frontend_project"
   | "build_error"
   | "build_log"
@@ -18,13 +18,14 @@ type ArtifactType =
 
 export type RunArtifactsMap = Record<ArtifactType, RunArtifact | undefined> & {
   reference_blocks: RunArtifact[];
+  style_variant_images: RunArtifact[];
 };
 
 const ARTIFACT_TYPES: ArtifactType[] = [
-  "project_spec",
+  "style_variants",
+  "style_variant_image",
+  "selected_style",
   "reference_image",
-  "design_description",
-  "design_tokens",
   "frontend_project",
   "build_error",
   "build_log",
@@ -43,6 +44,10 @@ export function useRunArtifacts(run: Run | undefined): RunArtifactsMap {
     }
     map.reference_blocks = (run?.artifacts ?? [])
       .filter((artifact) => artifact.type === "reference_block")
+      .slice()
+      .sort((a, b) => a.path.localeCompare(b.path));
+    map.style_variant_images = (run?.artifacts ?? [])
+      .filter((artifact) => artifact.type === "style_variant_image")
       .slice()
       .sort((a, b) => a.path.localeCompare(b.path));
     return map;

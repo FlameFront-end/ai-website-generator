@@ -21,6 +21,7 @@ import { ApproveStepDto } from './dto/approve-step.dto';
 import { ClarifyBriefDto } from './dto/clarify-brief.dto';
 import { CreateRunDto } from './dto/create-run.dto';
 import { EditRequestDto } from './dto/edit-request.dto';
+import { SelectStyleDto } from './dto/select-style.dto';
 import { UpdateRunPinnedDto } from './dto/update-run-pinned.dto';
 import { UpdateRunDto } from './dto/update-run.dto';
 import { RunsService } from './runs.service';
@@ -149,13 +150,11 @@ export class RunsController {
     return this.runsService.restartCurrentStep(id, req.user.id);
   }
 
-
   @Post(':id/stop-current-step')
   stopCurrentStep(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.runsService.stopCurrentStep(id, req.user.id);
   }
   @Post(':id/restart-code-step')
-
   restartCodeStep(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.runsService.restartCodeStep(id, req.user.id);
   }
@@ -182,5 +181,13 @@ export class RunsController {
       req.user.id,
     );
   }
-}
 
+  @Post(':id/select-style')
+  selectStyle(
+    @Param('id') id: string,
+    @Body() body: SelectStyleDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.runsService.selectStyle(id, body.styleVariantId, req.user.id);
+  }
+}

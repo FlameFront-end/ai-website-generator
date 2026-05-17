@@ -302,6 +302,92 @@
   }
 }
 
+.skeletonCard {
+  pointer-events: none;
+  cursor: default !important;
+}
+
+.skeletonLine,
+.skeletonIcon,
+.skeletonActions span {
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base, rgb(255 255 255 / 0.05)) 25%,
+    var(--skeleton-highlight, rgb(255 255 255 / 0.1)) 37%,
+    var(--skeleton-base, rgb(255 255 255 / 0.05)) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.skeletonTitle {
+  width: min(44%, 320px);
+  height: 20px;
+}
+
+.skeletonBadge {
+  width: 76px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.skeletonActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--bg-muted);
+
+  span {
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+  }
+}
+
+.skeletonDescription {
+  display: grid;
+  gap: 7px;
+
+  .skeletonLine {
+    height: 13px;
+  }
+
+  .skeletonLine:first-child {
+    width: 86%;
+  }
+
+  .skeletonLine:last-child {
+    width: 62%;
+  }
+}
+
+.skeletonIcon {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+}
+
+.skeletonMetaLine {
+  width: 118px;
+  height: 13px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0 50%;
+  }
+}
+
 .draftButton {
   border-style: dashed !important;
   background:

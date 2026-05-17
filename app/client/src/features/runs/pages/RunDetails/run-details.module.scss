@@ -521,6 +521,12 @@ p {
     &[aria-disabled="true"] {
       opacity: 0.4;
       cursor: not-allowed;
+
+      &:hover {
+        border-color: var(--border-solid);
+        background: var(--bg-subtle);
+        color: var(--text-heading);
+      }
     }
 
     .approveIcon {
@@ -590,13 +596,13 @@ p {
 
 .overviewGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
 
 .overviewArtifactsPanel {
-  width: min(100%, 520px);
+  width: 100%;
 }
 
 .list {

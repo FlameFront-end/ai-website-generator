@@ -2,6 +2,7 @@ import type { FC } from "react";
 
 import { useArtifactFileUrl } from "@/api/services/runs";
 import type { RunArtifact } from "@/api/services/runs";
+import { ImageViewerGallery } from "@/kit";
 
 import refStyles from "./ReferenceTab.module.scss";
 
@@ -44,6 +45,7 @@ interface ReferenceBlockProps {
   runId: string;
   artifact: RunArtifact;
   index: number;
+  onClick?: () => void;
 }
 
 /**
@@ -76,6 +78,7 @@ const ReferenceBlock: FC<ReferenceBlockProps> = ({
   runId,
   artifact,
   index,
+  onClick,
 }) => {
   const fileQuery = useArtifactFileUrl(runId, artifact.id);
   const meta = parseBlockMeta(artifact.path, index);
@@ -98,13 +101,15 @@ const ReferenceBlock: FC<ReferenceBlockProps> = ({
         <div className={refStyles.blockError}>
           Не удалось загрузить блок {index + 1}
         </div>
-      ) : (
+      ) : fileQuery.url ? (
         <img
           className={refStyles.blockImage}
-          src={fileQuery.url ?? undefined}
+          src={fileQuery.url}
           alt={`Блок ${index + 1} — ${meta.sectionId}`}
+          onClick={onClick}
+          style={{ cursor: "pointer" }}
         />
-      )}
+      ) : null}
     </figure>
   );
 };
@@ -166,32 +171,60 @@ export const ReferenceTab: FC<ReferenceTabProps> = ({
         )}
 
         {hasBlocks && (
-          <div className={refStyles.blocks}>
-            {blocks.map((block, index) => (
-              <ReferenceBlock
-                key={block.id}
-                runId={runId}
-                artifact={block}
-                index={index}
-              />
-            ))}
-            {isGenerating && <SkeletonBlock index={blocks.length} pending />}
-          </div>
+          <ImageViewerGallery
+            images={blocks.map((block, index) => {
+              const meta = parseBlockMeta(block.path, index);
+              return {
+                src: `/api/runs/${runId}/artifacts/${block.id}/file`,
+                alt: `Блок ${index + 1} — ${meta.sectionId}`,
+              };
+            })}
+          >
+            {({ openGallery }) => (
+              <div className={refStyles.blocks}>
+                {blocks.map((block, index) => (
+                  <ReferenceBlock
+                    key={block.id}
+                    runId={runId}
+                    artifact={block}
+                    index={index}
+                    onClick={() => openGallery(index)}
+                  />
+                ))}
+                {isGenerating && (
+                  <SkeletonBlock index={blocks.length} pending />
+                )}
+              </div>
+            )}
+          </ImageViewerGallery>
         )}
 
-        {hasFullPage && (
+        {hasFullPage && !hasBlocks && (
           <section className={refStyles.fullPage}>
             {fullPageQuery.isError ? (
               <p className={styles.error}>
                 Не удалось загрузить финальный референс. Возможно, файл не
                 найден.
               </p>
-            ) : (
-              <img
-                src={fullPageQuery.url ?? undefined}
-                alt="Визуальный референс — полная сборка"
-              />
-            )}
+            ) : fullPageQuery.url ? (
+              <ImageViewerGallery
+                images={[
+                  {
+                    src: fullPageQuery.url || "",
+                    alt: "Визуальный референс — полная сборка",
+                  },
+                ]}
+              >
+                {({ openGallery }) => (
+                  <img
+                    src={fullPageQuery.url || ""}
+                    alt="Визуальный референс — полная сборка"
+                    onClick={() => openGallery(0)}
+                    style={{ cursor: "pointer", maxWidth: "100%" }}
+                  />
+                )}
+              </ImageViewerGallery>
+            ) : null}
           </section>
         )}
       </div>

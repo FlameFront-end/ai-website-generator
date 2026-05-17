@@ -448,6 +448,28 @@ export class RunsService {
       status: RunStatus.Failed,
     };
   }
+
+  async selectStyle(
+    runId: string,
+    styleVariantId: string,
+    userId: string,
+  ): Promise<{ id: string; status: string }> {
+    const run = await this.getRunOrFail(runId, userId);
+
+    if (run.status !== RunStatus.AwaitingStyleSelection) {
+      throw new BadRequestException(
+        'Выбор стилистики доступен только на этапе ожидания выбора стилистики',
+      );
+    }
+
+    await this.addLog(run.id, `Выбран вариант стилистики: ${styleVariantId}`);
+
+    await this.pipelineService.selectStyle(run, styleVariantId, userId);
+
+    const updatedRun = await this.getRunOrFail(runId, userId);
+    return { id: updatedRun.id, status: updatedRun.status };
+  }
+
   async restartCodeStep(
     runId: string,
     userId: string,
@@ -473,9 +495,8 @@ export class RunsService {
 
   private async ensureCodeRestartArtifacts(runId: string): Promise<void> {
     const requiredTypes: ArtifactType[] = [
-      ArtifactType.ProjectSpec,
-      ArtifactType.DesignTokens,
-      ArtifactType.DesignDescription,
+      ArtifactType.SelectedStyle,
+      ArtifactType.ReferenceImage,
     ];
     const artifacts = await this.artifactsRepository.find({
       where: { runId },
@@ -621,31 +642,51 @@ export class RunsService {
   }
   async approveStep(
     runId: string,
-    step: 'spec' | 'design' | 'reference' | 'code' | 'final',
+    step: 'style' | 'reference' | 'code' | 'final',
     userId: string,
   ): Promise<{ id: string; status: string }> {
     const run = await this.getRunOrFail(runId, userId);
 
     const stepToStatusMap: Record<typeof step, RunStatus> = {
-      spec: RunStatus.AwaitingDesignApproval,
-      design: RunStatus.AwaitingReferenceApproval,
+      style: RunStatus.Running,
       reference: RunStatus.Running,
       code: RunStatus.AwaitingFinalApproval,
       final: RunStatus.Completed,
     };
 
+    if (step === 'style') {
+      const selectedStyle = await this.artifactsRepository.findOne({
+        where: {
+          runId: run.id,
+          type: ArtifactType.SelectedStyle,
+        },
+      });
+
+      if (!selectedStyle) {
+        throw new BadRequestException(
+          'Сначала выберите визуальный стиль сайта',
+        );
+      }
+    }
+
     const nextStatus = stepToStatusMap[step];
     await this.runsRepository.update(runId, {
       status: nextStatus,
       currentStep:
-        step === 'reference' ? 'prepare_frontend_project' : run.currentStep,
+        step === 'style'
+          ? 'prepare_reference_image'
+          : step === 'reference'
+            ? 'prepare_frontend_project'
+            : run.currentStep,
     });
     await this.addLog(
       run.id,
       `Шаг подтверждён: ${this.formatPipelineStep(step)}`,
     );
 
-    if (step !== 'final') {
+    if (step === 'style') {
+      void this.pipelineService.startReferenceFromSelectedStyle(run, userId);
+    } else if (step !== 'final') {
       void this.pipelineService.resumeRun(run, userId);
     }
 
@@ -655,7 +696,7 @@ export class RunsService {
 
   async requestEdit(
     runId: string,
-    step: 'spec' | 'design' | 'reference' | 'code' | 'final',
+    step: 'style' | 'reference' | 'code' | 'final',
     instruction: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
@@ -678,12 +719,11 @@ export class RunsService {
     status: RunStatus,
     currentStep?: string | null,
     runId?: string,
-  ): Promise<'spec' | 'design' | 'reference' | 'code' | null> {
+  ): Promise<'style' | 'reference' | 'code' | null> {
     const statusToStep: Partial<
-      Record<RunStatus, 'spec' | 'design' | 'reference' | 'code'>
+      Record<RunStatus, 'style' | 'reference' | 'code'>
     > = {
-      [RunStatus.AwaitingSpecApproval]: 'spec',
-      [RunStatus.AwaitingDesignApproval]: 'design',
+      [RunStatus.AwaitingStyleSelection]: 'style',
       [RunStatus.AwaitingReferenceApproval]: 'reference',
       [RunStatus.AwaitingCodeApproval]: 'code',
     };
@@ -705,10 +745,9 @@ export class RunsService {
 
   private getRestartableStepFromCurrentStep(
     currentStep?: string | null,
-  ): 'spec' | 'design' | 'reference' | 'code' | null {
+  ): 'style' | 'reference' | 'code' | null {
     if (!currentStep) return null;
-    if (currentStep.includes('spec')) return 'spec';
-    if (currentStep.includes('design')) return 'design';
+    if (currentStep.includes('style')) return 'style';
     if (currentStep.includes('reference')) return 'reference';
     if (
       currentStep.includes('code') ||
@@ -724,19 +763,13 @@ export class RunsService {
 
   private async inferFailedRestartStepFromArtifacts(
     runId: string,
-  ): Promise<'spec' | 'design' | 'reference' | 'code'> {
+  ): Promise<'style' | 'reference' | 'code'> {
     const artifacts = await this.artifactsRepository.find({
       where: { runId },
     });
     const types = new Set(artifacts.map((artifact) => artifact.type));
 
-    if (!types.has(ArtifactType.ProjectSpec)) return 'spec';
-    if (
-      !types.has(ArtifactType.DesignTokens) ||
-      !types.has(ArtifactType.DesignDescription)
-    ) {
-      return 'design';
-    }
+    if (!types.has(ArtifactType.StyleVariants)) return 'style';
     if (!types.has(ArtifactType.ReferenceImage)) return 'reference';
     return 'code';
   }
@@ -755,8 +788,7 @@ export class RunsService {
 
   private formatPipelineStep(step: string): string {
     const labels: Record<string, string> = {
-      spec: 'Спецификация',
-      design: 'Дизайн',
+      style: 'Стилистика',
       reference: 'Референс',
       code: 'Код',
       final: 'Финальная проверка',

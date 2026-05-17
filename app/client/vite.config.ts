@@ -9,6 +9,7 @@ export default defineConfig({
     host: "0.0.0.0",
   },
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: {
       "@/kit": fileURLToPath(new URL("./src/shared/kit", import.meta.url)),
       "@/widgets": fileURLToPath(

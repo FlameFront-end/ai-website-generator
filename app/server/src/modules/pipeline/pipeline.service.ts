@@ -1,25 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import sharp from 'sharp';
 
 import type {
-  DesignContextSummary,
   DesignTokens,
   ProjectSpec,
-  ProjectSpecSummary,
   ReferenceContextSummary,
+  StyleVariant,
 } from '../ai/ai.types';
 import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { AiService } from '../ai/ai.service';
 import { loadImageAsDataUrl } from '../ai/image-attachment';
-import { buildCodegenContext } from '../ai/codegen-context';
-import {
-  buildDesignContextSummary,
-  buildProjectSpecSummary,
-  buildReferenceContextSummary,
-} from '../ai/summary-builders';
 import type {
   CodegenArtifactKind,
   CodegenArtifactPayload,
@@ -33,6 +25,19 @@ import { VisualQAService } from './visual-qa.service';
 
 const PIPELINE_STEP_DELAY_MS = 1200;
 const MAX_BUILD_REPAIR_ATTEMPTS = 3;
+
+interface ReferenceSectionPlan {
+  id: string;
+  title: string;
+  goal: string;
+}
+
+interface GeneratedReferenceBlock {
+  section: ReferenceSectionPlan;
+  relativePath: string;
+  mimeType: string;
+  model: string;
+}
 
 @Injectable()
 export class PipelineService {
@@ -50,7 +55,7 @@ export class PipelineService {
   async processRun(run: RunEntity, userId: string): Promise<void> {
     try {
       await this.state.sleep(PIPELINE_STEP_DELAY_MS);
-      await this.prepareBrief(run, userId);
+      await this.generateStyleVariantsStep(run, userId);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Неизвестная ошибка пайплайна';
@@ -58,219 +63,80 @@ export class PipelineService {
     }
   }
 
-  private async prepareBrief(run: RunEntity, userId: string): Promise<void> {
-    const briefRun = await this.state.updateRunStatus(
+  /**
+   * Step 1: Generate style variants based on brief
+   * User will select one style to proceed
+   */
+  private async generateStyleVariantsStep(
+    run: RunEntity,
+    userId: string,
+  ): Promise<void> {
+    const styleRun = await this.state.updateRunStatus(
       run,
       RunStatus.Running,
-      'prepare_brief',
+      'generate_style_variants',
       userId,
     );
-    await this.state.addLog(briefRun.id, 'Анализируем бриф');
+    await this.state.addLog(styleRun.id, 'Генерируем варианты стилистик');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const projectSpec: ProjectSpec = await this.aiService.extractProjectSpec(
-      briefRun.brief,
+    const styleVariants = await this.aiService.generateStyleVariants(
+      styleRun.brief,
     );
-    const specRelativePath = this.state.getRunRelativePath(
+
+    const variantsRelativePath = this.state.getRunRelativePath(
       userId,
-      briefRun.id,
-      'spec',
-      'project-spec.json',
+      styleRun.id,
+      'style',
+      'style-variants.json',
     );
-    const specAbsolutePath = this.state.getRunAbsolutePath(
+    const variantsAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      briefRun.id,
-      'spec',
-      'project-spec.json',
+      styleRun.id,
+      'style',
+      'style-variants.json',
     );
+
     await this.state.writeGeneratedFile(
-      specAbsolutePath,
-      JSON.stringify(projectSpec, null, 2),
+      variantsAbsolutePath,
+      JSON.stringify(styleVariants, null, 2),
     );
 
     await this.state.saveArtifact(
-      briefRun.id,
-      ArtifactType.ProjectSpec,
-      specRelativePath,
+      styleRun.id,
+      ArtifactType.StyleVariants,
+      variantsRelativePath,
       'application/json',
     );
 
-    const specSummary = buildProjectSpecSummary(projectSpec);
-    const specSummaryRelativePath = this.state.getRunRelativePath(
+    const generatedImages = await this.generateStyleVariantImages(
+      styleRun.brief,
+      styleVariants.variants,
       userId,
-      briefRun.id,
-      'spec',
-      'project-spec.summary.json',
-    );
-    const specSummaryAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      briefRun.id,
-      'spec',
-      'project-spec.summary.json',
-    );
-    await this.state.writeGeneratedFile(
-      specSummaryAbsolutePath,
-      JSON.stringify(specSummary, null, 2),
-    );
-    await this.state.saveArtifact(
-      briefRun.id,
-      ArtifactType.ProjectSpecSummary,
-      specSummaryRelativePath,
-      'application/json',
+      styleRun.id,
     );
 
-    await this.state.addLog(briefRun.id, 'Спецификация готова', {
-      path: specRelativePath,
-      summaryPath: specSummaryRelativePath,
+    await this.state.addLog(styleRun.id, 'Варианты стилистик готовы', {
+      path: variantsRelativePath,
+      count: styleVariants.variants.length,
+      images: generatedImages.length,
     });
 
     await this.state.updateRunStatus(
-      briefRun,
-      RunStatus.AwaitingSpecApproval,
-      'awaiting_spec_approval',
+      styleRun,
+      RunStatus.AwaitingStyleSelection,
+      'awaiting_style_selection',
       userId,
     );
-    await this.state.addLog(
-      briefRun.id,
-      'Проверьте спецификацию и подтвердите шаг',
-    );
+    await this.state.addLog(styleRun.id, 'Выберите стилистику для продолжения');
   }
 
-  private async prepareDesignArtifacts(
-    run: RunEntity,
-    projectSpec: ProjectSpec,
-    userId: string,
-  ): Promise<void> {
-    const designRun = await this.state.updateRunStatus(
-      run,
-      RunStatus.Running,
-      'prepare_design_artifacts',
-      userId,
-    );
-    await this.state.addLog(run.id, 'Формируем описание дизайна');
-    await this.state.sleep(PIPELINE_STEP_DELAY_MS);
-
-    const tokens = await this.aiService.generateDesignTokens(
-      run.brief,
-      projectSpec,
-    );
-    const designDescription = await this.aiService.generateDesignDescription(
-      run.brief,
-      projectSpec,
-      tokens,
-    );
-    const descRelativePath = this.state.getRunRelativePath(
-      userId,
-      designRun.id,
-      'design',
-      'design-description.md',
-    );
-    const descAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      designRun.id,
-      'design',
-      'design-description.md',
-    );
-    await this.state.writeGeneratedFile(
-      descAbsolutePath,
-      designDescription.markdown,
-    );
-
-    await this.state.saveArtifact(
-      designRun.id,
-      ArtifactType.DesignDescription,
-      descRelativePath,
-      'text/markdown',
-    );
-    await this.state.addLog(designRun.id, 'Описание дизайна готово', {
-      path: descRelativePath,
-    });
-
-    await this.prepareDesignTokens(designRun, projectSpec, tokens, userId);
-  }
-
-  private async prepareDesignTokens(
-    run: RunEntity,
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
-    userId: string,
-  ): Promise<void> {
-    const tokensRun = await this.state.updateRunStatus(
-      run,
-      RunStatus.Running,
-      'prepare_design_tokens',
-      userId,
-    );
-    await this.state.addLog(run.id, 'Подбираем дизайн-токены');
-    await this.state.sleep(PIPELINE_STEP_DELAY_MS);
-
-    const tokensRelativePath = this.state.getRunRelativePath(
-      userId,
-      tokensRun.id,
-      'design',
-      'design-tokens.json',
-    );
-    const tokensAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      tokensRun.id,
-      'design',
-      'design-tokens.json',
-    );
-    await this.state.writeGeneratedFile(
-      tokensAbsolutePath,
-      JSON.stringify(tokens, null, 2),
-    );
-
-    await this.state.saveArtifact(
-      tokensRun.id,
-      ArtifactType.DesignTokens,
-      tokensRelativePath,
-      'application/json',
-    );
-
-    const designSummary = buildDesignContextSummary(projectSpec, tokens);
-    const designSummaryRelativePath = this.state.getRunRelativePath(
-      userId,
-      tokensRun.id,
-      'design',
-      'design-context.summary.json',
-    );
-    const designSummaryAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      tokensRun.id,
-      'design',
-      'design-context.summary.json',
-    );
-    await this.state.writeGeneratedFile(
-      designSummaryAbsolutePath,
-      JSON.stringify(designSummary, null, 2),
-    );
-    await this.state.saveArtifact(
-      tokensRun.id,
-      ArtifactType.DesignContextSummary,
-      designSummaryRelativePath,
-      'application/json',
-    );
-
-    await this.state.addLog(tokensRun.id, 'Дизайн-токены готовы', {
-      path: tokensRelativePath,
-      summaryPath: designSummaryRelativePath,
-    });
-
-    await this.state.updateRunStatus(
-      tokensRun,
-      RunStatus.AwaitingDesignApproval,
-      'awaiting_design_approval',
-      userId,
-    );
-    await this.state.addLog(tokensRun.id, 'Проверьте дизайн и подтвердите шаг');
-  }
-
+  /**
+   * Step 2: Generate full reference image based on selected style
+   */
   private async prepareReferenceImage(
     run: RunEntity,
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
-    designDescription: string,
+    selectedStyle: StyleVariant,
     userId: string,
   ): Promise<void> {
     const referenceRun = await this.state.updateRunStatus(
@@ -279,37 +145,52 @@ export class PipelineService {
       'prepare_reference_image',
       userId,
     );
-    await this.state.addLog(run.id, 'Готовим визуальный референс');
+    await this.state.addLog(
+      run.id,
+      `Готовим визуальный референс по стилистике: ${selectedStyle.name}`,
+    );
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const referenceImage = await this.generateFluxReferenceImage(
+    const referenceBlocks = await this.generateReferenceBlockImages(
       referenceRun.brief,
-      projectSpec,
-      tokens,
-      designDescription,
+      selectedStyle,
       userId,
-      referenceRun.id,
       referenceRun.id,
     );
 
-    await this.state.saveArtifact(
-      referenceRun.id,
-      ArtifactType.ReferenceImage,
-      referenceImage.relativePath,
-      referenceImage.mimeType,
-    );
+    for (const block of referenceBlocks) {
+      await this.state.saveArtifact(
+        referenceRun.id,
+        ArtifactType.ReferenceBlock,
+        block.relativePath,
+        block.mimeType,
+      );
+    }
+
+    const primaryReference = referenceBlocks[0];
+
+    if (primaryReference) {
+      await this.state.saveArtifact(
+        referenceRun.id,
+        ArtifactType.ReferenceImage,
+        primaryReference.relativePath,
+        primaryReference.mimeType,
+      );
+    }
 
     const referenceSummaryRelativePath = await this.saveReferenceContextSummary(
       referenceRun.id,
       userId,
       referenceRun.id,
-      projectSpec,
-      referenceImage.relativePath,
+      primaryReference?.relativePath ?? '',
+      referenceBlocks,
+      selectedStyle,
     );
 
     await this.state.addLog(referenceRun.id, 'Визуальный референс готов', {
-      model: referenceImage.model,
-      path: referenceImage.relativePath,
+      blocks: referenceBlocks.length,
+      model: primaryReference?.model,
+      path: primaryReference?.relativePath,
       summaryPath: referenceSummaryRelativePath,
     });
 
@@ -325,10 +206,12 @@ export class PipelineService {
     );
   }
 
+  /**
+   * Step 3: Generate code based on selected style and reference
+   */
   private async prepareFrontendProject(
     run: RunEntity,
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
+    selectedStyle: StyleVariant,
     designDescription: string,
     userId: string,
   ): Promise<void> {
@@ -345,19 +228,28 @@ export class PipelineService {
       this.storageService.getRunPath(userId, codeRun.id),
       'code',
     );
-    const codegenContext = await this.buildCodegenContextForRun(
-      codeRun.id,
-      designDescription,
-    );
+
+    // Build context from selected style
+    const codegenContext = this.buildStyleCodegenContext(selectedStyle);
+
     const codegenImages = await this.buildCodegenImageContext(codeRun.id);
     await this.state.addLog(
       codeRun.id,
       `Codegen visual input: full-page=${codegenImages.fullPageImageDataUrl ? 'yes' : 'no'}, section blocks=${codegenImages.sectionImageMap.size}`,
     );
+
+    // Generate project files using style-based approach
+    // Create compatible ProjectSpec and DesignTokens from selectedStyle
+    const projectSpec = this.buildProjectSpecFromStyle(
+      run.brief,
+      selectedStyle,
+    );
+    const designTokens = this.buildDesignTokensFromStyle(selectedStyle);
+
     await this.codeGeneratorService.generateProjectFiles(
       run.brief,
       projectSpec,
-      tokens,
+      designTokens,
       codegenContext,
       codePath,
       {
@@ -380,49 +272,9 @@ export class PipelineService {
       codeRun,
       codeRun.id,
       userId,
-      projectSpec,
-      tokens,
+      selectedStyle,
       codegenContext,
       codePath,
-    );
-  }
-
-  async rebuildRun(run: RunEntity, userId: string): Promise<void> {
-    const rebuildRun = await this.state.updateRunStatus(
-      run,
-      RunStatus.Running,
-      'build_project',
-      userId,
-    );
-    void this.runBuildAndQA(rebuildRun, rebuildRun.id, userId);
-  }
-
-  private async runBuildAndQA(
-    run: RunEntity,
-    slug: string,
-    userId: string,
-  ): Promise<void> {
-    const builtRun = await this.buildService.buildProject(run, slug, userId, 1);
-    if (builtRun.status === RunStatus.BuildFailed) {
-      return;
-    }
-
-    const screenshotRun = await this.screenshotService.takeScreenshots(
-      builtRun,
-      slug,
-      userId,
-    );
-    await this.visualQAService.runVisualQA(screenshotRun, run.id, slug, userId);
-
-    await this.state.updateRunStatus(
-      screenshotRun,
-      RunStatus.AwaitingFinalApproval,
-      'awaiting_final_approval',
-      userId,
-    );
-    await this.state.addLog(
-      screenshotRun.id,
-      'Проверьте результат и завершите проект',
     );
   }
 
@@ -430,8 +282,7 @@ export class PipelineService {
     run: RunEntity,
     slug: string,
     userId: string,
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
+    selectedStyle: StyleVariant,
     codegenContext: string,
     codePath: string,
   ): Promise<void> {
@@ -485,10 +336,16 @@ export class PipelineService {
         `Скармливаем ошибку сборки AI для исправления кода (${attempt}/${MAX_BUILD_REPAIR_ATTEMPTS})`,
         { error: result.error },
       );
+      const projectSpec = this.buildProjectSpecFromStyle(
+        run.brief,
+        selectedStyle,
+      );
+      const designTokens = this.buildDesignTokensFromStyle(selectedStyle);
+
       await this.codeGeneratorService.repairProjectFilesAfterBuildFailure(
         run.brief,
         projectSpec,
-        tokens,
+        designTokens,
         result.error,
         codegenContext,
         codePath,
@@ -496,14 +353,56 @@ export class PipelineService {
     }
   }
 
+  async rebuildRun(run: RunEntity, userId: string): Promise<void> {
+    const rebuildRun = await this.state.updateRunStatus(
+      run,
+      RunStatus.Running,
+      'build_project',
+      userId,
+    );
+    void this.runBuildAndQA(rebuildRun, rebuildRun.id, userId);
+  }
+
+  private async runBuildAndQA(
+    run: RunEntity,
+    slug: string,
+    userId: string,
+  ): Promise<void> {
+    const builtRun = await this.buildService.buildProject(run, slug, userId, 1);
+    if (builtRun.status === RunStatus.BuildFailed) {
+      return;
+    }
+
+    const screenshotRun = await this.screenshotService.takeScreenshots(
+      builtRun,
+      slug,
+      userId,
+    );
+    await this.visualQAService.runVisualQA(screenshotRun, run.id, slug, userId);
+
+    await this.state.updateRunStatus(
+      screenshotRun,
+      RunStatus.AwaitingFinalApproval,
+      'awaiting_final_approval',
+      userId,
+    );
+    await this.state.addLog(
+      screenshotRun.id,
+      'Проверьте результат и завершите проект',
+    );
+  }
+
+  /**
+   * Resume run from current status
+   */
   async resumeRun(run: RunEntity, userId: string): Promise<void> {
     try {
       switch (run.status) {
-        case RunStatus.AwaitingSpecApproval:
-          await this.resumeFromSpec(run, userId);
-          break;
-        case RunStatus.AwaitingDesignApproval:
-          await this.resumeFromDesign(run, userId);
+        case RunStatus.AwaitingStyleSelection:
+          await this.state.addLog(
+            run.id,
+            'Ожидание выбора стилистики пользователем',
+          );
           break;
         case RunStatus.AwaitingReferenceApproval:
           await this.resumeFromReference(run, userId);
@@ -529,99 +428,124 @@ export class PipelineService {
     }
   }
 
-  private async resumeFromSpec(run: RunEntity, userId: string): Promise<void> {
-    const specArtifact = await this.state.getArtifactByType(
+  /**
+   * Select style without continuing the pipeline.
+   */
+  async selectStyle(
+    run: RunEntity,
+    selectedStyleId: string,
+    userId: string,
+  ): Promise<void> {
+    const variantsArtifact = await this.state.getArtifactByType(
       run.id,
-      ArtifactType.ProjectSpec,
+      ArtifactType.StyleVariants,
     );
-    if (!specArtifact) {
-      await this.state.failRun(run, 'Спецификация не найдена');
+    if (!variantsArtifact) {
+      await this.state.failRun(run, 'Варианты стилистик не найдены');
       return;
     }
 
-    const specContent = await this.state.readArtifactFile(specArtifact.path);
-    const projectSpec = JSON.parse(specContent) as ProjectSpec;
+    const variantsContent = await this.state.readArtifactFile(
+      variantsArtifact.path,
+    );
+    const variants = JSON.parse(variantsContent) as {
+      variants: StyleVariant[];
+    };
 
-    await this.prepareDesignArtifacts(run, projectSpec, userId);
+    const selectedStyle = variants.variants.find(
+      (v) => v.id === selectedStyleId,
+    );
+    if (!selectedStyle) {
+      await this.state.failRun(run, `Стилистика ${selectedStyleId} не найдена`);
+      return;
+    }
+
+    // Save selected style as artifact
+    const selectedStylePath = this.state.getRunRelativePath(
+      userId,
+      run.id,
+      'style',
+      'selected-style.json',
+    );
+    const selectedStyleAbsolutePath = this.state.getRunAbsolutePath(
+      userId,
+      run.id,
+      'style',
+      'selected-style.json',
+    );
+
+    await this.state.writeGeneratedFile(
+      selectedStyleAbsolutePath,
+      JSON.stringify(selectedStyle, null, 2),
+    );
+
+    await this.state.updateArtifact(
+      run.id,
+      ArtifactType.SelectedStyle,
+      selectedStylePath,
+      'application/json',
+    );
+
+    await this.state.addLog(
+      run.id,
+      `Выбрана стилистика: ${selectedStyle.name}`,
+    );
+
+    await this.state.updateRunStatus(
+      run,
+      RunStatus.AwaitingStyleSelection,
+      'awaiting_style_selection',
+      userId,
+    );
   }
 
-  private async resumeFromDesign(
+  async startReferenceFromSelectedStyle(
     run: RunEntity,
     userId: string,
   ): Promise<void> {
-    const specArtifact = await this.state.getArtifactByType(
+    const selectedStyleArtifact = await this.state.getArtifactByType(
       run.id,
-      ArtifactType.ProjectSpec,
-    );
-    const tokensArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignTokens,
-    );
-    const designArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignDescription,
+      ArtifactType.SelectedStyle,
     );
 
-    if (!specArtifact || !tokensArtifact || !designArtifact) {
-      await this.state.failRun(run, 'Артефакты дизайна не найдены');
+    if (!selectedStyleArtifact) {
+      await this.state.failRun(run, 'Сначала выберите визуальный стиль');
       return;
     }
 
-    const specContent = await this.state.readArtifactFile(specArtifact.path);
-    const tokensContent = await this.state.readArtifactFile(
-      tokensArtifact.path,
-    );
-    const designDescription = await this.state.readArtifactFile(
-      designArtifact.path,
-    );
-    const projectSpec = JSON.parse(specContent) as ProjectSpec;
-    const tokens = JSON.parse(tokensContent) as DesignTokens;
+    const selectedStyle = JSON.parse(
+      await this.state.readArtifactFile(selectedStyleArtifact.path),
+    ) as StyleVariant;
 
-    await this.prepareReferenceImage(
-      run,
-      projectSpec,
-      tokens,
-      designDescription,
-      userId,
-    );
+    await this.prepareReferenceImage(run, selectedStyle, userId);
   }
 
   private async resumeFromReference(
     run: RunEntity,
     userId: string,
   ): Promise<void> {
-    const specArtifact = await this.state.getArtifactByType(
+    const selectedStyleArtifact = await this.state.getArtifactByType(
       run.id,
-      ArtifactType.ProjectSpec,
-    );
-    const tokensArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignTokens,
-    );
-    const designArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignDescription,
+      ArtifactType.SelectedStyle,
     );
 
-    if (!specArtifact || !tokensArtifact || !designArtifact) {
-      await this.state.failRun(run, 'Артефакты не найдены');
+    if (!selectedStyleArtifact) {
+      await this.state.failRun(run, 'Выбранная стилистика не найдена');
       return;
     }
 
-    const specContent = await this.state.readArtifactFile(specArtifact.path);
-    const tokensContent = await this.state.readArtifactFile(
-      tokensArtifact.path,
+    const styleContent = await this.state.readArtifactFile(
+      selectedStyleArtifact.path,
     );
-    const designDescription = await this.state.readArtifactFile(
-      designArtifact.path,
-    );
-    const projectSpec = JSON.parse(specContent) as ProjectSpec;
-    const tokens = JSON.parse(tokensContent) as DesignTokens;
+    const selectedStyle = JSON.parse(styleContent) as StyleVariant;
+
+    // Build design description from style
+    const designDescription =
+      this.buildDesignDescriptionFromStyle(selectedStyle);
 
     await this.prepareFrontendProject(
       run,
-      projectSpec,
-      tokens,
+      selectedStyle,
       designDescription,
       userId,
     );
@@ -638,60 +562,14 @@ export class PipelineService {
       return;
     }
 
-    // Проверяем, что файл существует на диске
-    const referencePath = this.state.getArtifactAbsolutePath(
-      referenceArtifact.path,
+    const selectedStyleArtifact = await this.state.getArtifactByType(
+      run.id,
+      ArtifactType.SelectedStyle,
     );
 
-    const referenceExists = await this.state.fileExists(referencePath);
-    if (!referenceExists) {
-      // Если файл не существует, регенерируем reference image
-      const specArtifact = await this.state.getArtifactByType(
-        run.id,
-        ArtifactType.ProjectSpec,
-      );
-      const tokensArtifact = await this.state.getArtifactByType(
-        run.id,
-        ArtifactType.DesignTokens,
-      );
-
-      if (!specArtifact || !tokensArtifact) {
-        await this.state.failRun(
-          run,
-          'Артефакты для генерации reference не найдены',
-        );
-        return;
-      }
-
-      const specContent = await this.state.readArtifactFile(specArtifact.path);
-      const tokensContent = await this.state.readArtifactFile(
-        tokensArtifact.path,
-      );
-      const projectSpec = JSON.parse(specContent) as ProjectSpec;
-      const tokens = JSON.parse(tokensContent) as DesignTokens;
-
-      const designArtifact = await this.state.getArtifactByType(
-        run.id,
-        ArtifactType.DesignDescription,
-      );
-      if (!designArtifact) {
-        await this.state.failRun(
-          run,
-          'Описание дизайна для генерации reference не найдено',
-        );
-        return;
-      }
-      const designDescription = await this.state.readArtifactFile(
-        designArtifact.path,
-      );
-
-      await this.prepareReferenceImage(
-        run,
-        projectSpec,
-        tokens,
-        designDescription,
-        userId,
-      );
+    if (!selectedStyleArtifact) {
+      await this.state.failRun(run, 'Выбранная стилистика не найдена');
+      return;
     }
 
     const builtRun = await this.buildService.buildProject(
@@ -728,19 +606,19 @@ export class PipelineService {
     await this.state.addLog(run.id, 'Проект завершён');
   }
 
+  /**
+   * Regenerate a specific step
+   */
   async regenerateStep(
     run: RunEntity,
-    step: 'spec' | 'design' | 'reference' | 'code' | 'final',
+    step: 'style' | 'reference' | 'code' | 'final',
     instruction: string,
     userId: string,
   ): Promise<void> {
     try {
       switch (step) {
-        case 'spec':
-          await this.regenerateSpec(run, instruction, userId);
-          break;
-        case 'design':
-          await this.regenerateDesign(run, instruction, userId);
+        case 'style':
+          await this.regenerateStyle(run, instruction, userId);
           break;
         case 'reference':
           await this.regenerateReference(run, instruction, userId);
@@ -765,15 +643,76 @@ export class PipelineService {
   }
 
   /**
-   * Wipe the on-disk workspace and DB artifacts produced by a previous attempt
-   * of the given step. Called at the start of every `regenerateXxx` flow so
-   * restart / edit-request always start from a clean slate and no stale files
-   * leak into the new attempt.
+   * Restart a specific step
    */
+  async restartStep(
+    run: RunEntity,
+    step: 'style' | 'reference' | 'code',
+    userId: string,
+  ): Promise<void> {
+    const stepTitleMap: Record<typeof step, string> = {
+      style: 'Стилистика',
+      reference: 'Визуальный референс',
+      code: 'Код сайта',
+    };
+    const runningStepMap: Record<typeof step, string> = {
+      style: 'generate_style_variants',
+      reference: 'prepare_reference_image',
+      code: 'prepare_frontend_project',
+    };
+
+    await this.state.updateRunStatus(
+      run,
+      RunStatus.Running,
+      runningStepMap[step],
+      userId,
+    );
+    await this.state.addLog(run.id, `Перезапускаем шаг: ${stepTitleMap[step]}`);
+
+    void this.finishRestartStep(run, step, userId);
+  }
+
+  private async finishRestartStep(
+    run: RunEntity,
+    step: 'style' | 'reference' | 'code',
+    userId: string,
+  ): Promise<void> {
+    const awaitingStatusMap: Record<typeof step, RunStatus> = {
+      style: RunStatus.AwaitingStyleSelection,
+      reference: RunStatus.AwaitingReferenceApproval,
+      code: RunStatus.AwaitingCodeApproval,
+    };
+
+    try {
+      switch (step) {
+        case 'style':
+          await this.regenerateStyle(run, '', userId);
+          break;
+        case 'reference':
+          await this.regenerateReference(run, '', userId);
+          break;
+        case 'code':
+          await this.regenerateCode(run, '', userId);
+          return;
+      }
+
+      await this.state.updateRunStatus(
+        run,
+        awaitingStatusMap[step],
+        `awaiting_${step}_approval`,
+        userId,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Ошибка при перезапуске шага';
+      await this.state.failRun(run, message);
+    }
+  }
+
   private async cleanStepWorkspace(
     userId: string,
     runId: string,
-    step: 'spec' | 'design' | 'reference' | 'code',
+    step: 'style' | 'reference' | 'code',
   ): Promise<void> {
     const folders = this.getStepFolders(step);
     const types = this.getStepArtifactTypes(step);
@@ -788,35 +727,23 @@ export class PipelineService {
     }
   }
 
-  private getStepFolders(
-    step: 'spec' | 'design' | 'reference' | 'code',
-  ): string[] {
+  private getStepFolders(step: 'style' | 'reference' | 'code'): string[] {
     switch (step) {
-      case 'spec':
-        return ['spec'];
-      case 'design':
-        return ['design'];
+      case 'style':
+        return ['style'];
       case 'reference':
         return ['reference'];
       case 'code':
-        // Code regeneration also re-runs build + screenshots + visual QA,
-        // so clean those workspaces too to avoid mixing old with new output.
         return ['code', 'screenshots', 'qa'];
     }
   }
 
   private getStepArtifactTypes(
-    step: 'spec' | 'design' | 'reference' | 'code',
+    step: 'style' | 'reference' | 'code',
   ): ArtifactType[] {
     switch (step) {
-      case 'spec':
-        return [ArtifactType.ProjectSpec, ArtifactType.ProjectSpecSummary];
-      case 'design':
-        return [
-          ArtifactType.DesignDescription,
-          ArtifactType.DesignTokens,
-          ArtifactType.DesignContextSummary,
-        ];
+      case 'style':
+        return [ArtifactType.StyleVariants, ArtifactType.SelectedStyle];
       case 'reference':
         return [
           ArtifactType.ReferenceImage,
@@ -841,194 +768,49 @@ export class PipelineService {
     }
   }
 
-  async restartStep(
-    run: RunEntity,
-    step: 'spec' | 'design' | 'reference' | 'code',
-    userId: string,
-  ): Promise<void> {
-    const stepTitleMap: Record<typeof step, string> = {
-      spec: 'Спецификация',
-      design: 'Дизайн',
-      reference: 'Визуальный референс',
-      code: 'Код сайта',
-    };
-    const runningStepMap: Record<typeof step, string> = {
-      spec: 'prepare_brief',
-      design: 'prepare_design_artifacts',
-      reference: 'prepare_reference_image',
-      code: 'prepare_frontend_project',
-    };
-
-    await this.state.updateRunStatus(
-      run,
-      RunStatus.Running,
-      runningStepMap[step],
-      userId,
-    );
-    await this.state.addLog(run.id, `Перезапускаем шаг: ${stepTitleMap[step]}`);
-
-    void this.finishRestartStep(run, step, userId);
-  }
-
-  private async finishRestartStep(
-    run: RunEntity,
-    step: 'spec' | 'design' | 'reference' | 'code',
-    userId: string,
-  ): Promise<void> {
-    const awaitingStatusMap: Record<typeof step, RunStatus> = {
-      spec: RunStatus.AwaitingSpecApproval,
-      design: RunStatus.AwaitingDesignApproval,
-      reference: RunStatus.AwaitingReferenceApproval,
-      code: RunStatus.AwaitingCodeApproval,
-    };
-
-    try {
-      switch (step) {
-        case 'spec':
-          await this.regenerateSpec(run, '', userId);
-          break;
-        case 'design':
-          await this.regenerateDesign(run, '', userId);
-          break;
-        case 'reference':
-          await this.regenerateReference(run, '', userId);
-          break;
-        case 'code':
-          await this.regenerateCode(run, '', userId);
-          return;
-      }
-
-      await this.state.updateRunStatus(
-        run,
-        awaitingStatusMap[step],
-        `awaiting_${step}_approval`,
-        userId,
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Ошибка при перезапуске шага';
-      await this.state.failRun(run, message);
-    }
-  }
-
-  private async regenerateSpec(
+  private async regenerateStyle(
     run: RunEntity,
     instruction: string,
     userId: string,
   ): Promise<void> {
-    await this.cleanStepWorkspace(userId, run.id, 'spec');
+    await this.cleanStepWorkspace(userId, run.id, 'style');
 
     const updatedBrief = instruction
       ? `${run.brief}\n\nПравка: ${instruction}`
       : run.brief;
     await this.state.updateRun(run, { brief: updatedBrief });
 
-    const projectSpec: ProjectSpec =
-      await this.aiService.extractProjectSpec(updatedBrief);
-    const specRelativePath = this.state.getRunRelativePath(
+    const styleVariants =
+      await this.aiService.generateStyleVariants(updatedBrief);
+
+    const variantsRelativePath = this.state.getRunRelativePath(
       userId,
       run.id,
-      'spec',
-      'project-spec.json',
+      'style',
+      'style-variants.json',
     );
-    const specAbsolutePath = this.state.getRunAbsolutePath(
+    const variantsAbsolutePath = this.state.getRunAbsolutePath(
       userId,
       run.id,
-      'spec',
-      'project-spec.json',
+      'style',
+      'style-variants.json',
     );
+
     await this.state.writeGeneratedFile(
-      specAbsolutePath,
-      JSON.stringify(projectSpec, null, 2),
+      variantsAbsolutePath,
+      JSON.stringify(styleVariants, null, 2),
     );
 
     await this.state.updateArtifact(
       run.id,
-      ArtifactType.ProjectSpec,
-      specRelativePath,
+      ArtifactType.StyleVariants,
+      variantsRelativePath,
     );
-    await this.state.addLog(run.id, 'Спецификация обновлена', {
+
+    await this.state.addLog(run.id, 'Варианты стилистик обновлены', {
       instruction,
+      count: styleVariants.variants.length,
     });
-  }
-
-  private async regenerateDesign(
-    run: RunEntity,
-    instruction: string,
-    userId: string,
-  ): Promise<void> {
-    const specArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.ProjectSpec,
-    );
-    if (!specArtifact) {
-      await this.state.failRun(run, 'Спецификация не найдена');
-      return;
-    }
-
-    await this.cleanStepWorkspace(userId, run.id, 'design');
-
-    const specContent = await this.state.readArtifactFile(specArtifact.path);
-    const projectSpec = JSON.parse(specContent) as ProjectSpec;
-
-    const tokens = await this.aiService.generateDesignTokens(
-      run.brief,
-      projectSpec,
-    );
-    const designDescription = await this.aiService.generateDesignDescription(
-      run.brief,
-      projectSpec,
-      tokens,
-    );
-
-    const descRelativePath = this.state.getRunRelativePath(
-      userId,
-      run.id,
-      'design',
-      'design-description.md',
-    );
-    const descAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      run.id,
-      'design',
-      'design-description.md',
-    );
-    await this.state.writeGeneratedFile(
-      descAbsolutePath,
-      designDescription.markdown,
-    );
-
-    await this.state.updateArtifact(
-      run.id,
-      ArtifactType.DesignDescription,
-      descRelativePath,
-      'text/markdown',
-    );
-
-    const tokensRelativePath = this.state.getRunRelativePath(
-      userId,
-      run.id,
-      'design',
-      'design-tokens.json',
-    );
-    const tokensAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      run.id,
-      'design',
-      'design-tokens.json',
-    );
-    await this.state.writeGeneratedFile(
-      tokensAbsolutePath,
-      JSON.stringify(tokens, null, 2),
-    );
-
-    await this.state.updateArtifact(
-      run.id,
-      ArtifactType.DesignTokens,
-      tokensRelativePath,
-      'application/json',
-    );
-    await this.state.addLog(run.id, 'Дизайн обновлён', { instruction });
   }
 
   private async regenerateReference(
@@ -1036,599 +818,368 @@ export class PipelineService {
     instruction: string,
     userId: string,
   ): Promise<void> {
-    const specArtifact = await this.state.getArtifactByType(
+    const selectedStyleArtifact = await this.state.getArtifactByType(
       run.id,
-      ArtifactType.ProjectSpec,
-    );
-    const tokensArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignTokens,
-    );
-    const designArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignDescription,
+      ArtifactType.SelectedStyle,
     );
 
-    if (!specArtifact || !tokensArtifact || !designArtifact) {
-      await this.state.failRun(run, 'Артефакты не найдены');
+    if (!selectedStyleArtifact) {
+      await this.state.failRun(run, 'Выбранная стилистика не найдена');
       return;
     }
 
+    const styleContent = await this.state.readArtifactFile(
+      selectedStyleArtifact.path,
+    );
+    const selectedStyle = JSON.parse(styleContent) as StyleVariant;
+
     await this.cleanStepWorkspace(userId, run.id, 'reference');
 
-    const specContent = await this.state.readArtifactFile(specArtifact.path);
-    const tokensContent = await this.state.readArtifactFile(
-      tokensArtifact.path,
-    );
-    const designDescription = await this.state.readArtifactFile(
-      designArtifact.path,
-    );
-    const projectSpec = JSON.parse(specContent) as ProjectSpec;
-    const tokens = JSON.parse(tokensContent) as DesignTokens;
+    const updatedStyle: StyleVariant = instruction
+      ? {
+          ...selectedStyle,
+          description: `${selectedStyle.description}\n\nПравка: ${instruction}`,
+        }
+      : selectedStyle;
 
-    const referenceImage = await this.generateFluxReferenceImage(
-      run.brief,
-      projectSpec,
-      tokens,
-      designDescription,
-      userId,
+    await this.prepareReferenceImage(run, updatedStyle, userId);
+  }
+
+  private async regenerateCode(
+    run: RunEntity,
+    instruction: string,
+    userId: string,
+  ): Promise<void> {
+    const selectedStyleArtifact = await this.state.getArtifactByType(
       run.id,
-      run.id,
+      ArtifactType.SelectedStyle,
     );
 
-    await this.state.updateArtifact(
-      run.id,
-      ArtifactType.ReferenceImage,
-      referenceImage.relativePath,
-      referenceImage.mimeType,
+    if (!selectedStyleArtifact) {
+      await this.state.failRun(run, 'Выбранная стилистика не найдена');
+      return;
+    }
+
+    const styleContent = await this.state.readArtifactFile(
+      selectedStyleArtifact.path,
     );
-    await this.state.addLog(run.id, 'Визуальный референс обновлён', {
-      instruction,
-      model: referenceImage.model,
-    });
-    await this.state.updateRunStatus(
+    const selectedStyle = JSON.parse(styleContent) as StyleVariant;
+
+    await this.cleanStepWorkspace(userId, run.id, 'code');
+
+    const updatedBrief = instruction
+      ? `${run.brief}\n\nПравка кода: ${instruction}`
+      : run.brief;
+    await this.state.updateRun(run, { brief: updatedBrief });
+
+    const designDescription =
+      this.buildDesignDescriptionFromStyle(selectedStyle);
+    await this.prepareFrontendProject(
       run,
-      RunStatus.AwaitingReferenceApproval,
-      'awaiting_reference_approval',
+      selectedStyle,
+      designDescription,
       userId,
     );
   }
 
-  private async generateFluxReferenceImage(
+  // ===================== Helper methods =====================
+
+  private async generateStyleVariantImages(
     brief: string,
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
-    designDescription: string,
+    variants: StyleVariant[],
     userId: string,
-    slug: string,
     runId: string,
-  ): Promise<{ relativePath: string; mimeType: string; model: string }> {
-    const sections = this.normalizeReferenceSections(projectSpec);
-    const generatedBlocks: Array<{
-      sectionId: string;
-      title: string;
-      relativePath: string;
-      absolutePath: string;
-      mimeType: string;
-      model: string;
-    }> = [];
+  ): Promise<string[]> {
+    const savedPaths: string[] = [];
+    const outputDir = this.state.getRunAbsolutePath(userId, runId, 'style');
+    await fs.mkdir(outputDir, { recursive: true });
 
-    // Clear previously-emitted progressive blocks from any prior failed/restarted attempt
-    await this.state.deleteArtifactsByType(runId, ArtifactType.ReferenceBlock);
-
-    // Also remove any stale block PNGs from disk so the folder reflects only the
-    // current run's progress (otherwise leftover files mislead anyone inspecting
-    // the filesystem).
-    const blocksDir = this.state.getRunAbsolutePath(
-      userId,
-      slug,
-      'reference',
-      'blocks',
-    );
-    await fs.rm(blocksDir, { recursive: true, force: true });
-
-    // Build the shared art-direction primer once. The same string is used for
-    // every section so the model receives identical brand cues across chats,
-    // which is what keeps separately-generated blocks visually consistent.
-    const artDirection = this.buildArtDirectionSpec(projectSpec, tokens);
-
-    for (const [index, section] of sections.entries()) {
-      const prompt = this.buildSectionImagePrompt(
-        projectSpec,
-        tokens,
-        section,
-        artDirection,
-      );
-
+    for (const variant of variants) {
       await this.state.addLog(
         runId,
-        `Генерация блока ${index + 1}/${sections.length}: ${section.title}`,
-        { sectionId: section.id },
+        `Генерируем превью стилистики: ${variant.name}`,
       );
-      await this.state.touchRun(runId);
 
+      const prompt = this.buildStyleVariantImagePrompt(brief, variant);
       const result = await this.imagesService.generateImage(prompt);
-      const image = await this.downloadGeneratedImage(result.image);
-      const extension = this.getImageExtension(image.mimeType);
-      const fileName = `${String(index + 1).padStart(2, '0')}-${this.slugifySectionId(section.id)}.${extension}`;
+      const filename = `${variant.id}.png`;
+      const absolutePath = path.join(outputDir, filename);
+
+      await this.writeImageResultToFile(result.image, absolutePath);
+
       const relativePath = this.state.getRunRelativePath(
         userId,
-        slug,
-        'reference',
-        'blocks',
-        fileName,
-      );
-      const absolutePath = this.state.getRunAbsolutePath(
-        userId,
-        slug,
-        'reference',
-        'blocks',
-        fileName,
+        runId,
+        'style',
+        filename,
       );
 
-      await this.state.writeGeneratedFile(absolutePath, image.buffer);
-
-      // Emit progressive artifact so the UI can show this block immediately,
-      // without waiting for remaining sections or the full-page preview.
       await this.state.saveArtifact(
         runId,
-        ArtifactType.ReferenceBlock,
+        ArtifactType.StyleVariantImage,
         relativePath,
-        image.mimeType,
-      );
-      await this.state.touchRun(runId);
-      await this.state.addLog(
-        runId,
-        `Блок ${index + 1}/${sections.length} готов: ${section.title}`,
-        { sectionId: section.id, path: relativePath },
+        'image/png',
       );
 
-      generatedBlocks.push({
-        sectionId: section.id,
-        title: section.title,
-        relativePath,
-        absolutePath,
-        mimeType: image.mimeType,
-        model: result.model,
+      savedPaths.push(relativePath);
+    }
+
+    return savedPaths;
+  }
+
+  private buildStyleVariantImagePrompt(
+    brief: string,
+    variant: StyleVariant,
+  ): string {
+    return [
+      'Create a high-fidelity landing page hero section screenshot preview.',
+      'Generate exactly one hero block, not a full website.',
+      'Use a consistent 16:9 widescreen composition for every style variant.',
+      'The final image must be landscape, 1024x576 or equivalent 16:9 aspect ratio.',
+      'Keep the whole hero section fully visible inside the frame with safe margins.',
+      'Do not crop any part of the website preview at the edges.',
+      'No browser chrome, no mockup frame, no annotations, no explanatory text.',
+      `User brief: ${brief}`,
+      `Style variant name: ${variant.name}`,
+      `Description: ${variant.description}`,
+      `Visual style: ${variant.visualStyle}`,
+      `Color palette: ${variant.colorPalette.join(', ')}`,
+      `Typography: ${variant.typographyStyle}`,
+      `Layout: ${variant.layoutStyle}`,
+      `Mood keywords: ${variant.moodKeywords.join(', ')}`,
+      'The image must clearly communicate this distinct website style direction.',
+      'Use polished modern UI, realistic spacing, production-quality composition.',
+    ].join('\n');
+  }
+
+  private async writeImageResultToFile(
+    image: string,
+    absolutePath: string,
+  ): Promise<void> {
+    if (image.startsWith('data:image/')) {
+      const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+      await fs.writeFile(absolutePath, Buffer.from(base64, 'base64'));
+      return;
+    }
+
+    if (/^[A-Za-z0-9+/=]+$/.test(image)) {
+      await fs.writeFile(absolutePath, Buffer.from(image, 'base64'));
+      return;
+    }
+
+    const response = await fetch(image);
+    if (!response.ok) {
+      throw new Error(`Failed to download generated image: ${response.status}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(absolutePath, buffer);
+  }
+
+  private async generateReferenceBlockImages(
+    brief: string,
+    selectedStyle: StyleVariant,
+    userId: string,
+    runId: string,
+  ): Promise<GeneratedReferenceBlock[]> {
+    const outputDir = this.state.getRunAbsolutePath(userId, runId, 'reference');
+    await fs.mkdir(outputDir, { recursive: true });
+
+    const sections = this.buildReferenceSectionsFromBrief(brief);
+    const stylePrompt = this.buildStylePrompt(selectedStyle);
+    const blocks: GeneratedReferenceBlock[] = [];
+
+    for (const [index, section] of sections.entries()) {
+      await this.state.addLog(
+        runId,
+        `Генерируем референс блока: ${section.title}`,
+      );
+
+      const prompt = this.buildReferenceBlockImagePrompt(
+        brief,
+        selectedStyle,
+        stylePrompt,
+        section,
+        index,
+        sections.length,
+      );
+      const result = await this.imagesService.generateImage(prompt);
+      const filename = `${String(index + 1).padStart(2, '0')}-${section.id}.png`;
+      const absolutePath = path.join(outputDir, filename);
+      await this.writeImageResultToFile(result.image, absolutePath);
+
+      blocks.push({
+        section,
+        relativePath: this.state.getRunRelativePath(
+          userId,
+          runId,
+          'reference',
+          filename,
+        ),
+        mimeType: 'image/png',
+        model: result.model || 'flux',
       });
     }
 
-    const fullPage = await this.createFullPagePreview(generatedBlocks);
-    const fullPageRelativePath = this.state.getRunRelativePath(
-      userId,
-      slug,
-      'reference',
-      'full-page-preview.png',
-    );
-    const fullPageAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      slug,
-      'reference',
-      'full-page-preview.png',
-    );
-    await this.state.writeGeneratedFile(fullPageAbsolutePath, fullPage);
-
-    const manifestAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      slug,
-      'reference',
-      'blocks-manifest.json',
-    );
-    await this.state.writeGeneratedFile(
-      manifestAbsolutePath,
-      JSON.stringify(
-        {
-          workflow: 'one-section-one-image',
-          fullPagePreview: fullPageRelativePath,
-          blocks: generatedBlocks.map((block) => ({
-            sectionId: block.sectionId,
-            title: block.title,
-            path: block.relativePath,
-            mimeType: block.mimeType,
-            model: block.model,
-          })),
-        },
-        null,
-        2,
-      ),
-    );
-
-    return {
-      relativePath: fullPageRelativePath,
-      mimeType: 'image/png',
-      model: generatedBlocks[0]?.model ?? 'unknown',
-    };
+    return blocks;
   }
 
-  private normalizeReferenceSections(projectSpec: ProjectSpec) {
-    if (projectSpec.sections?.length) {
-      return projectSpec.sections;
+  private buildReferenceSectionsFromBrief(
+    brief: string,
+  ): ReferenceSectionPlan[] {
+    const knownSections: Array<[RegExp, ReferenceSectionPlan]> = [
+      [
+        /hero|главн|перв(ый|ого)\s+экран/i,
+        {
+          id: 'hero',
+          title: 'Hero',
+          goal: 'Capture attention and communicate the core value proposition',
+        },
+      ],
+      [
+        /benefits|преимуществ/i,
+        {
+          id: 'benefits',
+          title: 'Benefits',
+          goal: 'Explain the main user benefits',
+        },
+      ],
+      [
+        /features|фич|возможност/i,
+        {
+          id: 'features',
+          title: 'Features',
+          goal: 'Show key product or service features',
+        },
+      ],
+      [
+        /pricing|тариф|цен/i,
+        {
+          id: 'pricing',
+          title: 'Pricing',
+          goal: 'Present plans, pricing, or offer packages',
+        },
+      ],
+      [
+        /testimonial|review|отзыв|кейс/i,
+        {
+          id: 'testimonials',
+          title: 'Testimonials',
+          goal: 'Build trust with social proof',
+        },
+      ],
+      [
+        /faq|вопрос|часто/i,
+        {
+          id: 'faq',
+          title: 'FAQ',
+          goal: 'Answer objections and common questions',
+        },
+      ],
+      [
+        /cta|заявк|контакт|форма|запис/i,
+        {
+          id: 'final-cta',
+          title: 'Final CTA',
+          goal: 'Motivate the visitor to take the primary action',
+        },
+      ],
+    ];
+
+    const sections = knownSections
+      .filter(([pattern]) => pattern.test(brief))
+      .map(([, section]) => section);
+
+    if (sections.length > 0) {
+      return sections.slice(0, 8);
     }
 
     return [
       {
-        id: '01-hero',
-        type: 'hero' as const,
+        id: 'hero',
         title: 'Hero',
-        goal: 'Первый экран и основной CTA',
-        contentNotes: [projectSpec.copy.headline, projectSpec.copy.description],
-        visualNotes: projectSpec.visualPreferences ?? [],
-        requiredElements: projectSpec.requiredElements ?? [
-          'navigation',
-          'headline',
-          'description',
-          'primary CTA',
-        ],
+        goal: 'Capture attention and communicate the core value proposition',
+      },
+      {
+        id: 'benefits',
+        title: 'Benefits',
+        goal: 'Explain why the offer is valuable for the target audience',
+      },
+      {
+        id: 'features',
+        title: 'Features',
+        goal: 'Show the most important capabilities, services, or details',
+      },
+      {
+        id: 'final-cta',
+        title: 'Final CTA',
+        goal: 'Drive the visitor to the primary action',
       },
     ];
   }
 
-  private async downloadGeneratedImage(
-    imageUrl: string,
-  ): Promise<{ buffer: Buffer; mimeType: string }> {
-    const response = await fetch(imageUrl);
-
-    if (!response.ok) {
-      throw new Error(
-        `Не удалось скачать reference image: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    return {
-      buffer: Buffer.from(await response.arrayBuffer()),
-      mimeType: this.normalizeImageMimeType(
-        response.headers.get('content-type'),
-      ),
-    };
-  }
-
-  private async createFullPagePreview(
-    blocks: Array<{ absolutePath: string }>,
-  ): Promise<Buffer> {
-    const normalizedBlocks = await Promise.all(
-      blocks.map(async (block) => {
-        const { data, info } = await sharp(block.absolutePath)
-          .resize({
-            width: 1440,
-            withoutEnlargement: false,
-          })
-          .png()
-          .toBuffer({ resolveWithObject: true });
-
-        return {
-          buffer: data,
-          height: info.height,
-        };
-      }),
-    );
-    const totalHeight = normalizedBlocks.reduce(
-      (sum, block) => sum + block.height,
-      0,
-    );
-
-    return sharp({
-      create: {
-        width: 1440,
-        height: totalHeight,
-        channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
-      },
-    })
-      .composite(
-        normalizedBlocks.map((block, index) => ({
-          input: block.buffer,
-          left: 0,
-          top: normalizedBlocks
-            .slice(0, index)
-            .reduce((sum, previous) => sum + previous.height, 0),
-        })),
-      )
-      .png()
-      .toBuffer();
-  }
-
-  /**
-   * Compact, deterministic art direction kit shared by every section of the
-   * same site. Keeping this short and identical across calls is what makes
-   * the generated blocks feel like a single coherent product, even when each
-   * is generated in its own ChatGPT chat.
-   */
-  private buildArtDirectionSpec(
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
+  private buildReferenceBlockImagePrompt(
+    brief: string,
+    selectedStyle: StyleVariant,
+    stylePrompt: string,
+    section: ReferenceSectionPlan,
+    index: number,
+    totalSections: number,
   ): string {
-    const c = tokens.colors;
-    const t = tokens.typography;
-    const cmp = tokens.components;
-
-    const palette = [
-      `background ${c.background}`,
-      c.backgroundGradient ? `bg-gradient ${c.backgroundGradient}` : null,
-      `accent ${c.accent}`,
-      c.accentSecondary ? `accent-2 ${c.accentSecondary}` : null,
-      `text ${c.textPrimary}`,
-      `text-secondary ${c.textSecondary}`,
-      `surface ${c.surface}`,
-      `border ${c.border}`,
-    ]
-      .filter(Boolean)
-      .join(', ');
-
-    const fontFamily =
-      t.fontFamily?.replace(/['"]/g, '').split(',')[0]?.trim() ||
-      'modern sans-serif';
-
-    const mood =
-      (projectSpec.stylePreference ?? []).slice(0, 4).join(', ') ||
-      'modern, clean';
-    const visualPrefs = (projectSpec.visualPreferences ?? [])
-      .slice(0, 4)
-      .join('; ');
-    const avoid = (tokens.assets?.avoid ?? []).join(', ');
-
     return [
-      `SITE: ${projectSpec.productName} — ${projectSpec.productDescription}`,
-      `INDUSTRY: ${projectSpec.industry ?? 'general'} | AUDIENCE: ${projectSpec.audience}`,
-      `MOOD: ${mood}`,
-      visualPrefs ? `VISUAL PREFERENCES: ${visualPrefs}` : '',
-      `PALETTE: ${palette}`,
-      `TYPOGRAPHY: headline ${t.headlineSize}/${t.headlineWeight} ${fontFamily}, body ${t.bodySize}, line-height ${t.lineHeight}`,
-      `COMPONENTS: button radius ${cmp.buttonRadius}${cmp.buttonHeight ? ` (h ${cmp.buttonHeight})` : ''}, card radius ${cmp.cardRadius} with shadow ${cmp.cardShadow}; dark surfaces with thin borders; subtle glow accents`,
-      avoid ? `AVOID: ${avoid}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  /**
-   * Build a focused image-generation prompt for a single section.
-   * Each section is rendered in its own fresh ChatGPT chat, so the prompt
-   * must be self-contained but as small as possible.
-   */
-  private buildSectionImagePrompt(
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
-    section: ProjectSpec['sections'][number],
-    artDirection: string,
-  ): string {
-    const sectionTokens = tokens.sections?.[section.id];
-    const isHero = section.type === 'hero';
-    const nav = projectSpec.navigation;
-
-    const navLine =
-      isHero && nav
-        ? `NAV (top of section): logo "${nav.logo}", menu [${(nav.menuItems ?? []).join(' | ')}]${nav.ctaButton ? `, CTA "${nav.ctaButton}"` : ''}.`
-        : 'Do NOT draw a navigation bar in this section — navigation appears only on the hero block.';
-
-    const heroCopyLines: string[] = [];
-    if (isHero) {
-      const copy = projectSpec.copy;
-      if (copy?.headline) heroCopyLines.push(`H1: "${copy.headline}"`);
-      if (copy?.headlineAccent)
-        heroCopyLines.push(`H1 accent: "${copy.headlineAccent}"`);
-      if (copy?.description)
-        heroCopyLines.push(`Lead paragraph: "${copy.description}"`);
-      if (copy?.primaryButton)
-        heroCopyLines.push(`Primary CTA: "${copy.primaryButton}"`);
-      if (copy?.secondaryButton)
-        heroCopyLines.push(`Secondary CTA: "${copy.secondaryButton}"`);
-      if (copy?.trustLine)
-        heroCopyLines.push(`Trust line: "${copy.trustLine}"`);
-    }
-
-    const sectionMeta = [
-      sectionTokens?.background
-        ? `Section background: ${sectionTokens.background}`
-        : '',
-      sectionTokens?.layout ? `Section layout: ${sectionTokens.layout}` : '',
-      sectionTokens?.spacing ? `Section spacing: ${sectionTokens.spacing}` : '',
-      sectionTokens?.visualRole
-        ? `Visual role: ${sectionTokens.visualRole}`
-        : '',
-    ].filter(Boolean);
-
-    return [
-      'Render ONE section of a desktop landing page as a clean 1440px-wide website screenshot.',
-      'No browser chrome, no device mockups, no annotations, no editor UI, no unrelated text.',
-      'Strong typography, clear hierarchy, generous spacing, readable text, frontend-implementable layout.',
-      '',
-      '=== SHARED ART DIRECTION (must match every section of this site) ===',
-      artDirection,
-      '',
-      `=== THIS SECTION (${section.id}) ===`,
-      `Type: ${section.type} — section title (in copy): "${section.title}"`,
-      `Goal: ${section.goal}`,
-      `Required elements: ${(section.requiredElements ?? []).join(', ') || '(use sensible defaults for this section type)'}`,
-      `Content to convey:\n  - ${(section.contentNotes ?? ['(use section title and goal)']).join('\n  - ')}`,
-      section.visualNotes && section.visualNotes.length > 0
-        ? `Visual hints:\n  - ${section.visualNotes.join('\n  - ')}`
-        : '',
-      ...sectionMeta,
-      heroCopyLines.length > 0
-        ? `Exact copy to include verbatim:\n  - ${heroCopyLines.join('\n  - ')}`
-        : '',
-      '',
-      navLine,
-      '',
-      `LANGUAGE: All visible UI text MUST be in "${projectSpec.language}" (e.g., "ru" → Russian).`,
-      'CRITICAL: Do NOT invent a different style. Use the exact palette, typography, button and card shapes from the SHARED ART DIRECTION above. Other sections of this site will be generated with the same tokens and must stack into one coherent product.',
-    ]
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  private slugifySectionId(sectionId: string): string {
-    const slug = sectionId
-      .toLowerCase()
-      .replace(/[^a-z0-9а-яё-]+/gi, '-')
-      .replace(/^-+|-+$/g, '');
-
-    return slug || 'section';
-  }
-
-  private normalizeImageMimeType(contentType: string | null): string {
-    const mimeType = contentType?.split(';')[0]?.trim().toLowerCase();
-
-    if (
-      mimeType === 'image/png' ||
-      mimeType === 'image/jpeg' ||
-      mimeType === 'image/webp'
-    ) {
-      return mimeType;
-    }
-
-    return 'image/png';
-  }
-
-  private getImageExtension(mimeType: string): 'png' | 'jpg' | 'webp' {
-    if (mimeType === 'image/jpeg') return 'jpg';
-    if (mimeType === 'image/webp') return 'webp';
-    return 'png';
-  }
-
-  private async buildCodegenContextForRun(
-    runId: string,
-    designDescription: string,
-  ): Promise<string> {
-    const [projectSpecSummary, designContextSummary, referenceContextSummary] =
-      await Promise.all([
-        this.readJsonArtifact<ProjectSpecSummary>(
-          runId,
-          ArtifactType.ProjectSpecSummary,
-        ),
-        this.readJsonArtifact<DesignContextSummary>(
-          runId,
-          ArtifactType.DesignContextSummary,
-        ),
-        this.readJsonArtifact<ReferenceContextSummary>(
-          runId,
-          ArtifactType.ReferenceContextSummary,
-        ),
-      ]);
-
-    return buildCodegenContext({
-      projectSpecSummary,
-      designContextSummary,
-      referenceContextSummary,
-      designDescription,
-      visualReferenceContext: await this.buildVisualReferenceContext(runId),
-    });
-  }
-
-  private async readJsonArtifact<T>(
-    runId: string,
-    type: ArtifactType,
-  ): Promise<T | undefined> {
-    const artifact = await this.state.getArtifactByType(runId, type);
-
-    if (!artifact) {
-      return undefined;
-    }
-
-    try {
-      return JSON.parse(await this.state.readArtifactFile(artifact.path)) as T;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private async buildVisualReferenceContext(runId: string): Promise<string> {
-    const summaryArtifact = await this.state.getArtifactByType(
-      runId,
-      ArtifactType.ReferenceContextSummary,
-    );
-
-    if (summaryArtifact) {
-      try {
-        const summary = await this.state.readArtifactFile(summaryArtifact.path);
-        return [
-          'Approved visual reference summary (use as primary visual source):',
-          summary,
-          'Match layout, spacing, hierarchy and palette to the approved blocks. Do not redesign sections; do not rasterize whole sections in code.',
-        ].join('\n');
-      } catch {
-        // fall through to manifest/full-page handling
-      }
-    }
-
-    const referenceArtifact = await this.state.getArtifactByType(
-      runId,
-      ArtifactType.ReferenceImage,
-    );
-
-    if (!referenceArtifact) {
-      return 'Visual references: not generated yet.';
-    }
-
-    const manifestPath = referenceArtifact.path.replace(
-      /reference\/full-page-preview\.(png|svg)$/,
-      'reference/blocks-manifest.json',
-    );
-
-    try {
-      const manifest = await this.state.readArtifactFile(manifestPath);
-
-      return [
-        'Approved visual references:',
-        `Full-page preview: ${referenceArtifact.path}`,
-        `Blocks manifest:\n${manifest}`,
-        'Use these block references as the primary visual source. Match them with real HTML/CSS; do not rasterize whole sections.',
-      ].join('\n');
-    } catch {
-      return [
-        'Approved visual references:',
-        `Full-page preview: ${referenceArtifact.path}`,
-        'Blocks manifest is unavailable. Use the full-page preview path as the approved reference and keep code aligned with the design description.',
-      ].join('\n');
-    }
+      'Create a high-fidelity website section screenshot preview.',
+      'Generate exactly one section/block, not a full page.',
+      `This is section ${index + 1} of ${totalSections}.`,
+      `Section title: ${section.title}`,
+      `Section goal: ${section.goal}`,
+      'Use a consistent 16:9 widescreen composition.',
+      'Keep the whole section fully visible inside the frame with safe margins.',
+      'No browser chrome, no mockup frame, no annotations, no explanatory text.',
+      `User brief: ${brief}`,
+      `Selected style name: ${selectedStyle.name}`,
+      `Selected style description: ${selectedStyle.description}`,
+      `Visual style: ${stylePrompt}`,
+      'All generated reference blocks must feel like parts of the same website.',
+      'Use the same palette, typography, spacing system, visual effects, and component language across sections.',
+    ].join('\n');
   }
 
   private async saveReferenceContextSummary(
     runId: string,
     userId: string,
     slug: string,
-    projectSpec: ProjectSpec,
-    fullPageReferencePath: string,
+    referenceImagePath: string,
+    referenceBlocks: GeneratedReferenceBlock[],
+    selectedStyle: StyleVariant,
   ): Promise<string> {
-    const manifestRelativePath = fullPageReferencePath.replace(
-      /reference\/full-page-preview\.(png|svg)$/,
-      'reference/blocks-manifest.json',
-    );
-
-    let manifest: {
-      workflow?: string;
-      fullPagePreview?: string;
-      blocks?: Array<{
-        sectionId: string;
-        title?: string;
-        path: string;
-        mimeType?: string;
-      }>;
-    } = {};
-
-    try {
-      const manifestRaw =
-        await this.state.readArtifactFile(manifestRelativePath);
-      manifest = JSON.parse(manifestRaw) as typeof manifest;
-    } catch {
-      manifest = {};
-    }
-
-    const summary = buildReferenceContextSummary(
-      projectSpec,
-      manifest,
-      fullPageReferencePath,
-    );
+    const summary: ReferenceContextSummary = {
+      workflow: 'style-based-reference',
+      fullPagePreview: referenceImagePath,
+      sections: referenceBlocks.map((block) => ({
+        sectionId: block.section.id,
+        title: block.section.title,
+        goal: block.section.goal,
+        path: block.relativePath,
+        mimeType: block.mimeType,
+      })),
+      notes: [
+        `Selected style: ${selectedStyle.name}`,
+        `Visual direction: ${selectedStyle.visualStyle}`,
+        `Color palette: ${selectedStyle.colorPalette.join(', ')}`,
+        `Typography: ${selectedStyle.typographyStyle}`,
+        `Layout: ${selectedStyle.layoutStyle}`,
+        'Use this reference as the primary visual source for code generation.',
+      ],
+    };
 
     const summaryRelativePath = this.state.getRunRelativePath(
       userId,
-      slug,
+      runId,
       'reference',
       'reference-context.summary.json',
     );
     const summaryAbsolutePath = this.state.getRunAbsolutePath(
       userId,
-      slug,
+      runId,
       'reference',
       'reference-context.summary.json',
     );
@@ -1637,6 +1188,7 @@ export class PipelineService {
       summaryAbsolutePath,
       JSON.stringify(summary, null, 2),
     );
+
     await this.state.saveArtifact(
       runId,
       ArtifactType.ReferenceContextSummary,
@@ -1647,95 +1199,6 @@ export class PipelineService {
     return summaryRelativePath;
   }
 
-  /**
-   * Load the approved reference images for a run as data URLs ready to pass
-   * to the multimodal code-generation prompts:
-   *   - `fullPageImageDataUrl`: the stitched full-page preview, used to anchor
-   *     the layout call.
-   *   - `sectionImageMap`: section.id → data URL of the per-section block,
-   *     used as the visual source of truth for each section codegen call.
-   *
-   * If a file is missing or unreadable we silently skip it — the prompt builder
-   * accepts `null` and falls back to a text-only prompt for that step.
-   */
-  private async buildCodegenImageContext(runId: string): Promise<{
-    fullPageImageDataUrl: string | null;
-    sectionImageMap: Map<string, string>;
-  }> {
-    const sectionImageMap = new Map<string, string>();
-    let fullPageImageDataUrl: string | null = null;
-
-    try {
-      const blockArtifacts = await this.state.getArtifactsByType(
-        runId,
-        ArtifactType.ReferenceBlock,
-      );
-      for (const block of blockArtifacts) {
-        const sectionId = this.parseSectionIdFromBlockPath(block.path);
-        if (!sectionId) continue;
-        try {
-          const absolutePath = this.state.getArtifactAbsolutePath(block.path);
-          const dataUrl = await loadImageAsDataUrl(absolutePath);
-          sectionImageMap.set(sectionId, dataUrl);
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          await this.state.addLog(
-            runId,
-            `Не удалось загрузить картинку блока для codegen: ${block.path}`,
-            { error: message },
-          );
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.state.addLog(
-        runId,
-        'Не удалось получить артефакты блоков-референсов для codegen',
-        { error: message },
-      );
-    }
-
-    try {
-      const referenceArtifact = await this.state.getArtifactByType(
-        runId,
-        ArtifactType.ReferenceImage,
-      );
-      if (
-        referenceArtifact &&
-        (referenceArtifact.mimeType ?? '').startsWith('image/') &&
-        !referenceArtifact.path.endsWith('.svg')
-      ) {
-        const absolutePath = this.state.getArtifactAbsolutePath(
-          referenceArtifact.path,
-        );
-        fullPageImageDataUrl = await loadImageAsDataUrl(absolutePath);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.state.addLog(
-        runId,
-        'Не удалось загрузить full-page-preview для codegen',
-        { error: message },
-      );
-    }
-
-    return { fullPageImageDataUrl, sectionImageMap };
-  }
-
-  /**
-   * Reverse the filename convention used in `generateFluxReferenceImage`:
-   *   `<index>-<slugified-section-id>.<ext>` (e.g. `01-01-hero.png`).
-   * Strip the leading order prefix once so we get back the original section.id.
-   */
-  private parseSectionIdFromBlockPath(relativePath: string): string | null {
-    const fileName = relativePath.split('/').pop();
-    if (!fileName) return null;
-    const stem = fileName.replace(/\.[^.]+$/, '');
-    const withoutOrder = stem.replace(/^\d+-/, '');
-    return withoutOrder || null;
-  }
-
   private async saveCodegenArtifact(
     runId: string,
     userId: string,
@@ -1743,133 +1206,297 @@ export class PipelineService {
     kind: CodegenArtifactKind,
     data: unknown,
   ): Promise<void> {
-    const config: Record<
-      CodegenArtifactKind,
-      { type: ArtifactType; fileName: string }
-    > = {
-      'code-plan': {
-        type: ArtifactType.CodePlan,
-        fileName: 'code-plan.json',
-      },
-      'content-module': {
-        type: ArtifactType.CodeContentModule,
-        fileName: 'content-module.json',
-      },
-      'layout-module': {
-        type: ArtifactType.CodeLayoutModule,
-        fileName: 'layout-module.json',
-      },
-      'sections-module': {
-        type: ArtifactType.CodeSectionsModule,
-        fileName: 'sections-module.json',
-      },
+    const artifactTypeMap: Record<CodegenArtifactKind, ArtifactType> = {
+      'code-plan': ArtifactType.CodePlan,
+      'content-module': ArtifactType.CodeContentModule,
+      'layout-module': ArtifactType.CodeLayoutModule,
+      'sections-module': ArtifactType.CodeSectionsModule,
     };
-    const item = config[kind];
+
+    const filenameMap: Record<CodegenArtifactKind, string> = {
+      'code-plan': 'code-plan.json',
+      'content-module': 'content-module.json',
+      'layout-module': 'layout-module.json',
+      'sections-module': 'sections-module.json',
+    };
+
     const relativePath = this.state.getRunRelativePath(
       userId,
-      slug,
+      runId,
       'codegen',
-      item.fileName,
+      filenameMap[kind],
     );
     const absolutePath = this.state.getRunAbsolutePath(
       userId,
-      slug,
+      runId,
       'codegen',
-      item.fileName,
+      filenameMap[kind],
     );
 
     await this.state.writeGeneratedFile(
       absolutePath,
       JSON.stringify(data, null, 2),
     );
+
     await this.state.saveArtifact(
       runId,
-      item.type,
+      artifactTypeMap[kind],
       relativePath,
       'application/json',
     );
   }
 
-  private async regenerateCode(
-    run: RunEntity,
-    instruction: string,
-    userId: string,
-  ): Promise<void> {
-    const specArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.ProjectSpec,
+  private async buildCodegenImageContext(runId: string): Promise<{
+    fullPageImageDataUrl: string | null;
+    sectionImageMap: Map<string, string>;
+  }> {
+    const referenceArtifact = await this.state.getArtifactByType(
+      runId,
+      ArtifactType.ReferenceImage,
     );
-    const tokensArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignTokens,
-    );
-    const designArtifact = await this.state.getArtifactByType(
-      run.id,
-      ArtifactType.DesignDescription,
+    const referenceBlocks = await this.state.getArtifactsByType(
+      runId,
+      ArtifactType.ReferenceBlock,
     );
 
-    if (!specArtifact || !tokensArtifact || !designArtifact) {
-      await this.state.failRun(run, 'Артефакты не найдены');
-      return;
+    if (!referenceArtifact) {
+      const sectionImageMap = await this.buildSectionImageMap(referenceBlocks);
+      return { fullPageImageDataUrl: null, sectionImageMap };
     }
 
-    await this.cleanStepWorkspace(userId, run.id, 'code');
+    const fullPagePath = this.state.getArtifactAbsolutePath(
+      referenceArtifact.path,
+    );
+    const fullPageImageDataUrl = await loadImageAsDataUrl(fullPagePath);
 
-    const specContent = await this.state.readArtifactFile(specArtifact.path);
-    const tokensContent = await this.state.readArtifactFile(
-      tokensArtifact.path,
-    );
-    const designDescription = await this.state.readArtifactFile(
-      designArtifact.path,
-    );
-    const projectSpec = JSON.parse(specContent) as unknown as ProjectSpec;
-    const tokens = JSON.parse(tokensContent) as unknown as DesignTokens;
+    return {
+      fullPageImageDataUrl,
+      sectionImageMap: await this.buildSectionImageMap(referenceBlocks),
+    };
+  }
 
-    const codePath = path.join(
-      this.storageService.getRunPath(userId, run.id),
-      'code',
-    );
-    const codegenContext = await this.buildCodegenContextForRun(
-      run.id,
-      designDescription,
-    );
-    const codegenImages = await this.buildCodegenImageContext(run.id);
-    await this.state.addLog(
-      run.id,
-      `Codegen visual input: full-page=${codegenImages.fullPageImageDataUrl ? 'yes' : 'no'}, section blocks=${codegenImages.sectionImageMap.size}`,
-    );
-    await this.codeGeneratorService.generateProjectFiles(
-      run.brief,
-      projectSpec,
-      tokens,
-      codegenContext,
-      codePath,
-      {
-        onCodegenArtifact: (payload: CodegenArtifactPayload) =>
-          this.saveCodegenArtifact(
-            run.id,
-            userId,
-            run.id,
-            payload.kind,
-            payload.data,
-          ),
-        fullPageImageDataUrl: codegenImages.fullPageImageDataUrl,
-        sectionImageMap: codegenImages.sectionImageMap,
+  private async buildSectionImageMap(
+    referenceBlocks: Array<{ path: string }>,
+  ): Promise<Map<string, string>> {
+    const sectionImageMap = new Map<string, string>();
+
+    for (const block of referenceBlocks) {
+      const fileName = path.basename(block.path).replace(/\.[^.]+$/, '');
+      const sectionId = fileName.replace(/^\d+-/, '');
+      const absolutePath = this.state.getArtifactAbsolutePath(block.path);
+      sectionImageMap.set(sectionId, await loadImageAsDataUrl(absolutePath));
+    }
+
+    return sectionImageMap;
+  }
+
+  private buildStyleCodegenContext(selectedStyle: StyleVariant): string {
+    return [
+      'Project Context:',
+      `- Style name: ${selectedStyle.name}`,
+      `- Visual style: ${selectedStyle.visualStyle}`,
+      `- Color palette: ${selectedStyle.colorPalette.join(', ')}`,
+      `- Typography: ${selectedStyle.typographyStyle}`,
+      `- Layout: ${selectedStyle.layoutStyle}`,
+      `- Mood: ${selectedStyle.moodKeywords.join(', ')}`,
+      '',
+      `Description: ${selectedStyle.description}`,
+    ].join('\n');
+  }
+
+  private buildProjectSpecFromStyle(
+    brief: string,
+    selectedStyle: StyleVariant,
+  ): ProjectSpec {
+    return {
+      projectType: 'landing-page',
+      idea: brief,
+      goal: 'Generate a modern landing page from the user brief and selected visual style',
+      language: brief.includes('Target site language: English')
+        ? 'English'
+        : 'Russian',
+      stylePreference: [
+        selectedStyle.name,
+        selectedStyle.visualStyle,
+        selectedStyle.layoutStyle,
+      ],
+      productName: selectedStyle.name,
+      productDescription: brief,
+      audience: 'Target audience from the user brief',
+      requiredElements: [
+        'clear headline',
+        'value proposition',
+        'primary call to action',
+        'trust signals',
+      ],
+      contentNotes: [brief],
+      visualNotes: [
+        selectedStyle.description,
+        selectedStyle.visualStyle,
+        selectedStyle.layoutStyle,
+      ],
+      assumptions: [
+        'Infer missing product, audience and conversion details from the brief',
+      ],
+      sections: [
+        {
+          id: 'hero',
+          type: 'hero',
+          title: 'Hero',
+          goal: 'Explain the offer and drive the main action',
+          contentNotes: [brief],
+          visualNotes: [selectedStyle.visualStyle],
+          requiredElements: ['headline', 'description', 'primary CTA'],
+        },
+        {
+          id: 'benefits',
+          type: 'benefits',
+          title: 'Benefits',
+          goal: 'Show the key reasons to choose the offer',
+          contentNotes: ['Infer 3-4 strongest benefits from the brief'],
+          visualNotes: [selectedStyle.visualStyle],
+          requiredElements: ['benefit cards', 'short explanations'],
+        },
+        {
+          id: 'features',
+          type: 'features',
+          title: 'Features',
+          goal: 'Explain what the product or service includes',
+          contentNotes: ['Infer key features from the brief'],
+          visualNotes: [selectedStyle.visualStyle],
+          requiredElements: ['feature list', 'supporting visual structure'],
+        },
+        {
+          id: 'final-cta',
+          type: 'final-cta-footer',
+          title: 'Final CTA',
+          goal: 'Convert the visitor',
+          contentNotes: ['Create a concise closing call to action'],
+          visualNotes: [selectedStyle.visualStyle],
+          requiredElements: ['CTA button', 'footer'],
+        },
+      ],
+      copy: {
+        headline: 'Generated landing page headline',
+        description: brief,
+        primaryButton: 'Начать',
+        secondaryButton: 'Подробнее',
       },
-    );
+      navigation: {
+        logo: selectedStyle.name,
+        menuItems: ['Преимущества', 'Возможности', 'Контакты'],
+        ctaButton: 'Начать',
+      },
+      visualPreferences: [
+        selectedStyle.visualStyle,
+        selectedStyle.typographyStyle,
+        selectedStyle.layoutStyle,
+      ],
+      colorHints: {
+        background: selectedStyle.colorPalette[0],
+        accent: selectedStyle.colorPalette.slice(1, 3),
+        text: selectedStyle.colorPalette.at(-1),
+      },
+    };
+  }
 
-    await this.state.addLog(run.id, 'Код сайта перегенерирован', {
-      instruction,
-    });
+  private buildDesignTokensFromStyle(
+    selectedStyle: StyleVariant,
+  ): DesignTokens {
+    const [background, accent, accentSecondary, surface, textPrimary, border] =
+      [
+        selectedStyle.colorPalette[0] ?? '#0F172A',
+        selectedStyle.colorPalette[1] ?? '#3B82F6',
+        selectedStyle.colorPalette[2] ?? '#8B5CF6',
+        selectedStyle.colorPalette[3] ?? '#FFFFFF',
+        selectedStyle.colorPalette[4] ?? '#111827',
+        selectedStyle.colorPalette[5] ?? '#E5E7EB',
+      ];
 
-    await this.runBuildAndQAWithRepair(
-      run,
-      run.id,
-      userId,
-      projectSpec,
-      tokens,
-      codegenContext,
-      codePath,
-    );
+    return {
+      colors: {
+        background,
+        textPrimary,
+        textSecondary: '#64748B',
+        accent,
+        accentSecondary,
+        surface,
+        border,
+      },
+      layout: {
+        containerWidth: '1200px',
+        sectionPaddingY: '96px',
+        sectionPaddingX: '24px',
+        columns: selectedStyle.layoutStyle.toLowerCase().includes('split')
+          ? 2
+          : 1,
+        gridGap: '24px',
+        heroMinHeight: '720px',
+      },
+      typography: {
+        headlineSize: 'clamp(48px, 7vw, 92px)',
+        headlineMobileSize: '44px',
+        headlineWeight: 800,
+        bodySize: '18px',
+        lineHeight: '1.55',
+        fontFamily: selectedStyle.typographyStyle,
+      },
+      components: {
+        buttonRadius: '999px',
+        buttonHeight: '52px',
+        cardRadius: '28px',
+        cardShadow: '0 24px 80px rgba(15, 23, 42, 0.14)',
+      },
+      sections: {
+        hero: {
+          layout: selectedStyle.layoutStyle,
+          visualRole: selectedStyle.visualStyle,
+        },
+      },
+      assets: {
+        imageStyle: selectedStyle.visualStyle,
+        illustrationStyle: selectedStyle.visualStyle,
+        avoid: ['generic stock-photo look', 'unstyled default UI'],
+      },
+      responsive: {
+        desktopBreakpoint: '1024px',
+        tabletBreakpoint: '768px',
+        mobileBreakpoint: '640px',
+        mobileLayout: 'single-column responsive layout',
+      },
+    };
+  }
+
+  private buildDesignDescriptionFromStyle(selectedStyle: StyleVariant): string {
+    return [
+      `# ${selectedStyle.name}`,
+      '',
+      selectedStyle.description,
+      '',
+      '## Visual Direction',
+      selectedStyle.visualStyle,
+      '',
+      '## Color Palette',
+      ...selectedStyle.colorPalette.map((c) => `- ${c}`),
+      '',
+      '## Typography',
+      selectedStyle.typographyStyle,
+      '',
+      '## Layout Approach',
+      selectedStyle.layoutStyle,
+      '',
+      '## Mood',
+      selectedStyle.moodKeywords.join(', '),
+    ].join('\n');
+  }
+
+  private buildStylePrompt(selectedStyle: StyleVariant): string {
+    return [
+      selectedStyle.visualStyle,
+      `Colors: ${selectedStyle.colorPalette.join(', ')}`,
+      `Typography: ${selectedStyle.typographyStyle}`,
+      `Layout: ${selectedStyle.layoutStyle}`,
+      `Mood: ${selectedStyle.moodKeywords.join(', ')}`,
+    ].join('. ');
   }
 }

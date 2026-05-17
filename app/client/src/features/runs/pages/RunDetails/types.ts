@@ -2,11 +2,10 @@ import type { RunArtifact } from "@/api/services/runs";
 
 export type RunDetailsTab =
   | "overview"
+  | "style"
   | "reference"
-  | "result"
-  | "spec"
-  | "design"
   | "code"
+  | "result"
   | "artifacts"
   | "logs";
 

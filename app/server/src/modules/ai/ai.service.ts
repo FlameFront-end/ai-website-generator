@@ -11,6 +11,7 @@ import type {
   GeneratedLayoutModule,
   GeneratedSectionModule,
   ProjectSpec,
+  StyleVariantsResult,
 } from './ai.types';
 import { AiProviderRegistry } from './providers/ai-provider.registry';
 import { buildExtractSpecMessages } from './prompts/extract-spec.prompt';
@@ -19,6 +20,10 @@ import { buildDesignDescriptionMessages } from './prompts/design-description.pro
 import { buildGenerateCodeMessages } from './prompts/generate-code.prompt';
 import { buildGenerateSvgMessages } from './prompts/generate-svg.prompt';
 import { buildClarifyBriefMessages } from './prompts/clarify-brief.prompt';
+import {
+  buildGenerateStyleVariantsMessages,
+  normalizeStyleVariantsResult,
+} from './prompts/generate-style-variants.prompt';
 import { buildCodePlanMessages } from './prompts/code-plan.prompt';
 import { buildGenerateContentMessages } from './prompts/generate-content.prompt';
 import { buildGenerateLayoutMessages } from './prompts/generate-layout.prompt';
@@ -169,6 +174,27 @@ export class AiService {
       'deadline',
       'budget',
     ].some((word) => question.includes(word));
+  }
+
+  /**
+   * Generate style variants based on brief via LLM
+   */
+  async generateStyleVariants(brief: string): Promise<StyleVariantsResult> {
+    this.logger.log('Generating style variants via AI');
+
+    const result = await this.providers.chat('analysis', {
+      messages: buildGenerateStyleVariantsMessages(brief),
+      json: true,
+      temperature: 0.4,
+      maxTokens: 4096,
+    });
+
+    const parsed = this.parseJson<StyleVariantsResult>(
+      result.content,
+      'StyleVariantsResult',
+    );
+
+    return normalizeStyleVariantsResult(parsed);
   }
 
   private buildFallbackFinalBrief(

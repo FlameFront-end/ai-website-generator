@@ -11,8 +11,7 @@ interface ApprovalPanelProps {
 }
 
 const STEP_TITLES: Record<string, string> = {
-  awaiting_spec_approval: "Спецификация",
-  awaiting_design_approval: "Дизайн",
+  awaiting_style_selection: "Стилистика",
   awaiting_reference_approval: "Визуальный референс",
   awaiting_code_approval: "Код проекта",
   awaiting_final_approval: "Финальный результат",

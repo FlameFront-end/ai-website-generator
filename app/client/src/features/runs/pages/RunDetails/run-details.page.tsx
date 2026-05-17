@@ -11,25 +11,22 @@ import { useActiveTab, useRunActions, useRunArtifacts } from "./hooks";
 import {
   ArtifactsTab,
   CodeTab,
-  DesignTab,
   LogsTab,
   OverviewTab,
   ReferenceTab,
   ResultTab,
-  SpecTab,
+  StyleTab,
 } from "./tabs";
 import styles from "./run-details.module.scss";
 
 const STATUS_TO_TAB = {
-  awaiting_spec_approval: "spec",
-  awaiting_design_approval: "design",
+  awaiting_style_selection: "style",
   awaiting_reference_approval: "reference",
   awaiting_final_approval: "result",
 } as const;
 
 const RESTARTABLE_STATUSES = new Set([
-  "awaiting_spec_approval",
-  "awaiting_design_approval",
+  "awaiting_style_selection",
   "awaiting_reference_approval",
   "failed",
   "pipeline_failed",
@@ -58,9 +55,8 @@ export default function RunDetailsPage() {
 
   const getStepFromStatus = (
     status: string,
-  ): "spec" | "design" | "reference" | "code" | "final" | null => {
-    if (status === "awaiting_spec_approval") return "spec";
-    if (status === "awaiting_design_approval") return "design";
+  ): "style" | "reference" | "code" | "final" | null => {
+    if (status === "awaiting_style_selection") return "style";
     if (status === "awaiting_reference_approval") return "reference";
     if (status === "awaiting_final_approval") return "final";
     return null;
@@ -126,9 +122,7 @@ export default function RunDetailsPage() {
   }
 
   const effectiveCurrentStep = getEffectiveCurrentStep(run.currentStep, {
-    hasProjectSpec: Boolean(artifacts.project_spec),
-    hasDesignTokens: Boolean(artifacts.design_tokens),
-    hasDesignDescription: Boolean(artifacts.design_description),
+    hasStyleVariants: Boolean(artifacts.style_variants),
     hasReferenceImage: Boolean(artifacts.reference_image),
     hasFrontendProject: Boolean(artifacts.frontend_project),
   });
@@ -149,11 +143,7 @@ export default function RunDetailsPage() {
         canRestartCodeStep={
           Boolean(artifacts.frontend_project) &&
           CODE_RESTARTABLE_STATUSES.has(run.status) &&
-          Boolean(
-            artifacts.project_spec &&
-            artifacts.design_tokens &&
-            artifacts.design_description,
-          )
+          Boolean(artifacts.selected_style && artifacts.reference_image)
         }
         onRename={(displayName) => actions.rename(run.id, displayName)}
         onDelete={() => setShowDeleteModal(true)}
@@ -199,20 +189,14 @@ export default function RunDetailsPage() {
           />
         )}
 
-        {activeTab === "spec" && (
-          <SpecTab
+        {activeTab === "style" && (
+          <StyleTab
             runId={run.id}
-            artifact={artifacts.project_spec}
-            styles={styles}
-          />
-        )}
-
-        {activeTab === "design" && (
-          <DesignTab
-            runId={run.id}
-            designDescription={artifacts.design_description}
-            designTokens={artifacts.design_tokens}
-            styles={styles}
+            status={run.status}
+            variantsArtifact={artifacts.style_variants}
+            imageArtifacts={artifacts.style_variant_images}
+            selectedStyleArtifact={artifacts.selected_style}
+            onSelected={() => void runQuery.refetch()}
           />
         )}
 
@@ -249,9 +233,7 @@ export default function RunDetailsPage() {
 function getEffectiveCurrentStep(
   currentStep: string | null | undefined,
   artifacts: {
-    hasProjectSpec: boolean;
-    hasDesignTokens: boolean;
-    hasDesignDescription: boolean;
+    hasStyleVariants: boolean;
     hasReferenceImage: boolean;
     hasFrontendProject: boolean;
   },
@@ -260,16 +242,12 @@ function getEffectiveCurrentStep(
     return currentStep;
   }
 
-  if (!artifacts.hasProjectSpec) {
+  if (!artifacts.hasStyleVariants) {
     return "queued";
   }
 
-  if (!artifacts.hasDesignTokens || !artifacts.hasDesignDescription) {
-    return "awaiting_spec_approval";
-  }
-
   if (!artifacts.hasReferenceImage) {
-    return "awaiting_design_approval";
+    return "awaiting_style_selection";
   }
 
   if (!artifacts.hasFrontendProject) {

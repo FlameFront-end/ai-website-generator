@@ -7,11 +7,29 @@ export type RunStatus =
   | "needs_manual_review"
   | "completed"
   | "failed"
-  | "awaiting_spec_approval"
-  | "awaiting_design_approval"
+  | "awaiting_style_selection"
   | "awaiting_reference_approval"
   | "awaiting_code_approval"
   | "awaiting_final_approval";
+
+export interface StyleVariant {
+  id: string;
+  name: string;
+  description: string;
+  visualStyle: string;
+  colorPalette: string[];
+  typographyStyle: string;
+  layoutStyle: string;
+  moodKeywords: string[];
+}
+
+export interface StyleVariantsResponse {
+  variants: StyleVariant[];
+}
+
+export interface SelectStyleRequest {
+  styleVariantId: string;
+}
 
 export interface RunArtifact {
   id: string;

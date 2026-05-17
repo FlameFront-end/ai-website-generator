@@ -13,11 +13,12 @@ interface RunTabsProps {
   currentStep: string;
   onApprove?: () => void;
   isApproving?: boolean;
+  isApproveDisabled?: boolean;
+  approveDisabledReason?: string;
 }
 
 const STATUS_TO_TAB: Record<string, RunDetailsTab> = {
-  awaiting_spec_approval: "spec",
-  awaiting_design_approval: "design",
+  awaiting_style_selection: "style",
   awaiting_reference_approval: "reference",
   awaiting_final_approval: "result",
 };
@@ -30,6 +31,8 @@ export const RunTabs: FC<RunTabsProps> = ({
   currentStep,
   onApprove,
   isApproving = false,
+  isApproveDisabled = false,
+  approveDisabledReason,
 }) => {
   const approvalTab = STATUS_TO_TAB[status];
 
@@ -58,13 +61,13 @@ export const RunTabs: FC<RunTabsProps> = ({
                 className={styles.approveButton}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (isApproving) return;
+                  if (isApproving || isApproveDisabled) return;
                   onApprove();
                 }}
                 role="button"
-                tabIndex={isApproving ? -1 : 0}
-                aria-disabled={isApproving}
-                title="Подтвердить этап"
+                tabIndex={isApproving || isApproveDisabled ? -1 : 0}
+                aria-disabled={isApproving || isApproveDisabled}
+                title={approveDisabledReason || "Подтвердить этап"}
               >
                 <CheckCircle2 className={styles.approveIcon} />
                 <span>Подтвердить</span>
