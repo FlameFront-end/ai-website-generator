@@ -256,6 +256,7 @@ export interface BriefClarificationAnswer {
   questionId: string;
   question: string;
   value: string | string[] | number | boolean;
+  skipped?: boolean;
 }
 
 export interface BriefClarificationResult {

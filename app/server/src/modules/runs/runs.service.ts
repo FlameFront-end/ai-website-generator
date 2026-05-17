@@ -142,9 +142,14 @@ export class RunsService {
     await this.getRunOrFail(runId, userId);
     const artifact = await this.getArtifactOrFail(artifactId, runId);
 
+    let effectiveMimeType = artifact.mimeType;
+    if (!effectiveMimeType) {
+      effectiveMimeType = this.inferMimeTypeFromPath(artifact.path);
+    }
+
     if (
-      !artifact.mimeType?.includes('json') &&
-      !artifact.mimeType?.startsWith('text/')
+      !effectiveMimeType?.includes('json') &&
+      !effectiveMimeType?.startsWith('text/')
     ) {
       throw new BadRequestException('Артефакт не является текстовым файлом');
     }
@@ -163,9 +168,35 @@ export class RunsService {
       artifactId: artifact.id,
       type: artifact.type,
       path: artifact.path,
-      mimeType: artifact.mimeType,
+      mimeType: effectiveMimeType,
       content,
     };
+  }
+
+  private inferMimeTypeFromPath(filePath: string): string {
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'json':
+        return 'application/json';
+      case 'md':
+        return 'text/markdown';
+      case 'txt':
+        return 'text/plain';
+      case 'css':
+        return 'text/css';
+      case 'html':
+        return 'text/html';
+      case 'js':
+      case 'mjs':
+        return 'application/javascript';
+      case 'ts':
+      case 'tsx':
+        return 'application/typescript';
+      case 'svg':
+        return 'image/svg+xml';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   async updateRun(id: string, dto: UpdateRunDto, userId: string) {
@@ -364,7 +395,17 @@ export class RunsService {
     runId: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.getRunOrFail(runId, userId);
+    let run = await this.getRunOrFail(runId, userId);
+
+    if (run.status !== RunStatus.Failed) {
+      throw new BadRequestException(
+        'Перезапустить можно только шаг, завершившийся с ошибкой',
+      );
+    }
+
+    // Reload run from DB to get the accurate currentStep that was set before the error
+    run = (await this.runsRepository.findOne({ where: { id: runId } })) || run;
+
     const step = await this.getRestartableStep(
       run.status,
       run.currentStep,

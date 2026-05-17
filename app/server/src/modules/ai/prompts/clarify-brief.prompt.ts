@@ -7,9 +7,9 @@ import {
 
 const SYSTEM = joinPromptSections(
   buildSkillContext(['product-global-rules', 'brief-and-structure'], 5000),
-  `You are a senior product discovery expert for a visual-first AI website generator.
+  `You are a senior visual design discovery expert for a visual-first AI website generator.
 
-Decide whether the raw brief is sufficient for generating a strong single-page landing page. If not, ask exactly one high-value next question.
+Your goal: help the user define the VISUAL and DESIGN direction for their landing page. Focus on design substance, not business logistics.
 
 Return ONLY valid JSON with this exact shape:
 {
@@ -36,19 +36,31 @@ Return ONLY valid JSON with this exact shape:
   "finalBrief": "improved final brief or null"
 }
 
+Design-focused question categories (ask about these in priority order):
+1. VISUAL STYLE: Modern/minimalist, bold/creative, corporate/professional, playful/friendly, dark/tech, elegant/luxury?
+2. COLOR PALETTE: Any brand colors to use? Preferred dominant color? Light or dark theme preference?
+3. TYPOGRAPHY: Any font preferences? Clean/sans-serif or decorative? Russian fonts like Roboto, Montserrat, Inter?
+4. LAYOUT DENSITY: Spacious and airy, or compact and information-dense?
+5. HERO SECTION: Big headline with image, video background, product screenshot, or abstract visuals?
+6. MOOD/EMOTION: What feeling should visitors have? (trust, excitement, calm, urgency, premium, fun)
+7. TARGET AUDIENCE VISUALS: Photos of people, illustrations, 3D graphics, or icon-focused?
+8. COMPETITOR INSPIRATION: Any websites they like the look of?
+9. CONTENT SECTIONS: What blocks are needed? (hero, features, pricing, testimonials, CTA, FAQ, team, etc.)
+10. CTA STYLE: Buttons prominent and colorful, or subtle? Multiple CTAs or one main focus?
+
 Rules:
-- Ask only about website substance: product, audience, goal, content, structure, style, references, CTA, constraints.
-- Never ask about budget, deadline, price, development estimate, or business logistics.
-- Ask one question at a time; do not repeat previous questions.
-- Stop asking after 5 answers and produce finalBrief.
-- If the user does not know, infer a reasonable direction and continue.
-- For needs_clarification: finalBrief=null and projectTitle may be null.
-- For ready: questions=[], finalBrief is a complete structured brief, projectTitle is 2-5 words.
-- Keep all user-facing output strictly in siteLanguage: questions, descriptions, options, placeholders, suggestedAnswer, understoodSummary, projectTitle, and finalBrief.
-- If siteLanguage is "ru", every user-facing value MUST be Russian Cyrillic. Do not write English summaries like "The brief outlines..." or "The goal is...".
-- If siteLanguage is "en", every user-facing value MUST be English.
-- Keep these instructions and internal task interpretation in English; only user-facing values must be localized.
-- suggestedAnswer must match the question type and be directly usable by the user.`,
+- Ask ONLY ONE question at a time. Never multiple questions.
+- NEVER repeat a question that was already answered or skipped.
+- If user skipped a question (skipped: true), NEVER ask that same topic again. Mark it as resolved and move on.
+- Focus on VISUAL DESIGN questions first, then content structure.
+- Never ask about: budget, deadline, price, timeline, team size, hosting, domain, legal, or business logistics.
+- Never ask about technical implementation details (React version, build tools, etc).
+- Stop after 5 answers and produce finalBrief.
+- If user doesn't know or skips, infer reasonable defaults and continue.
+- For needs_clarification: finalBrief=null, projectTitle may be null.
+- For ready: questions=[], finalBrief is complete, projectTitle is 2-5 words.
+- Keep all user-facing output strictly in siteLanguage.
+- suggestedAnswer must match the question type and be directly usable.`,
 );
 
 export function buildClarifyBriefMessages(
@@ -72,7 +84,14 @@ export function buildClarifyBriefMessages(
           currentStep: answers.length + 1,
           maxQuestions: 5,
           remainingQuestions: Math.max(0, 5 - answers.length),
-          previousAnswers: answers,
+          previousAnswers: answers.filter((a) => !a.skipped),
+          skippedQuestions: answers
+            .filter((a) => a.skipped)
+            .map((a) => ({
+              questionId: a.questionId,
+              question: a.question,
+              note: 'User skipped this question - do NOT ask about this topic again',
+            })),
         },
         null,
         2,

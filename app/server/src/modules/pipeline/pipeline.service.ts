@@ -282,7 +282,7 @@ export class PipelineService {
     await this.state.addLog(run.id, 'Готовим визуальный референс');
     await this.state.sleep(PIPELINE_STEP_DELAY_MS);
 
-    const referenceImage = await this.generateReferenceImageWithFallback(
+    const referenceImage = await this.generateFluxReferenceImage(
       referenceRun.brief,
       projectSpec,
       tokens,
@@ -1002,6 +1002,7 @@ export class PipelineService {
       run.id,
       ArtifactType.DesignDescription,
       descRelativePath,
+      'text/markdown',
     );
 
     const tokensRelativePath = this.state.getRunRelativePath(
@@ -1025,6 +1026,7 @@ export class PipelineService {
       run.id,
       ArtifactType.DesignTokens,
       tokensRelativePath,
+      'application/json',
     );
     await this.state.addLog(run.id, 'Дизайн обновлён', { instruction });
   }
@@ -1064,7 +1066,7 @@ export class PipelineService {
     const projectSpec = JSON.parse(specContent) as ProjectSpec;
     const tokens = JSON.parse(tokensContent) as DesignTokens;
 
-    const referenceImage = await this.generateReferenceImageWithFallback(
+    const referenceImage = await this.generateFluxReferenceImage(
       run.brief,
       projectSpec,
       tokens,
@@ -1090,50 +1092,6 @@ export class PipelineService {
       'awaiting_reference_approval',
       userId,
     );
-  }
-
-  private async generateReferenceImageWithFallback(
-    brief: string,
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
-    designDescription: string,
-    userId: string,
-    slug: string,
-    runId: string,
-  ): Promise<{ relativePath: string; mimeType: string; model: string }> {
-    try {
-      return await this.generateFluxReferenceImage(
-        brief,
-        projectSpec,
-        tokens,
-        designDescription,
-        userId,
-        slug,
-        runId,
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Image generation failed';
-
-      if (!this.canFallbackToSvgReference(message)) {
-        throw error;
-      }
-
-      await this.state.addLog(
-        runId,
-        'Генерация raster-референса недоступна, создаём SVG fallback',
-        { reason: message },
-      );
-
-      return this.generateSvgReferenceImage(
-        brief,
-        projectSpec,
-        tokens,
-        designDescription,
-        userId,
-        slug,
-      );
-    }
   }
 
   private async generateFluxReferenceImage(
@@ -1280,139 +1238,6 @@ export class PipelineService {
       mimeType: 'image/png',
       model: generatedBlocks[0]?.model ?? 'unknown',
     };
-  }
-
-  private async generateSvgReferenceImage(
-    brief: string,
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
-    designDescription: string,
-    userId: string,
-    slug: string,
-  ): Promise<{ relativePath: string; mimeType: string; model: string }> {
-    let svg: string;
-    let model = 'analysis-svg-fallback';
-
-    try {
-      svg = await this.aiService.generateReferenceSvg(
-        brief,
-        projectSpec,
-        tokens,
-        designDescription,
-      );
-    } catch {
-      svg = this.createDeterministicReferenceSvg(projectSpec, tokens);
-      model = 'deterministic-svg-fallback';
-    }
-
-    const relativePath = this.state.getRunRelativePath(
-      userId,
-      slug,
-      'reference',
-      'full-page-preview.svg',
-    );
-    const absolutePath = this.state.getRunAbsolutePath(
-      userId,
-      slug,
-      'reference',
-      'full-page-preview.svg',
-    );
-
-    await this.state.writeGeneratedFile(absolutePath, svg);
-
-    const manifestAbsolutePath = this.state.getRunAbsolutePath(
-      userId,
-      slug,
-      'reference',
-      'blocks-manifest.json',
-    );
-
-    await this.state.writeGeneratedFile(
-      manifestAbsolutePath,
-      JSON.stringify(
-        {
-          workflow: 'svg-fallback',
-          fullPagePreview: relativePath,
-          blocks: this.normalizeReferenceSections(projectSpec).map(
-            (section) => ({
-              sectionId: section.id,
-              title: section.title,
-              path: relativePath,
-              mimeType: 'image/svg+xml',
-              model,
-            }),
-          ),
-        },
-        null,
-        2,
-      ),
-    );
-
-    return {
-      relativePath,
-      mimeType: 'image/svg+xml',
-      model,
-    };
-  }
-
-  private createDeterministicReferenceSvg(
-    projectSpec: ProjectSpec,
-    tokens: DesignTokens,
-  ): string {
-    const colors = tokens.colors;
-    const sections = this.normalizeReferenceSections(projectSpec).slice(0, 6);
-    const background = this.escapeSvg(colors.background || '#09090b');
-    const surface = this.escapeSvg(colors.surface || '#18181b');
-    const border = this.escapeSvg(colors.border || '#27272a');
-    const textPrimary = this.escapeSvg(colors.textPrimary || '#fafafa');
-    const textSecondary = this.escapeSvg(colors.textSecondary || '#a1a1aa');
-    const accent = this.escapeSvg(colors.accent || '#f97316');
-    const accentSecondary = this.escapeSvg(
-      colors.accentSecondary || colors.accent || '#22c55e',
-    );
-    const headline = this.escapeSvg(projectSpec.copy.headline);
-    const description = this.escapeSvg(projectSpec.copy.description);
-    const primaryButton = this.escapeSvg(projectSpec.copy.primaryButton);
-    const secondaryButton = this.escapeSvg(projectSpec.copy.secondaryButton);
-    const sectionCards = sections
-      .map((section, index) => {
-        const x = 90 + (index % 3) * 420;
-        const y = 560 + Math.floor(index / 3) * 130;
-        return [
-          `<rect x="${x}" y="${y}" width="360" height="92" rx="22" fill="${surface}" stroke="${border}" />`,
-          `<text x="${x + 24}" y="${y + 38}" fill="${textPrimary}" font-size="24" font-weight="700">${this.escapeSvg(section.title)}</text>`,
-          `<text x="${x + 24}" y="${y + 68}" fill="${textSecondary}" font-size="16">${this.escapeSvg(section.goal).slice(0, 72)}</text>`,
-        ].join('\n');
-      })
-      .join('\n');
-
-    return `<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="1440" height="900" fill="${background}"/>
-<circle cx="1190" cy="110" r="260" fill="${accent}" opacity="0.16"/>
-<circle cx="260" cy="760" r="240" fill="${accentSecondary}" opacity="0.12"/>
-<rect x="72" y="56" width="1296" height="788" rx="36" fill="${surface}" opacity="0.74" stroke="${border}"/>
-<text x="112" y="130" fill="${accent}" font-size="18" font-weight="700" letter-spacing="4">${this.escapeSvg(projectSpec.productName)}</text>
-<text x="112" y="230" fill="${textPrimary}" font-size="64" font-weight="800">${headline.slice(0, 44)}</text>
-<text x="112" y="292" fill="${textSecondary}" font-size="24">${description.slice(0, 92)}</text>
-<rect x="112" y="360" width="230" height="58" rx="18" fill="${accent}"/>
-<text x="142" y="397" fill="${background}" font-size="20" font-weight="700">${primaryButton.slice(0, 22)}</text>
-<rect x="366" y="360" width="230" height="58" rx="18" fill="transparent" stroke="${border}"/>
-<text x="396" y="397" fill="${textPrimary}" font-size="20" font-weight="700">${secondaryButton.slice(0, 22)}</text>
-<rect x="860" y="190" width="390" height="260" rx="34" fill="${background}" stroke="${border}"/>
-<rect x="902" y="236" width="306" height="32" rx="16" fill="${accent}" opacity="0.75"/>
-<rect x="902" y="296" width="230" height="22" rx="11" fill="${textSecondary}" opacity="0.45"/>
-<rect x="902" y="344" width="270" height="22" rx="11" fill="${textSecondary}" opacity="0.32"/>
-<rect x="902" y="392" width="190" height="22" rx="11" fill="${accentSecondary}" opacity="0.7"/>
-${sectionCards}
-</svg>`;
-  }
-
-  private escapeSvg(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;');
   }
 
   private normalizeReferenceSections(projectSpec: ProjectSpec) {
@@ -1963,17 +1788,6 @@ ${sectionCards}
       relativePath,
       'application/json',
     );
-  }
-
-  private canFallbackToSvgReference(message: string): boolean {
-    return [
-      'Image generation failed',
-      'AI_IMAGE_PROVIDER',
-      'AI_IMAGE_API_KEY',
-      'Insufficient credit',
-      'Payment Required',
-      'Replicate returned no image URL',
-    ].some((fragment) => message.includes(fragment));
   }
 
   private async regenerateCode(

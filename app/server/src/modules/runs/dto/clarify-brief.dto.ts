@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsOptional,
   IsString,
   MaxLength,
@@ -14,6 +15,10 @@ export class BriefClarificationAnswerDto {
   question!: string;
 
   value!: string | string[] | number | boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  skipped?: boolean;
 }
 
 export class ClarifyBriefDto {

@@ -191,11 +191,14 @@ function NewRunDraftPage({
     void runClarification(brief, []);
   };
 
-  const submitAnswers = (overrideValue?: BriefClarificationAnswer["value"]) => {
+  const submitAnswers = (
+    overrideValue?: BriefClarificationAnswer["value"],
+    isSkipped = false,
+  ) => {
     const question = clarification?.questions[0];
     if (!question) return;
 
-    const nextAnswer = {
+    const nextAnswer: BriefClarificationAnswer = {
       questionId: question.id,
       question: question.question,
       type: question.type,
@@ -206,8 +209,11 @@ function NewRunDraftPage({
       suggestedAnswer: question.suggestedAnswer,
       min: question.min,
       max: question.max,
-      value:
-        overrideValue ?? normalizeAnswerValue(question, answerMap[question.id]),
+      value: isSkipped
+        ? "skipped"
+        : (overrideValue ??
+          normalizeAnswerValue(question, answerMap[question.id])),
+      skipped: isSkipped,
     };
 
     const mergedAnswers = [...answers, nextAnswer];
@@ -215,6 +221,10 @@ function NewRunDraftPage({
     setAnswerMap({});
     setClarification((prev) => (prev ? { ...prev, questions: [] } : prev));
     void runClarification(rawBrief, mergedAnswers);
+  };
+
+  const skipCurrentQuestion = () => {
+    submitAnswers("skipped", true);
   };
 
   const editAnswerFrom = (index: number) => {
@@ -487,20 +497,25 @@ function NewRunDraftPage({
                 </button>
               </div>
               <div ref={historyListRef} className={styles.answerHistoryList}>
-                {answers.map((answer, index) => (
-                  <div key={`${answer.questionId}:${index}`}>
-                    <div className={styles.answerHistoryItemHeader}>
-                      <b>{answer.question}</b>
-                      <button
-                        type="button"
-                        onClick={() => editAnswerFrom(index)}
-                      >
-                        Изменить
-                      </button>
-                    </div>
-                    <p>{formatAnswerValue(answer.value)}</p>
-                  </div>
-                ))}
+                {answers
+                  .filter((answer) => !answer.skipped)
+                  .map((answer, index) => {
+                    const originalIndex = answers.indexOf(answer);
+                    return (
+                      <div key={`${answer.questionId}:${index}`}>
+                        <div className={styles.answerHistoryItemHeader}>
+                          <b>{answer.question}</b>
+                          <button
+                            type="button"
+                            onClick={() => editAnswerFrom(originalIndex)}
+                          >
+                            Изменить
+                          </button>
+                        </div>
+                        <p>{formatAnswerValue(answer.value)}</p>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -540,9 +555,10 @@ function NewRunDraftPage({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setFinalBrief(rawBrief)}
+                onClick={skipCurrentQuestion}
+                disabled={isClarifying}
               >
-                Пропустить и использовать исходный бриф
+                Пропустить вопрос
               </Button>
               <Button
                 type="button"
@@ -603,14 +619,6 @@ function NewRunDraftPage({
   );
 }
 
-function buildLocalizedBrief(brief: string, siteLanguage: string) {
-  const languageLabel = siteLanguage === "en" ? "English" : "Russian";
-
-  return [
-    `Target site language: ${languageLabel}.`,
-    "Generate all user-facing website copy, clarification-derived content, design text, sections, CTAs, metadata and UI labels in this language.",
-    "Keep internal reasoning and implementation instructions in English.",
-    "",
-    brief.trim(),
-  ].join("\n");
+function buildLocalizedBrief(brief: string, _siteLanguage: string) {
+  return brief.trim();
 }

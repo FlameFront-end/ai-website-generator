@@ -96,6 +96,7 @@ export interface BriefClarificationAnswer {
   min?: number;
   max?: number;
   value: string | string[] | number | boolean;
+  skipped?: boolean;
 }
 
 export interface ClarifyBriefRequest {
