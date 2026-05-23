@@ -68,6 +68,7 @@ jobs:
 
   deploy:
     name: "Deploy to Production"
+    if: ${{ secrets.DEPLOY_HOST != '' }}
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
