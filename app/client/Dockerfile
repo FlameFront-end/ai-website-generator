@@ -15,7 +15,7 @@ ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build --workspace app/client
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.31.1-alpine AS runtime
 
 COPY app/client/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/app/client/dist /usr/share/nginx/html
