@@ -37,8 +37,10 @@ jobs:
         run: |
           SHA="${{ github.sha }}"
           SHORT_SHA="${SHA:0:7}"
+          PREFIX=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}" | tr '[:upper:]' '[:lower:]')
           echo "tag=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "latest=latest" >> "$GITHUB_OUTPUT"
+          echo "prefix=${PREFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Build & push client
         uses: docker/build-push-action@v6
@@ -47,8 +49,8 @@ jobs:
           file: app/client/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/client:${{ steps.meta.outputs.tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/client:latest
+            ${{ steps.meta.outputs.prefix }}/client:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.prefix }}/client:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -59,8 +61,8 @@ jobs:
           file: app/server/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/server:${{ steps.meta.outputs.tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/server:latest
+            ${{ steps.meta.outputs.prefix }}/server:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.prefix }}/server:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
