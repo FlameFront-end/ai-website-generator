@@ -14,7 +14,8 @@
     "build:server": "npm run build --workspace app/server",
     "lint:client": "npm run lint --workspace app/client",
     "lint:server": "npm run lint --workspace app/server",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "prepare": "husky"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.19",
@@ -24,5 +25,17 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "yet-another-react-lightbox": "^3.32.0"
+  },
+  "lint-staged": {
+    "app/client/src/**/*.{ts,tsx}": [
+      "eslint --max-warnings 0"
+    ],
+    "app/server/src/**/*.ts": [
+      "eslint --max-warnings 0"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5"
   }
 }
