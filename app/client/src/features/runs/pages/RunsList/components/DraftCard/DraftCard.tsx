@@ -42,49 +42,20 @@ export const DraftCard: FC<DraftCardProps> = ({
   const description = getDraftDescription(draft);
 
   return (
-    <div className={styles.runItem}>
-      <div
-        role="button"
-        tabIndex={0}
+    <article className={styles.runItem}>
+      <button
+        type="button"
         className={clsx(
           styles.runButton,
           styles.draftButton,
           isPinned && styles.pinnedCard,
         )}
         onClick={onOpen}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onOpen();
-          }
-        }}
       >
         <div className={styles.cardHeader}>
           <span className={styles.cardTitle}>{getDraftTitle(draft)}</span>
           <div className={styles.cardHeaderRight}>
             <Badge>Черновик</Badge>
-            <span className={styles.cardActions}>
-              <CardAction
-                icon={isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-                title={isPinned ? "Открепить" : "Закрепить"}
-                ariaLabel={
-                  isPinned ? "Открепить черновик" : "Закрепить черновик"
-                }
-                onClick={onTogglePin}
-              />
-              <CardAction
-                icon={<Pencil size={15} />}
-                title="Переименовать"
-                ariaLabel="Переименовать черновик"
-                onClick={onRename}
-              />
-              <CardAction
-                icon={<Trash2 size={15} />}
-                title="Удалить черновик"
-                ariaLabel="Удалить черновик"
-                onClick={onDelete}
-              />
-            </span>
           </div>
         </div>
         {description && <p className={styles.cardDescription}>{description}</p>}
@@ -98,7 +69,27 @@ export const DraftCard: FC<DraftCardProps> = ({
             Обновлен {formatDate(draft.updatedAt)}
           </span>
         </div>
+      </button>
+      <div className={styles.cardActions} role="toolbar" aria-label="Действия">
+        <CardAction
+          icon={isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+          title={isPinned ? "Открепить" : "Закрепить"}
+          ariaLabel={isPinned ? "Открепить черновик" : "Закрепить черновик"}
+          onClick={onTogglePin}
+        />
+        <CardAction
+          icon={<Pencil size={15} />}
+          title="Переименовать"
+          ariaLabel="Переименовать черновик"
+          onClick={onRename}
+        />
+        <CardAction
+          icon={<Trash2 size={15} />}
+          title="Удалить черновик"
+          ariaLabel="Удалить черновик"
+          onClick={onDelete}
+        />
       </div>
-    </div>
+    </article>
   );
 };

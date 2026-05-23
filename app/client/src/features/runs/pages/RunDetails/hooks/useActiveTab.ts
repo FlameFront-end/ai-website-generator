@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { TABS } from "../lib/constants";
 import type { RunDetailsTab } from "../lib/types";
 
-const TAB_IDS = TABS.map((tab) => tab.id) as RunDetailsTab[];
+const TAB_IDS: RunDetailsTab[] = TABS.map((tab) => tab.id);
 
 export function useActiveTab() {
   const [searchParams, setSearchParams] = useSearchParams();

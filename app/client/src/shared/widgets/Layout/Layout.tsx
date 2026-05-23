@@ -18,7 +18,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { IconButton } from "@/kit";
-import { useAuth } from "@/lib";
+import { useAuth, safeStorage } from "@/lib";
 import { useTheme } from "@/hooks";
 import { ROUTES } from "@/model";
 
@@ -60,19 +60,19 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    return localStorage.getItem("sidebar-collapsed") === "true";
+    return safeStorage.getString("sidebar-collapsed") === "true";
   });
 
   const headerConfig = getHeaderConfig(location.pathname);
 
   useEffect(() => {
-    localStorage.setItem("sidebar-collapsed", String(isSidebarCollapsed));
+    safeStorage.setString("sidebar-collapsed", String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
   const handleLogout = () => {
     logout();
     toast.success("Вы вышли из системы");
-    navigate(ROUTES.LOGIN);
+    void navigate(ROUTES.LOGIN);
   };
 
   return (

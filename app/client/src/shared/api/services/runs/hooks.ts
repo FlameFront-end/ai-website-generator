@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { runsApi } from "./runs-api";
 
@@ -59,10 +59,17 @@ export function useArtifactFileUrl(runId: string, artifactId?: string) {
     queryFn: () => runsApi.getArtifactFile(runId, artifactId ?? ""),
     enabled: Boolean(runId && artifactId),
   });
+
   const url = useMemo(
     () => (query.data ? window.URL.createObjectURL(query.data) : null),
     [query.data],
   );
+
+  useEffect(() => {
+    return () => {
+      if (url) window.URL.revokeObjectURL(url);
+    };
+  }, [url]);
 
   return { ...query, url };
 }
@@ -150,7 +157,7 @@ export function useRebuildRunMutation() {
   return useMutation({
     mutationFn: runsApi.rebuildRun,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["runs"] });
     },
   });
 }

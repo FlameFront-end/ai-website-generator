@@ -1,0 +1,47 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-width: calc(100vw - 160px);
+  max-height: calc(100vh - 120px);
+}
+
+.zoomContainer {
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-width: calc(100vw - 160px);
+  max-height: calc(100vh - 160px);
+  user-select: none;
+}
+
+.image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 180px);
+  max-height: calc(100vh - 180px);
+  object-fit: contain;
+  will-change: transform;
+}
+
+.caption {
+  color: #fff;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
+  max-width: 600px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}

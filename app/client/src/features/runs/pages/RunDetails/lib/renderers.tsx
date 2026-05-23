@@ -286,7 +286,10 @@ function formatTokenValue(value: unknown): string {
       .join("; ");
   }
 
-  return String(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  return "—";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

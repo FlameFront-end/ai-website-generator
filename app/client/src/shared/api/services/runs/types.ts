@@ -12,6 +12,32 @@ export type RunStatus =
   | "awaiting_code_approval"
   | "awaiting_final_approval";
 
+export type PipelineStep =
+  | "queued"
+  | "prepare_brief"
+  | "generate_style_variants"
+  | "awaiting_style_selection"
+  | "prepare_reference_image"
+  | "reference_ready"
+  | "awaiting_reference_approval"
+  | "prepare_frontend_project"
+  | "generate_code"
+  | "build_project"
+  | "build"
+  | "built"
+  | "build_success"
+  | "build_failed"
+  | "take_screenshots"
+  | "screenshots_ready"
+  | "screenshots_failed"
+  | "visual_qa"
+  | "visual_qa_failed"
+  | "awaiting_code_approval"
+  | "awaiting_final_approval"
+  | "frontend_project_ready"
+  | "completed"
+  | "pipeline_failed";
+
 export interface StyleVariant {
   id: string;
   name: string;

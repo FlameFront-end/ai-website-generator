@@ -13,7 +13,7 @@ export function normalizeAnswerValue(
   if (question.type === "yes_no") return Boolean(value);
   if (question.type === "multi_choice")
     return Array.isArray(value) ? value : [];
-  return String(value ?? "");
+  return typeof value === "string" ? value : "";
 }
 
 export function getProgressLabel(answerCount: number) {

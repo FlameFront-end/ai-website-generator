@@ -10,6 +10,7 @@ import type {
   ClarifyBriefResponse,
 } from "@/api/services/runs";
 import { runsApi } from "@/shared/api/services/runs/runs-api";
+import { logger } from "@/lib";
 import { ROUTES } from "@/model";
 
 import {
@@ -144,7 +145,7 @@ export function useBriefWizard(requestedDraftId: string | null) {
         setProjectTitle(result.projectTitle ?? "");
       }
     } catch (error) {
-      console.error("Failed to clarify brief:", error);
+      logger.error("brief:clarify", error);
       toast.error("Не удалось уточнить бриф");
     } finally {
       setIsClarifying(false);
@@ -235,7 +236,7 @@ export function useBriefWizard(requestedDraftId: string | null) {
       {
         onSuccess: (run) => {
           deleteBriefDraft(draftId);
-          navigate(ROUTES.runDetails(run.id));
+          void navigate(ROUTES.runDetails(run.id));
         },
         onError: () => toast.error("Не удалось создать проект"),
       },

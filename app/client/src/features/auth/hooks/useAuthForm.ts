@@ -9,7 +9,7 @@ import type {
   LoginCredentials,
   RegisterCredentials,
 } from "@/api/services/auth";
-import { useAuth } from "@/lib";
+import { logger, useAuth } from "@/lib";
 import { ROUTES } from "@/model";
 
 type AuthMode = "login" | "register";
@@ -29,17 +29,19 @@ export function useAuthForm({
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  const submit = async (credentials: LoginCredentials | RegisterCredentials) => {
+  const submit = async (
+    credentials: LoginCredentials | RegisterCredentials,
+  ) => {
     setIsLoading(true);
 
     try {
       const response: AuthResponse =
         mode === "login"
           ? await authService.login(credentials)
-          : await authService.register(credentials as RegisterCredentials);
+          : await authService.register(credentials);
       login(response.accessToken, response.user);
       toast.success(successMessage);
-      navigate(ROUTES.RUNS);
+      void navigate(ROUTES.RUNS);
     } catch (error: unknown) {
       const fallback = errorMessage;
       const apiMessage =
@@ -48,7 +50,7 @@ export function useAuthForm({
         (error as Error)?.message ??
         fallback;
       toast.error(mode === "login" ? fallback : apiMessage);
-      console.error(`${mode} error:`, error);
+      logger.error(`auth:${mode}`, error);
     } finally {
       setIsLoading(false);
     }

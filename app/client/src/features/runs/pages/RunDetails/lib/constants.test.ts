@@ -37,15 +37,13 @@ describe("isTabAvailable", () => {
   });
 
   it("code tab is available at awaiting_code_approval", () => {
-    expect(
-      isTabAvailable("code", "running", "awaiting_code_approval"),
-    ).toBe(true);
+    expect(isTabAvailable("code", "running", "awaiting_code_approval")).toBe(
+      true,
+    );
   });
 
   it("result tab is available at screenshots_ready", () => {
-    expect(
-      isTabAvailable("result", "running", "screenshots_ready"),
-    ).toBe(true);
+    expect(isTabAvailable("result", "running", "screenshots_ready")).toBe(true);
   });
 
   it("result tab is unavailable before screenshots_ready", () => {
@@ -53,10 +51,10 @@ describe("isTabAvailable", () => {
   });
 
   it("uses currentStep for failed status", () => {
-    expect(
-      isTabAvailable("code", "failed", "awaiting_code_approval"),
-    ).toBe(true);
-    expect(isTabAvailable("code", "pipeline_failed", "queued")).toBe(false);
+    expect(isTabAvailable("code", "failed", "awaiting_code_approval")).toBe(
+      true,
+    );
+    expect(isTabAvailable("code", "failed", "queued")).toBe(false);
   });
 
   it("falls back to status as step when currentStep is undefined", () => {

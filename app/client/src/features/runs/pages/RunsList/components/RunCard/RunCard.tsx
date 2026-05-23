@@ -38,43 +38,16 @@ export const RunCard: FC<RunCardProps> = ({
   onRename,
   onDelete,
 }) => (
-  <div className={styles.runItem}>
-    <div
-      role="button"
-      tabIndex={0}
+  <article className={styles.runItem}>
+    <button
+      type="button"
       className={clsx(styles.runButton, run.isPinned && styles.pinnedCard)}
       onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
     >
       <div className={styles.cardHeader}>
         <span className={styles.cardTitle}>{getRunTitle(run)}</span>
         <div className={styles.cardHeaderRight}>
           <RunStatusBadge status={run.status} />
-          <span className={styles.cardActions}>
-            <CardAction
-              icon={run.isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-              title={run.isPinned ? "Открепить" : "Закрепить"}
-              ariaLabel={run.isPinned ? "Открепить проект" : "Закрепить проект"}
-              onClick={onTogglePin}
-            />
-            <CardAction
-              icon={<Pencil size={15} />}
-              title="Переименовать"
-              ariaLabel="Переименовать проект"
-              onClick={onRename}
-            />
-            <CardAction
-              icon={<Trash2 size={15} />}
-              title="Удалить"
-              ariaLabel="Удалить проект"
-              onClick={onDelete}
-            />
-          </span>
         </div>
       </div>
       <p className={styles.cardDescription}>{getRunDescription(run)}</p>
@@ -88,6 +61,26 @@ export const RunCard: FC<RunCardProps> = ({
           Создан {formatDate(run.createdAt)}
         </span>
       </div>
+    </button>
+    <div className={styles.cardActions} role="toolbar" aria-label="Действия">
+      <CardAction
+        icon={run.isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+        title={run.isPinned ? "Открепить" : "Закрепить"}
+        ariaLabel={run.isPinned ? "Открепить проект" : "Закрепить проект"}
+        onClick={onTogglePin}
+      />
+      <CardAction
+        icon={<Pencil size={15} />}
+        title="Переименовать"
+        ariaLabel="Переименовать проект"
+        onClick={onRename}
+      />
+      <CardAction
+        icon={<Trash2 size={15} />}
+        title="Удалить"
+        ariaLabel="Удалить проект"
+        onClick={onDelete}
+      />
     </div>
-  </div>
+  </article>
 );

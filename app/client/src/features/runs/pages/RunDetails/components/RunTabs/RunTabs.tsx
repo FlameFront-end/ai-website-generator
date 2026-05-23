@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { FC } from "react";
 
-import clsx from "clsx";
 import { CheckCircle2 } from "lucide-react";
 
 import { Tabs } from "@/kit";
@@ -57,30 +56,22 @@ export const RunTabs: FC<RunTabsProps> = ({
       value={activeTab}
       onChange={onChange}
       ariaLabel="Разделы проекта"
-      renderExtra={(item) => {
+      renderAfter={(item) => {
         const needsApproval = item.id === approvalTab;
         if (!needsApproval || !onApprove) return null;
         return (
           <>
             <span className={styles.approvalDot} />
-            <span
-              className={clsx(
-                styles.approveButton,
-                (isApproving || isApproveDisabled) && styles.approveDisabled,
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isApproving || isApproveDisabled) return;
-                onApprove();
-              }}
-              role="button"
-              tabIndex={isApproving || isApproveDisabled ? -1 : 0}
-              aria-disabled={isApproving || isApproveDisabled}
+            <button
+              type="button"
+              className={styles.approveButton}
+              onClick={onApprove}
+              disabled={isApproving || isApproveDisabled}
               title={approveDisabledReason || "Подтвердить этап"}
             >
               <CheckCircle2 className={styles.approveIcon} />
               <span>Подтвердить</span>
-            </span>
+            </button>
           </>
         );
       }}

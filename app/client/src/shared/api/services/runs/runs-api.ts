@@ -121,7 +121,7 @@ export const runsApi = {
   },
 
   getArtifactFileUrl(runId: string, artifactId: string): string {
-    return `${axiosInstance.defaults.baseURL}${API_ENDPOINTS.artifactFileEncoded(runId, artifactId)}`;
+    return `${axiosInstance.defaults.baseURL}${API_ENDPOINTS.artifactFile(runId, artifactId)}`;
   },
 
   async getArtifactFile(runId: string, artifactId: string): Promise<Blob> {

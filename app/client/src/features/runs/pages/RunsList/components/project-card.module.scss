@@ -1,33 +1,35 @@
 .runItem {
+  position: relative;
   display: block;
+}
 
-  .runButton {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    flex: 1;
-    min-width: 0;
-    min-height: 104px;
-    border: 1px solid var(--run-button-border);
-    border-radius: 8px;
-    padding: 14px;
-    background: var(--run-button-bg);
-    color: var(--text-primary);
-    text-align: left;
-    cursor: pointer;
-    transition:
-      border-color 0.16s ease,
-      background 0.16s ease;
+.runButton {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 104px;
+  border: 1px solid var(--run-button-border);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--run-button-bg);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease;
 
-    &:hover {
-      border-color: var(--button-secondary-hover-border);
-      background: var(--button-secondary-hover-bg);
-    }
+  &:hover {
+    border-color: var(--button-secondary-hover-border);
+    background: var(--button-secondary-hover-bg);
+  }
 
-    &:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 3px var(--button-focus-ring);
-    }
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--button-focus-ring);
   }
 }
 
@@ -89,6 +91,9 @@
 }
 
 .cardActions {
+  position: absolute;
+  top: 14px;
+  right: 14px;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -97,6 +102,7 @@
   padding: 2px;
   background: var(--bg-muted);
   color: var(--text-muted);
+  z-index: 1;
 
   button {
     display: inline-flex;

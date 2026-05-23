@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { User } from "@/api/services/auth";
 import { queryClient, isUser } from "@/api";
+import { safeStorage } from "@/lib";
 
 import { AuthContext } from "./auth-types";
 import { TOKEN_KEY, USER_KEY } from "./auth-types";
@@ -10,17 +11,7 @@ import type { AuthContextValue } from "./auth-types";
 import { registerAuthErrorHandler } from "./auth-events";
 
 function readStoredUser(): User | null {
-  const stored = localStorage.getItem(USER_KEY);
-  if (!stored) return null;
-  try {
-    const parsed: unknown = JSON.parse(stored);
-    if (isUser(parsed)) return parsed;
-    localStorage.removeItem(USER_KEY);
-    return null;
-  } catch {
-    localStorage.removeItem(USER_KEY);
-    return null;
-  }
+  return safeStorage.getJSON(USER_KEY, isUser);
 }
 
 interface AuthProviderProps {
@@ -29,21 +20,21 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem(TOKEN_KEY),
+    safeStorage.getString(TOKEN_KEY),
   );
   const [user, setUserState] = useState<User | null>(readStoredUser);
   const [isLoading, setIsLoading] = useState(false);
 
   const login = useCallback((newToken: string, newUser: User) => {
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+    safeStorage.setString(TOKEN_KEY, newToken);
+    safeStorage.setJSON(USER_KEY, newUser);
     setToken(newToken);
     setUserState(newUser);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    safeStorage.remove(TOKEN_KEY);
+    safeStorage.remove(USER_KEY);
     setToken(null);
     setUserState(null);
     queryClient.clear();
@@ -57,9 +48,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const setUser = useCallback((newUser: User | null) => {
     if (newUser) {
-      localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+      safeStorage.setJSON(USER_KEY, newUser);
     } else {
-      localStorage.removeItem(USER_KEY);
+      safeStorage.remove(USER_KEY);
     }
     setUserState(newUser);
   }, []);

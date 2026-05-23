@@ -62,7 +62,7 @@ export function useRunActions({
   const remove = useCallback(
     (runId: string) => {
       deleteRunMutation.mutate(runId, {
-        onSuccess: () => navigate(ROUTES.RUNS),
+        onSuccess: () => void navigate(ROUTES.RUNS),
         onError: () => toast.error("Не удалось удалить проект"),
       });
     },

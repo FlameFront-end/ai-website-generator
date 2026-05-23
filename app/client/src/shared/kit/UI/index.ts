@@ -9,8 +9,5 @@ export { Skeleton } from "./Skeleton/Skeleton";
 export { Spinner } from "./Spinner/Spinner";
 export { Tabs } from "./Tabs/Tabs";
 export type { TabItem } from "./Tabs/Tabs";
-export { ImageViewer, ImageViewerGallery } from "./ImageViewer/ImageViewer";
-export type {
-  ImageViewerProps,
-  ImageViewerGalleryProps,
-} from "./ImageViewer/ImageViewer";
+export { ImageViewer, ImageViewerGallery } from "./ImageViewer";
+export type { ImageViewerProps, ImageViewerGalleryProps } from "./ImageViewer";

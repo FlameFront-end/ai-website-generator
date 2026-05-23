@@ -1,35 +1,10 @@
 import type { RunDetailsTab } from "./types";
 
-export const STEP_LABELS: Record<string, string> = {
-  queued: "В очереди",
-  prepare_brief: "Подготовка брифа",
-  generate_style_variants: "Подбираем визуальные направления",
-  awaiting_style_selection: "Выберите визуальный стиль",
-  prepare_reference_image: "Подготовка визуального референса",
-  reference_ready: "Визуальный референс готов",
-  prepare_frontend_project: "Генерация клиентского проекта",
-  generate_code: "Генерация кода",
-  code: "Код",
-  build_project: "Сборка проекта",
-  build: "Сборка проекта",
-  built: "Сборка завершена",
-  build_success: "Сборка успешна",
-  take_screenshots: "Создание скриншотов",
-  screenshots_ready: "Скриншоты готовы",
-  visual_qa: "Визуальный анализ",
-  completed: "Завершено",
-  frontend_project_ready: "Клиентский проект готов",
-  pipeline_failed: "Ошибка пайплайна",
-  build_failed: "Ошибка сборки",
-  screenshots_failed: "Ошибка создания скриншотов",
-  visual_qa_failed: "Ошибка визуального анализа",
-  awaiting_reference_approval: "Ожидание подтверждения референса",
-  awaiting_code_approval: "Ожидание подтверждения кода",
-  awaiting_final_approval: "Ожидание финального подтверждения",
-  style: "Визуальный стиль",
-  reference: "Референс",
-  final: "Финальная проверка",
-};
+export {
+  STEP_LABELS,
+  getStepLabel,
+  isKnownStep,
+} from "../../../lib/pipeline-labels";
 
 export const STEP_PROGRESS: Record<string, number> = {
   queued: 5,
@@ -142,9 +117,7 @@ export function isTabAvailable(
   }
 
   const step =
-    status === "failed" || status === "pipeline_failed"
-      ? currentStep || "queued"
-      : currentStep || status;
+    status === "failed" ? currentStep || "queued" : currentStep || status;
   const currentIndex = getStepIndex(step);
   const requiredIndex = TAB_MIN_STEP[tabId];
 

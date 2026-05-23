@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Link, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 
 import { useRunQuery } from "@/api/services/runs";
 import { runsApi } from "@/shared/api/services/runs/runs-api";
 import { EmptyState } from "@/kit";
+import { logger } from "@/lib";
 import { ROUTES } from "@/model";
 
 import { DeleteRunDialog, ProgressBar, RunHeader, RunTabs } from "./components";
@@ -26,11 +28,10 @@ const STATUS_TO_TAB = {
   awaiting_final_approval: "result",
 } as const;
 
-const RESTARTABLE_STATUSES = new Set([
+const RESTARTABLE_STATUSES = new Set<string>([
   "awaiting_style_selection",
   "awaiting_reference_approval",
   "failed",
-  "pipeline_failed",
 ]);
 
 const CODE_RESTARTABLE_STATUSES = new Set([
@@ -71,9 +72,10 @@ export default function RunDetailsPage() {
     setIsApproving(true);
     try {
       await runsApi.approveStep(run.id, step);
-      runQuery.refetch();
+      void runQuery.refetch();
     } catch (error) {
-      console.error("Failed to approve step:", error);
+      logger.error("run:approve", error, { runId: run.id, step });
+      toast.error("Не удалось подтвердить этап");
     } finally {
       setIsApproving(false);
     }

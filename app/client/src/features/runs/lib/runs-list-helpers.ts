@@ -1,8 +1,10 @@
 import type { Run } from "@/api/services/runs";
 import { pluralize } from "@/lib/pluralize";
+import { safeStorage } from "@/lib";
 
 import type { BriefDraft } from "./brief-drafts";
 import { stripTechnicalBriefPrefix } from "./brief-display";
+import { getStepLabel } from "./pipeline-labels";
 import { getRunTitle } from "./run-title";
 
 const PINNED_DRAFTS_STORAGE_KEY = "pinned-draft-cards";
@@ -39,23 +41,15 @@ export function getDraftCardId(draftId: string) {
   return `draft:${draftId}`;
 }
 
-export function readPinnedDraftIds(): string[] {
-  try {
-    const pinnedIds = localStorage.getItem(PINNED_DRAFTS_STORAGE_KEY);
-    if (!pinnedIds) return [];
+const isStringArray = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((item) => typeof item === "string");
 
-    const parsed = JSON.parse(pinnedIds);
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === "string")
-      : [];
-  } catch {
-    localStorage.removeItem(PINNED_DRAFTS_STORAGE_KEY);
-    return [];
-  }
+export function readPinnedDraftIds(): string[] {
+  return safeStorage.getJSON(PINNED_DRAFTS_STORAGE_KEY, isStringArray) ?? [];
 }
 
 export function savePinnedDraftIds(ids: string[]) {
-  localStorage.setItem(PINNED_DRAFTS_STORAGE_KEY, JSON.stringify(ids));
+  safeStorage.setJSON(PINNED_DRAFTS_STORAGE_KEY, ids);
 }
 
 // ── Display helpers ─────────────────────────────────────────────────
@@ -120,27 +114,3 @@ export function getRunMeta(run: Run) {
 }
 
 export { formatDate } from "@/lib/format";
-
-function getStepLabel(step: string) {
-  // Lazy import to avoid circular dep — formatStep lives in RunDetails/utils
-  // We inline a minimal version here to keep this lib self-contained
-  const STEP_LABELS: Record<string, string> = {
-    queued: "В очереди",
-    prepare_brief: "Подготовка брифа",
-    generate_style_variants: "Подбираем визуальные направления",
-    awaiting_style_selection: "Выберите визуальный стиль",
-    prepare_reference_image: "Подготовка визуального референса",
-    prepare_frontend_project: "Генерация клиентского проекта",
-    build_project: "Сборка проекта",
-    take_screenshots: "Создание скриншотов",
-    visual_qa: "Визуальный анализ",
-    completed: "Завершено",
-    pipeline_failed: "Ошибка пайплайна",
-  };
-
-  const label = STEP_LABELS[step];
-  if (label) return label;
-
-  const normalized = step.replace(/[_-]+/g, " ");
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}

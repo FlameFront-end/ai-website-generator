@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import { TOKEN_KEY, notifyAuthError } from "@/lib";
+import { TOKEN_KEY, notifyAuthError, safeStorage } from "@/lib";
 import { env } from "@/model";
 
 const axiosInstance = axios.create({
@@ -13,7 +13,7 @@ const axiosInstance = axios.create({
 
 // Add token to requests
 axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = safeStorage.getString(TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -27,7 +27,7 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       notifyAuthError();
     }
-    return Promise.reject(error);
+    return Promise.reject(error as Error);
   },
 );
 

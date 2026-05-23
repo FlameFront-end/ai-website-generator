@@ -16,7 +16,7 @@ interface TabsProps<T extends string = string> {
   onChange: (id: T) => void;
   className?: string;
   ariaLabel?: string;
-  renderExtra?: (item: TabItem<T>) => ReactNode;
+  renderAfter?: (item: TabItem<T>) => ReactNode;
 }
 
 export function Tabs<T extends string = string>({
@@ -25,26 +25,37 @@ export function Tabs<T extends string = string>({
   onChange,
   className,
   ariaLabel,
-  renderExtra,
+  renderAfter,
 }: TabsProps<T>) {
   return (
-    <nav className={clsx(styles.tabs, className)} aria-label={ariaLabel}>
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={clsx(
-            styles.tab,
-            value === item.id && styles.active,
-            item.disabled && styles.disabled,
-          )}
-          onClick={() => !item.disabled && onChange(item.id)}
-          disabled={item.disabled}
-        >
-          {item.label}
-          {renderExtra?.(item)}
-        </button>
-      ))}
-    </nav>
+    <div
+      role="tablist"
+      className={clsx(styles.tabs, className)}
+      aria-label={ariaLabel}
+    >
+      {items.map((item) => {
+        const isActive = value === item.id;
+        return (
+          <div key={item.id} className={styles.tabWrapper}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              className={clsx(
+                styles.tab,
+                isActive && styles.active,
+                item.disabled && styles.disabled,
+              )}
+              onClick={() => !item.disabled && onChange(item.id)}
+              disabled={item.disabled}
+              tabIndex={isActive ? 0 : -1}
+            >
+              {item.label}
+            </button>
+            {renderAfter?.(item)}
+          </div>
+        );
+      })}
+    </div>
   );
 }

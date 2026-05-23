@@ -2,8 +2,12 @@ import type {
   BriefClarificationAnswer,
   ClarifyBriefResponse,
 } from "@/api/services/runs";
+import { safeStorage } from "@/lib";
 
-export type DraftAnswerMap = Record<string, string | string[] | number | boolean>;
+export type DraftAnswerMap = Record<
+  string,
+  string | string[] | number | boolean
+>;
 
 export interface BriefDraft {
   id: string;
@@ -44,7 +48,7 @@ function normalizeDraft(value: Partial<BriefDraft>): BriefDraft {
     answers: Array.isArray(value.answers) ? value.answers : [],
     answerMap:
       value.answerMap && typeof value.answerMap === "object"
-        ? (value.answerMap as DraftAnswerMap)
+        ? value.answerMap
         : {},
     isHistoryExpanded: Boolean(value.isHistoryExpanded),
     createdAt: typeof value.createdAt === "string" ? value.createdAt : now,
@@ -52,45 +56,39 @@ function normalizeDraft(value: Partial<BriefDraft>): BriefDraft {
   };
 }
 
-function readLegacyDraft(): BriefDraft[] {
-  const legacyDraft = localStorage.getItem(LEGACY_BRIEF_DRAFT_STORAGE_KEY);
-  if (!legacyDraft) return [];
+const isPartialDraft = (v: unknown): v is Partial<BriefDraft> =>
+  typeof v === "object" && v !== null;
 
-  try {
-    const parsed = JSON.parse(legacyDraft) as Partial<BriefDraft>;
-    localStorage.removeItem(LEGACY_BRIEF_DRAFT_STORAGE_KEY);
-    return [normalizeDraft(parsed)];
-  } catch {
-    localStorage.removeItem(LEGACY_BRIEF_DRAFT_STORAGE_KEY);
-    return [];
-  }
+const isPartialDraftArray = (v: unknown): v is Partial<BriefDraft>[] =>
+  Array.isArray(v);
+
+function readLegacyDraft(): BriefDraft[] {
+  const parsed = safeStorage.getJSON(
+    LEGACY_BRIEF_DRAFT_STORAGE_KEY,
+    isPartialDraft,
+  );
+  if (!parsed) return [];
+
+  safeStorage.remove(LEGACY_BRIEF_DRAFT_STORAGE_KEY);
+  return [normalizeDraft(parsed)];
 }
 
 export function readBriefDrafts() {
-  try {
-    const legacyDrafts = readLegacyDraft();
-    const drafts = localStorage.getItem(BRIEF_DRAFTS_STORAGE_KEY);
-    const parsedDrafts = drafts
-      ? (JSON.parse(drafts) as Partial<BriefDraft>[])
-      : [];
-    const normalizedDrafts = Array.isArray(parsedDrafts)
-      ? parsedDrafts.map(normalizeDraft)
-      : [];
-    const mergedDrafts = [...normalizedDrafts, ...legacyDrafts];
-    const sortedDrafts = mergedDrafts.sort(
-      (left, right) =>
-        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
-    );
+  const legacyDrafts = readLegacyDraft();
+  const parsedDrafts =
+    safeStorage.getJSON(BRIEF_DRAFTS_STORAGE_KEY, isPartialDraftArray) ?? [];
+  const normalizedDrafts = parsedDrafts.map(normalizeDraft);
+  const mergedDrafts = [...normalizedDrafts, ...legacyDrafts];
+  const sortedDrafts = mergedDrafts.sort(
+    (left, right) =>
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  );
 
-    if (legacyDrafts.length > 0) {
-      localStorage.setItem(BRIEF_DRAFTS_STORAGE_KEY, JSON.stringify(sortedDrafts));
-    }
-
-    return sortedDrafts;
-  } catch {
-    localStorage.removeItem(BRIEF_DRAFTS_STORAGE_KEY);
-    return readLegacyDraft();
+  if (legacyDrafts.length > 0) {
+    safeStorage.setJSON(BRIEF_DRAFTS_STORAGE_KEY, sortedDrafts);
   }
+
+  return sortedDrafts;
 }
 
 export function readBriefDraft(id: string) {
@@ -108,12 +106,11 @@ export function saveBriefDraft(draft: BriefDraft) {
     ...drafts.filter((item) => item.id !== nextDraft.id),
   ];
 
-  localStorage.setItem(BRIEF_DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts));
+  safeStorage.setJSON(BRIEF_DRAFTS_STORAGE_KEY, nextDrafts);
   return nextDraft;
 }
 
 export function deleteBriefDraft(id: string) {
   const drafts = readBriefDrafts().filter((draft) => draft.id !== id);
-  localStorage.setItem(BRIEF_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+  safeStorage.setJSON(BRIEF_DRAFTS_STORAGE_KEY, drafts);
 }
-

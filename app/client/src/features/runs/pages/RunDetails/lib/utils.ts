@@ -1,11 +1,14 @@
 import type { RunArtifact } from "@/api/services/runs";
 
-import { ARTIFACT_LABELS, STEP_LABELS, STEP_PROGRESS } from "./constants";
+import {
+  ARTIFACT_LABELS,
+  getStepLabel,
+  isKnownStep,
+  STEP_PROGRESS,
+} from "./constants";
 
 export function formatStep(step: string | null): string {
-  return step
-    ? STEP_LABELS[step] || humanizeTechnicalKey(step)
-    : "Ожидаем статус пайплайна";
+  return step ? getStepLabel(step) : "Ожидаем статус пайплайна";
 }
 
 export function getProgress(step: string | null, status: string): number {
@@ -79,8 +82,8 @@ export function translateLogMessage(message: string): string {
   const withStepLabels = translated.replace(
     /"([^"]+)"/g,
     (match, key: string) => {
-      const label = STEP_LABELS[key];
-      return label ? `"${label}"` : match;
+      if (!isKnownStep(key)) return match;
+      return `"${getStepLabel(key)}"`;
     },
   );
 

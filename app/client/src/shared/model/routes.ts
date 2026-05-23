@@ -7,8 +7,10 @@ export const ROUTES = {
   RUN_DETAILS: "/runs/:runId",
   RUN_DETAILS_PREFIX: "/runs/",
   NOT_FOUND: "*",
-  runDetails: (runId: string) => `/runs/${runId}`,
+  runDetails: (runId: string) => `/runs/${encodeURIComponent(runId)}`,
 } as const;
+
+const e = encodeURIComponent;
 
 export const API_ENDPOINTS = {
   AUTH_LOGIN: "/auth/login",
@@ -16,23 +18,19 @@ export const API_ENDPOINTS = {
   AUTH_ME: "/auth/me",
   GENERATE_IMAGE: "/generate-image",
   RUNS: "/runs",
-  run: (runId: string) => `/runs/${runId}`,
-  rebuildRun: (runId: string) => `/runs/${runId}/rebuild`,
-  restartCurrentStep: (runId: string) => `/runs/${runId}/restart-current-step`,
-  stopCurrentStep: (runId: string) => `/runs/${runId}/stop-current-step`,
-  restartCodeStep: (runId: string) => `/runs/${runId}/restart-code-step`,
+  run: (runId: string) => `/runs/${e(runId)}`,
+  rebuildRun: (runId: string) => `/runs/${e(runId)}/rebuild`,
+  restartCurrentStep: (runId: string) =>
+    `/runs/${e(runId)}/restart-current-step`,
+  stopCurrentStep: (runId: string) => `/runs/${e(runId)}/stop-current-step`,
+  restartCodeStep: (runId: string) => `/runs/${e(runId)}/restart-code-step`,
   artifactContent: (runId: string, artifactId: string) =>
-    `/runs/${runId}/artifacts/${artifactId}/content`,
+    `/runs/${e(runId)}/artifacts/${e(artifactId)}/content`,
   artifactFile: (runId: string, artifactId: string) =>
-    `/runs/${runId}/artifacts/${artifactId}/file`,
-  artifactFileEncoded: (runId: string, artifactId: string) =>
-    `/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(
-      artifactId,
-    )}/file`,
-  codeFiles: (runId: string) => `/runs/${runId}/code-files`,
-  codeFile: (runId: string) => `/runs/${runId}/code-file`,
-  downloadCode: (runId: string) => `/runs/${runId}/download-code`,
-  approveStep: (runId: string) => `/runs/${runId}/approve`,
-  editRequest: (runId: string) => `/runs/${runId}/edit-request`,
+    `/runs/${e(runId)}/artifacts/${e(artifactId)}/file`,
+  codeFiles: (runId: string) => `/runs/${e(runId)}/code-files`,
+  codeFile: (runId: string) => `/runs/${e(runId)}/code-file`,
+  downloadCode: (runId: string) => `/runs/${e(runId)}/download-code`,
+  approveStep: (runId: string) => `/runs/${e(runId)}/approve`,
+  editRequest: (runId: string) => `/runs/${e(runId)}/edit-request`,
 } as const;
-

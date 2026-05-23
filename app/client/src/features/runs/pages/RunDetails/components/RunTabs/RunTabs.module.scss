@@ -16,6 +16,7 @@
   background: var(--bg-subtle);
   border: 1px solid var(--border-solid);
   color: var(--text-heading);
+  font: inherit;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -23,10 +24,9 @@
     color 0.12s ease,
     background 0.12s ease;
   flex-shrink: 0;
-  margin-left: 2px;
   padding: 0 7px;
 
-  &:hover {
+  &:hover:not(:disabled) {
     border-color: var(--button-primary-hover-border);
     background: var(--button-primary-hover-bg);
     color: var(--button-primary-color);
@@ -36,16 +36,10 @@
     outline: none;
     box-shadow: 0 0 0 3px var(--button-focus-ring);
   }
-}
 
-.approveDisabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-
-  &:hover {
-    border-color: var(--border-solid);
-    background: var(--bg-subtle);
-    color: var(--text-heading);
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 }
 
