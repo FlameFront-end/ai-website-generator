@@ -1,9 +1,15 @@
 import type { DesignTokens, ProjectSpec } from '../ai.types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
-import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
+import {
+  buildSkillContext,
+  joinPromptSections,
+} from '../skills/prompt-context';
 
 const SYSTEM = joinPromptSections(
-  buildSkillContext(['design-system-assets', 'image-generation-workflow'], 4000),
+  buildSkillContext(
+    ['design-system-assets', 'image-generation-workflow'],
+    4000,
+  ),
   `You are a design illustrator creating a supporting SVG reference for one website section.
 
 SVG is a helper artifact, not the main layout source. The visual-first workflow uses section images as primary references.

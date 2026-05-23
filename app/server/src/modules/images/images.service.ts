@@ -202,7 +202,7 @@ export class ImagesService {
   }
 
   private extractImageUrl(output: unknown): string | null {
-    const firstOutput = Array.isArray(output) ? output[0] : output;
+    const firstOutput: unknown = Array.isArray(output) ? output[0] : output;
 
     if (typeof firstOutput === 'string') {
       return firstOutput;

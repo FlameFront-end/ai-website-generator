@@ -129,9 +129,13 @@ export class VisualQAService {
       return this.state.completeRun(qaRun, Math.round(score), userId, slug);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.state.addLog(runId, 'Визуальная проверка завершилась ошибкой', {
-        error: message,
-      });
+      await this.state.addLog(
+        runId,
+        'Визуальная проверка завершилась ошибкой',
+        {
+          error: message,
+        },
+      );
       return this.state.updateRunStatus(
         qaRun,
         RunStatus.VisualFailed,

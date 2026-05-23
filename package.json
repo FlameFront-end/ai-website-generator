@@ -28,10 +28,10 @@
   },
   "lint-staged": {
     "app/client/src/**/*.{ts,tsx}": [
-      "eslint --max-warnings 0"
+      "npx --workspace app/client eslint --max-warnings 0"
     ],
     "app/server/src/**/*.ts": [
-      "eslint --max-warnings 0"
+      "npx --workspace app/server eslint --max-warnings 0"
     ]
   },
   "devDependencies": {

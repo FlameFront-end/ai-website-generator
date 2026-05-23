@@ -64,10 +64,7 @@ export class ScreenshotService {
 
       await this.waitForServer(previewUrl);
 
-      await this.state.addLog(
-        run.id,
-        'Создаём скриншоты страницы',
-      );
+      await this.state.addLog(run.id, 'Создаём скриншоты страницы');
       browser = await chromium.launch();
       const page = await browser.newPage();
       page.setDefaultTimeout(PAGE_LOAD_TIMEOUT_MS);

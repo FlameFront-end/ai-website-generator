@@ -1,7 +1,4 @@
-import {
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 
 import type {
   AiProvider,

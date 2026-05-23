@@ -1,5 +1,8 @@
 import type { ChatMessage } from '../providers/ai-provider.interface';
-import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
+import {
+  buildSkillContext,
+  joinPromptSections,
+} from '../skills/prompt-context';
 
 const SYSTEM = joinPromptSections(
   buildSkillContext(['product-global-rules', 'brief-and-structure'], 5000),

@@ -1,6 +1,9 @@
-import type { DesignTokens, ProjectSpec } from '../ai.types';
+import type { ProjectSpec } from '../ai.types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
-import { buildSkillContext, joinPromptSections } from '../skills/prompt-context';
+import {
+  buildSkillContext,
+  joinPromptSections,
+} from '../skills/prompt-context';
 
 const SYSTEM = joinPromptSections(
   buildSkillContext(
