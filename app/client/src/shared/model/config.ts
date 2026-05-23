@@ -15,10 +15,21 @@ function resolveApiUrl(): string {
     return DEV_FALLBACK;
   }
 
-  try {
-    new URL(raw);
-  } catch {
-    throw new Error(`VITE_API_URL is not a valid URL: "${raw}"`);
+  const isAbsolute = /^https?:\/\//.test(raw);
+  const isRelative = raw.startsWith("/");
+
+  if (!isAbsolute && !isRelative) {
+    throw new Error(
+      `VITE_API_URL must be an absolute URL or a root-relative path: "${raw}"`,
+    );
+  }
+
+  if (isAbsolute) {
+    try {
+      new URL(raw);
+    } catch {
+      throw new Error(`VITE_API_URL is not a valid URL: "${raw}"`);
+    }
   }
 
   return raw;

@@ -1,3 +1,3 @@
-export { FullErrorScreen } from "./FullErrorScreen";
-export { FullScreenLoader } from "./FullScreenLoader";
+export { FullErrorScreen } from "./FullErrorScreen/FullErrorScreen";
+export { FullScreenLoader } from "./FullScreenLoader/FullScreenLoader";
 export { Layout } from "./Layout";

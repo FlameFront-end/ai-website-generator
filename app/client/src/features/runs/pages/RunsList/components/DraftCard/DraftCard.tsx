@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { FC } from "react";
 
 import clsx from "clsx";
@@ -31,14 +32,14 @@ interface DraftCardProps {
   onDelete: () => void;
 }
 
-export const DraftCard: FC<DraftCardProps> = ({
+export const DraftCard: FC<DraftCardProps> = memo(function DraftCard({
   draft,
   isPinned,
   onOpen,
   onTogglePin,
   onRename,
   onDelete,
-}) => {
+}) {
   const description = getDraftDescription(draft);
 
   return (
@@ -92,4 +93,4 @@ export const DraftCard: FC<DraftCardProps> = ({
       </div>
     </article>
   );
-};
+});

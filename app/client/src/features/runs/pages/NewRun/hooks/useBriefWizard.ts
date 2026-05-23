@@ -64,7 +64,7 @@ export function useBriefWizard(requestedDraftId: string | null) {
   const [isClarifying, setIsClarifying] = useState(false);
   const historyListRef = useRef<HTMLDivElement | null>(null);
 
-  // ── Draft auto-save ───────────────────────────────────────────────
+  // ── Draft auto-save (debounced) ──────────────────────────────────
 
   useEffect(() => {
     const hasDraft =
@@ -80,21 +80,25 @@ export function useBriefWizard(requestedDraftId: string | null) {
       setSearchParams({ draft: draftId }, { replace: true });
     }
 
-    const draft: BriefDraft = {
-      id: draftId,
-      title: projectTitle.trim() || null,
-      rawBrief,
-      siteLanguage,
-      finalBrief,
-      clarification,
-      answers,
-      answerMap,
-      isHistoryExpanded,
-      createdAt: initialDraft?.createdAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const timer = setTimeout(() => {
+      const draft: BriefDraft = {
+        id: draftId,
+        title: projectTitle.trim() || null,
+        rawBrief,
+        siteLanguage,
+        finalBrief,
+        clarification,
+        answers,
+        answerMap,
+        isHistoryExpanded,
+        createdAt: initialDraft?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-    saveBriefDraft(draft);
+      saveBriefDraft(draft);
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [
     draftId,
     initialDraft?.createdAt,

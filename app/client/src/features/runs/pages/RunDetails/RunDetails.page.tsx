@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 
 import { useRunQuery } from "@/api/services/runs";
 import { runsApi } from "@/shared/api/services/runs/runs-api";
-import { EmptyState } from "@/kit";
+import { EmptyState, ErrorBoundary } from "@/kit";
 import { logger } from "@/lib";
 import { ROUTES } from "@/model";
 
@@ -166,50 +166,52 @@ export default function RunDetailsPage() {
         isApproving={isApproving}
       />
 
-      <div key={activeTab} className={styles.tabContent}>
-        {activeTab === "overview" && <OverviewTab run={run} />}
+      <ErrorBoundary key={activeTab}>
+        <div className={styles.tabContent}>
+          {activeTab === "overview" && <OverviewTab run={run} />}
 
-        {activeTab === "reference" && (
-          <ReferenceTab
-            runId={run.id}
-            artifact={artifacts.reference_image}
-            blocks={artifacts.reference_blocks}
-          />
-        )}
+          {activeTab === "reference" && (
+            <ReferenceTab
+              runId={run.id}
+              artifact={artifacts.reference_image}
+              blocks={artifacts.reference_blocks}
+            />
+          )}
 
-        {activeTab === "result" && (
-          <ResultTab
-            runId={run.id}
-            desktopScreenshot={artifacts.desktop_screenshot}
-            mobileScreenshot={artifacts.mobile_screenshot}
-            diffImage={artifacts.diff_image}
-            visualReport={artifacts.visual_report}
-          />
-        )}
+          {activeTab === "result" && (
+            <ResultTab
+              runId={run.id}
+              desktopScreenshot={artifacts.desktop_screenshot}
+              mobileScreenshot={artifacts.mobile_screenshot}
+              diffImage={artifacts.diff_image}
+              visualReport={artifacts.visual_report}
+            />
+          )}
 
-        {activeTab === "style" && (
-          <StyleTab
-            runId={run.id}
-            status={run.status}
-            variantsArtifact={artifacts.style_variants}
-            imageArtifacts={artifacts.style_variant_images}
-            selectedStyleArtifact={artifacts.selected_style}
-            onSelected={() => void runQuery.refetch()}
-          />
-        )}
+          {activeTab === "style" && (
+            <StyleTab
+              runId={run.id}
+              status={run.status}
+              variantsArtifact={artifacts.style_variants}
+              imageArtifacts={artifacts.style_variant_images}
+              selectedStyleArtifact={artifacts.selected_style}
+              onSelected={() => void runQuery.refetch()}
+            />
+          )}
 
-        {activeTab === "code" && <CodeTab runId={run.id} />}
+          {activeTab === "code" && <CodeTab runId={run.id} />}
 
-        {activeTab === "artifacts" && <ArtifactsTab run={run} />}
+          {activeTab === "artifacts" && <ArtifactsTab run={run} />}
 
-        {activeTab === "logs" && (
-          <LogsTab
-            runId={run.id}
-            logs={run.logs}
-            buildLogArtifact={artifacts.build_log}
-          />
-        )}
-      </div>
+          {activeTab === "logs" && (
+            <LogsTab
+              runId={run.id}
+              logs={run.logs}
+              buildLogArtifact={artifacts.build_log}
+            />
+          )}
+        </div>
+      </ErrorBoundary>
 
       <DeleteRunDialog
         run={run}

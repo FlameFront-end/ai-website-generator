@@ -9,6 +9,7 @@ import {
 } from "react-toastify";
 
 import { queryClient } from "@/api";
+import { useTheme } from "@/hooks";
 import { AuthProvider } from "@/lib";
 
 import "react-toastify/dist/ReactToastify.css";
@@ -45,29 +46,39 @@ const toastCloseButton = ({ closeToast }: CloseButtonProps) => (
   </button>
 );
 
+const ToastWrapper: FC<{ children: ReactNode }> = ({ children }) => {
+  const { theme } = useTheme();
+
+  return (
+    <>
+      {children}
+      <ToastContainer
+        position="top-right"
+        autoClose={2800}
+        pauseOnFocusLoss={false}
+        hideProgressBar={true}
+        newestOnTop={true}
+        closeOnClick={false}
+        rtl={false}
+        draggable="touch"
+        theme={theme === "dark" ? "dark" : "light"}
+        className="custom-toast-container"
+        closeButton={toastCloseButton}
+        icon={toastIcon}
+        toastClassName={(context) =>
+          `${context?.defaultClassName ?? ""} custom-toast custom-toast--${context?.type ?? "default"}`
+        }
+        progressClassName="custom-toast-progress"
+      />
+    </>
+  );
+};
+
 export const Providers: FC<ProvidersProps> = ({ children }) => {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        {children}
-        <ToastContainer
-          position="top-right"
-          autoClose={2800}
-          pauseOnFocusLoss={false}
-          hideProgressBar={true}
-          newestOnTop={true}
-          closeOnClick={false}
-          rtl={false}
-          draggable="touch"
-          theme="light"
-          className="custom-toast-container"
-          closeButton={toastCloseButton}
-          icon={toastIcon}
-          toastClassName={(context) =>
-            `${context?.defaultClassName ?? ""} custom-toast custom-toast--${context?.type ?? "default"}`
-          }
-          progressClassName="custom-toast-progress"
-        />
+        <ToastWrapper>{children}</ToastWrapper>
       </QueryClientProvider>
     </AuthProvider>
   );

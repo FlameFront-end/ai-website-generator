@@ -120,10 +120,6 @@ export const runsApi = {
     return data;
   },
 
-  getArtifactFileUrl(runId: string, artifactId: string): string {
-    return `${axiosInstance.defaults.baseURL}${API_ENDPOINTS.artifactFile(runId, artifactId)}`;
-  },
-
   async getArtifactFile(runId: string, artifactId: string): Promise<Blob> {
     const { data } = await axiosInstance.get<Blob>(
       API_ENDPOINTS.artifactFile(runId, artifactId),

@@ -4,6 +4,7 @@ import type { FC } from "react";
 import { useArtifactFileUrl } from "@/api/services/runs";
 import type { RunArtifact } from "@/api/services/runs";
 import { ImageViewerGallery } from "@/kit";
+import { pluralize } from "@/lib/pluralize";
 
 import shared from "../../lib/run-details-shared.module.scss";
 import refStyles from "./ReferenceTab.module.scss";
@@ -128,14 +129,7 @@ export const ReferenceTab: FC<ReferenceTabProps> = ({
   const hasFullPage = Boolean(artifact);
   const isGenerating = hasBlocks && !hasFullPage;
 
-  const blockWord = (n: number) => {
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return "блок";
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20))
-      return "блока";
-    return "блоков";
-  };
+  const blockWord = (n: number) => pluralize(n, "блок", "блока", "блоков");
 
   const headerStatus = isGenerating ? (
     <span className={refStyles.statusLine}>

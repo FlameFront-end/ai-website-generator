@@ -13,7 +13,7 @@ import {
 import type { RunLog } from "@/api/services/runs";
 import type { UseQueryResult } from "@tanstack/react-query";
 
-import { translateLogMessage } from "../../pages/RunDetails/lib/utils";
+import { translateLogMessage } from "../../lib/log-messages";
 import styles from "./LogsPanel.module.scss";
 
 interface LogsPanelProps {
