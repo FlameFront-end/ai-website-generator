@@ -1,8 +1,8 @@
-export { ArtifactViewer } from "./ArtifactViewer";
-export { ApprovalPanel } from "./ApprovalPanel";
-export { CodeViewer } from "./CodeViewer";
-export { DeleteRunDialog } from "./DeleteRunDialog";
-export { FileTree } from "./FileTree";
-export { ProgressBar } from "./ProgressBar";
-export { RunHeader } from "./RunHeader";
-export { RunTabs } from "./RunTabs";
+export { ArtifactViewer } from "./ArtifactViewer/ArtifactViewer";
+export { ApprovalPanel } from "./ApprovalPanel/ApprovalPanel";
+export { CodeViewer } from "./CodeViewer/CodeViewer";
+export { DeleteRunDialog } from "./DeleteRunDialog/DeleteRunDialog";
+export { FileTree } from "./FileTree/FileTree";
+export { ProgressBar } from "./ProgressBar/ProgressBar";
+export { RunHeader } from "./RunHeader/RunHeader";
+export { RunTabs } from "./RunTabs/RunTabs";

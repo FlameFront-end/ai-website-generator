@@ -1,6 +1,7 @@
 import type { FC, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import clsx from "clsx";
 import {
   Activity,
   CreditCard,
@@ -76,7 +77,10 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
 
   return (
     <div
-      className={`${styles.layout} ${isSidebarCollapsed ? styles.layoutCollapsed : ""}`}
+      className={clsx(
+        styles.layout,
+        isSidebarCollapsed && styles.layoutCollapsed,
+      )}
     >
       <aside className={styles.sidebar}>
         <div className={styles.sidebarTop}>

@@ -1,0 +1,125 @@
+.header {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+}
+
+.headerTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.headerTitle {
+  min-width: 0;
+
+  h1 {
+    margin: 0;
+    overflow: hidden;
+    font-size: clamp(20px, 2vw, 24px);
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text-heading);
+    letter-spacing: -0.04em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.headerMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.scoreBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--score-bg);
+  border: 1px solid var(--score-border);
+  color: var(--score-color);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.headerDivider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-solid);
+  flex-shrink: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.renameForm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: min(520px, 100%);
+  flex-wrap: wrap;
+
+  input {
+    min-width: 180px;
+    min-height: 30px;
+    flex: 1;
+    border: 1px solid var(--border-solid);
+    border-radius: 6px;
+    padding: 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    background: var(--bg-input);
+    color: var(--text-primary);
+
+    &:focus {
+      border-color: var(--text-muted);
+    }
+  }
+}
+
+@media (max-width: 980px) {
+  .headerTop {
+    grid-template-columns: 1fr;
+  }
+
+  .headerActions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .headerRight {
+    display: contents;
+  }
+
+  .headerMeta {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}

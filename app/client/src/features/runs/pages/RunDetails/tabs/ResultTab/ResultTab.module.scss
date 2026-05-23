@@ -1,0 +1,124 @@
+.resultLayout {
+  display: grid;
+  gap: 20px;
+}
+
+.screenshotsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.screenshotContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7280;
+  }
+}
+
+.screenshotImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.diffImageWrap {
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-height: 600px;
+}
+
+.diffImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  object-position: top left;
+}
+
+.resultSkeletonTitle,
+.resultSkeletonImage,
+.resultSkeletonMobileImage,
+.resultSkeletonDiff,
+.resultSkeletonReport span {
+  display: block;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-to) 45%,
+    var(--skeleton-from) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeletonPulse 1.25s ease-in-out infinite;
+}
+
+.resultSkeletonTitle {
+  width: 148px;
+  height: 16px;
+  border-radius: 999px;
+}
+
+.resultSkeletonImage {
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid var(--border-solid);
+}
+
+.resultSkeletonMobileImage {
+  aspect-ratio: 390 / 844;
+  width: min(220px, 100%);
+  min-height: 360px;
+  border: 1px solid var(--border-solid);
+}
+
+.resultSkeletonDiff {
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  min-height: 260px;
+  border: 1px solid var(--border-solid);
+}
+
+.resultSkeletonReport {
+  display: grid;
+  gap: 10px;
+
+  span {
+    height: 16px;
+    border-radius: 999px;
+
+    &:nth-child(2) {
+      width: 86%;
+    }
+
+    &:nth-child(3) {
+      width: 72%;
+    }
+
+    &:nth-child(4) {
+      width: 54%;
+    }
+  }
+}
+
+@keyframes skeletonPulse {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}

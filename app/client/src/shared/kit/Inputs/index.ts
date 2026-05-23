@@ -1,3 +1,3 @@
-export { Input } from "./Input";
-export { PasswordInput } from "./PasswordInput";
-export { Textarea } from "./Textarea";
+export { Input } from "./Input/Input";
+export { PasswordInput } from "./PasswordInput/PasswordInput";
+export { Textarea } from "./Textarea/Textarea";

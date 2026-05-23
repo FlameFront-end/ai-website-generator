@@ -10,7 +10,7 @@ import { ROUTES } from "@/model";
 
 import { AuthCard } from "../components";
 import { useAuthForm } from "../hooks/useAuthForm";
-import styles from "./register.module.scss";
+import styles from "./Register.module.scss";
 
 const MAX_AVATAR_SIZE = 1024 * 1024;
 

@@ -1,0 +1,82 @@
+.progressPanel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+
+  &.completedPanel {
+    background: var(--bg-surface);
+    border-color: var(--border);
+  }
+
+  strong {
+    color: var(--text-heading);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+}
+
+.progressHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progressInfo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.completedIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.completedText {
+  color: var(--text-heading);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.completedScore {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.progressTrack {
+  overflow: hidden;
+  height: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-muted);
+
+  &.completedTrack {
+    background: var(--bg-muted);
+  }
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--text-heading);
+    transition: width 0.45s ease;
+
+    &.completedBar {
+      background: var(--text-heading);
+    }
+  }
+}

@@ -2,8 +2,8 @@ import { useCallback, useMemo } from "react";
 
 import { useSearchParams } from "react-router-dom";
 
-import { TABS } from "../constants";
-import type { RunDetailsTab } from "../types";
+import { TABS } from "../lib/constants";
+import type { RunDetailsTab } from "../lib/types";
 
 const TAB_IDS = TABS.map((tab) => tab.id) as RunDetailsTab[];
 

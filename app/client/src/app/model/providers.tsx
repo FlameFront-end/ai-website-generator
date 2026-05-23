@@ -2,13 +2,17 @@ import type { FC, ReactNode } from "react";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AlertCircle, Check, Info, X, XCircle } from "lucide-react";
-import { ToastContainer, type CloseButtonProps, type IconProps } from "react-toastify";
+import {
+  ToastContainer,
+  type CloseButtonProps,
+  type IconProps,
+} from "react-toastify";
 
 import { queryClient } from "@/api";
 import { AuthProvider } from "@/lib";
 
 import "react-toastify/dist/ReactToastify.css";
-import "./toast.styles.scss";
+import "./toast-overrides.scss";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -31,7 +35,12 @@ const toastIcon = ({ type }: IconProps) => {
 };
 
 const toastCloseButton = ({ closeToast }: CloseButtonProps) => (
-  <button aria-label="Закрыть уведомление" className="custom-toast-close" type="button" onClick={closeToast}>
+  <button
+    aria-label="Закрыть уведомление"
+    className="custom-toast-close"
+    type="button"
+    onClick={closeToast}
+  >
     <X aria-hidden="true" />
   </button>
 );

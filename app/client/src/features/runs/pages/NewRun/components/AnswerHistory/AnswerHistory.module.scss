@@ -1,0 +1,131 @@
+.answerHistory {
+  display: grid;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--bg-muted);
+}
+
+.answerHistoryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  span {
+    color: var(--text-heading);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  button {
+    flex-shrink: 0;
+    min-height: 30px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 0 10px;
+    background: var(--bg-surface-alt);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      border-color: var(--border-solid);
+      background: var(--bg-subtle);
+      color: var(--text-heading);
+    }
+  }
+}
+
+.answerHistoryList {
+  display: grid;
+  gap: 10px;
+  max-height: 96px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  transition: max-height 0.2s ease;
+
+  > div {
+    display: grid;
+    gap: 6px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 10px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+}
+
+.answerHistoryExpanded .answerHistoryList {
+  max-height: 360px;
+  padding-right: 4px;
+}
+
+.answerHistoryItemHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+
+  b {
+    min-width: 0;
+    color: var(--text-heading);
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    flex-shrink: 0;
+    min-height: 28px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 0 9px;
+    background: var(--bg-surface-alt);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      border-color: var(--border-solid);
+      background: var(--bg-subtle);
+      color: var(--text-heading);
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .answerHistoryHeader,
+  .answerHistoryItemHeader {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .answerHistoryHeader {
+    display: grid;
+  }
+
+  .answerHistoryHeader button,
+  .answerHistoryItemHeader button {
+    width: fit-content;
+  }
+}

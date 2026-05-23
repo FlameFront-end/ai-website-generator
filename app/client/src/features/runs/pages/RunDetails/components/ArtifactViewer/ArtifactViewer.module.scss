@@ -1,0 +1,136 @@
+.artifactItem {
+  border-bottom: 1px solid var(--artifact-item-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.artifactHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  background: var(--artifact-header-bg);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+
+  &:hover {
+    background: var(--bg-subtle);
+  }
+}
+
+.artifactChevron {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: transform 0.15s ease;
+  color: #9ca3af;
+}
+
+.artifactLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.artifactPath {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.artifactBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--artifact-badge-bg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--artifact-badge-color);
+  text-align: center;
+}
+
+.artifactBody {
+  border-top: 1px solid var(--artifact-item-border);
+  background: #0d1117;
+  overflow: hidden;
+}
+
+.artifactImage {
+  display: block;
+  max-width: 100%;
+  max-height: 520px;
+  margin: 0 auto;
+  padding: 16px;
+  object-fit: contain;
+}
+
+.artifactLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+}
+
+.artifactDownload {
+  padding: 20px 16px;
+  background: var(--artifact-download-bg);
+}
+
+.artifactDownloadLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.13s ease;
+
+  &:hover {
+    background: #4f46e5;
+  }
+}
+
+.error {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--danger-bg, #fee2e2);
+  color: var(--danger-color, #dc2626);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.codeLoadingSpinner {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #1e2433;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

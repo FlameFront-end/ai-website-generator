@@ -1,0 +1,59 @@
+.codeWrapper {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  background: #000000;
+}
+
+.lineNumbers {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 18px 12px 18px 16px;
+  background: #000000;
+  color: #525252;
+  font-family:
+    ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid var(--border);
+
+  span {
+    display: block;
+  }
+}
+
+.codeBlock {
+  flex: 1 0 auto;
+  min-width: max-content;
+  overflow: visible;
+  margin: 0;
+  padding: 18px 22px;
+  background: #000000;
+  color: #ededed;
+  font-family:
+    ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre;
+  tab-size: 2;
+
+  code {
+    display: block;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    padding: 0;
+    overflow: visible;
+    white-space: pre;
+  }
+
+  :global(.hljs) {
+    background: transparent;
+    padding: 0;
+  }
+}

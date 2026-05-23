@@ -1,0 +1,69 @@
+@use "../../components/ArtifactViewer/ArtifactViewer.module" as av;
+
+.artifactsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+.artifactSkeletonRow {
+  cursor: default;
+
+  &:hover {
+    background: var(--artifact-header-bg);
+  }
+}
+
+.artifactSkeletonChevron,
+.artifactSkeletonBadge,
+.artifactSkeletonLabel,
+.artifactSkeletonPath {
+  display: block;
+  flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-to) 45%,
+    var(--skeleton-from) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeletonPulse 1.25s ease-in-out infinite;
+}
+
+.artifactSkeletonChevron {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.artifactSkeletonBadge {
+  width: 42px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.artifactSkeletonLabel {
+  width: min(190px, 28%);
+  height: 16px;
+  border-radius: 999px;
+}
+
+.artifactSkeletonPath {
+  flex: 1;
+  height: 14px;
+  border-radius: 999px;
+}
+
+@keyframes skeletonPulse {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}

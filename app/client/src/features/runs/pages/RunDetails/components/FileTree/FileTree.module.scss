@@ -1,0 +1,93 @@
+.fileList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+
+  li {
+    margin: 0;
+  }
+}
+
+.treeDir {
+  list-style: none;
+}
+
+.treeDirLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 10px 5px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease;
+
+  &:hover {
+    background: var(--bg-subtle);
+  }
+}
+
+.treeIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+
+.treeDirName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileItem,
+.fileItemActive {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 10px 5px 0;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+
+  &:hover {
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+  }
+}
+
+.fileItemActive {
+  background: var(--bg-subtle) !important;
+  border-left-color: var(--text-heading) !important;
+  color: var(--text-heading) !important;
+}
+
+.fileItemName {
+  font-size: 13px;
+  font-weight: 500;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

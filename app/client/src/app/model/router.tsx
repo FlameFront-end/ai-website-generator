@@ -5,7 +5,7 @@ import {
   ProtectedRoute,
   PublicOnlyRoute,
   RootRedirect,
-} from "@/app/components/route-guards";
+} from "@/app/components/RouteGuards";
 import { lazyImport } from "@/lib";
 import { ROUTES } from "@/model";
 import { FullErrorScreen, FullScreenLoader } from "@/widgets";
@@ -19,12 +19,12 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.LOGIN,
         lazy: () =>
-          lazyImport(() => import("@/features/auth/pages/login.page")),
+          lazyImport(() => import("@/features/auth/pages/Login.page")),
       },
       {
         path: ROUTES.REGISTER,
         lazy: () =>
-          lazyImport(() => import("@/features/auth/pages/register.page")),
+          lazyImport(() => import("@/features/auth/pages/Register.page")),
       },
     ],
   },
@@ -41,14 +41,14 @@ export const router = createBrowserRouter([
             path: ROUTES.RUNS,
             lazy: () =>
               lazyImport(
-                () => import("@/features/runs/pages/RunsList/runs-list.page"),
+                () => import("@/features/runs/pages/RunsList/RunsList.page"),
               ),
           },
           {
             path: ROUTES.NEW_RUN,
             lazy: () =>
               lazyImport(
-                () => import("@/features/runs/pages/NewRun/new-run.page"),
+                () => import("@/features/runs/pages/NewRun/NewRun.page"),
               ),
           },
           {
@@ -56,7 +56,7 @@ export const router = createBrowserRouter([
             lazy: () =>
               lazyImport(
                 () =>
-                  import("@/features/runs/pages/RunDetails/run-details.page"),
+                  import("@/features/runs/pages/RunDetails/RunDetails.page"),
               ),
           },
         ],
@@ -68,7 +68,7 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.NOT_FOUND,
         lazy: () =>
-          lazyImport(() => import("@/features/not-found/pages/not-found.page")),
+          lazyImport(() => import("@/features/not-found/pages/NotFound.page")),
       },
     ],
   },

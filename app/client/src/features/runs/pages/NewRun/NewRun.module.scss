@@ -1,0 +1,166 @@
+.page {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  animation: fadeIn 0.18s ease both;
+}
+
+.header {
+  button {
+    width: fit-content;
+    min-height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 10px;
+    background: var(--bg-surface-alt);
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--border-solid);
+      background: var(--bg-subtle);
+      color: var(--text-heading);
+    }
+  }
+}
+
+.wizardHero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+
+  h1 {
+    margin: 0;
+    color: var(--text-heading);
+    font-size: 24px;
+    font-weight: 650;
+    letter-spacing: -0.04em;
+    line-height: 1.2;
+  }
+}
+
+.stepBadge {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 6px 9px;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.intro {
+  display: grid;
+  gap: 12px;
+  max-width: 680px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.65;
+
+  p {
+    margin: 0;
+  }
+}
+
+.progressTrack {
+  overflow: hidden;
+  width: min(100%, 320px);
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--text-heading);
+    transition: width 0.25s ease;
+  }
+}
+
+.questions {
+  display: grid;
+  gap: 16px;
+}
+
+.questionCard {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 18px;
+  background: var(--bg-muted);
+  animation: questionEnter 0.18s ease both;
+
+  h3 {
+    margin: 0 0 6px;
+    color: var(--text-heading);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+}
+
+.understoodSummary {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--bg-muted);
+
+  span {
+    color: var(--text-heading);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes questionEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .wizardHero {
+    display: grid;
+  }
+}

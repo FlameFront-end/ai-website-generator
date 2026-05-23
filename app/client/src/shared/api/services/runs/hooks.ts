@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { runsApi } from "./runs.api";
+import { runsApi } from "./runs-api";
 
 export const runsQueryKeys = {
   all: ["runs"] as const,
@@ -89,13 +89,8 @@ export function useUpdateRunPinnedMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      runId,
-      isPinned,
-    }: {
-      runId: string;
-      isPinned: boolean;
-    }) => runsApi.updateRunPinned(runId, { isPinned }),
+    mutationFn: ({ runId, isPinned }: { runId: string; isPinned: boolean }) =>
+      runsApi.updateRunPinned(runId, { isPinned }),
     onSuccess: (run) => {
       void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
       void queryClient.setQueryData(runsQueryKeys.detail(run.id), run);
@@ -167,11 +162,12 @@ export function useRestartCurrentStepMutation() {
     mutationFn: runsApi.restartCurrentStep,
     onSuccess: (_result, runId) => {
       void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
-      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.detail(runId) });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.detail(runId),
+      });
     },
   });
 }
-
 
 export function useStopCurrentStepMutation() {
   const queryClient = useQueryClient();
@@ -187,7 +183,6 @@ export function useStopCurrentStepMutation() {
   });
 }
 export function useRestartCodeStepMutation() {
-
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -203,4 +198,3 @@ export function useRestartCodeStepMutation() {
     },
   });
 }
-

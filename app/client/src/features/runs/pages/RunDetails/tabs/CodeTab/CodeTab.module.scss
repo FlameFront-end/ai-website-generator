@@ -1,0 +1,98 @@
+.codeExplorer {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 0;
+  height: min(680px, 72vh);
+  min-height: 520px;
+  border: 1px solid var(--border-solid);
+  border-radius: 12px;
+  background: #000000;
+  overflow: hidden;
+}
+
+.fileTree {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg-surface-alt);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.fileTreeHeader {
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.fileTreeEmpty {
+  margin: 0;
+  padding: 16px 14px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.fileViewer {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  background: #000000;
+}
+
+.fileViewerEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  background: #000000;
+
+  p {
+    color: var(--text-faint);
+    font-size: 14px;
+  }
+}
+
+.codeLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  background: #0d1117;
+}
+
+.codeLoadingSpinner {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #1e2433;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .codeExplorer {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+
+    .fileTree {
+      border-right: none;
+      border-bottom: 1px solid #1e2433;
+      max-height: 220px;
+    }
+  }
+}
