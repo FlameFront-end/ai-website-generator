@@ -15,7 +15,7 @@
     "lint:client": "npm run lint --workspace app/client",
     "lint:server": "npm run lint --workspace app/server",
     "install:all": "npm install",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.19",
