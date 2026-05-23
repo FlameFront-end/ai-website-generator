@@ -12,6 +12,7 @@ import {
 
 import { RunStatusBadge } from "@/features/runs/components/RunStatusBadge/RunStatusBadge";
 import type { Run } from "@/api/services/runs";
+import { CardAction } from "@/kit";
 
 import { getRunTitle } from "../../../../lib/run-title";
 import {
@@ -55,41 +56,24 @@ export const RunCard: FC<RunCardProps> = ({
         <div className={styles.cardHeaderRight}>
           <RunStatusBadge status={run.status} />
           <span className={styles.cardActions}>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onTogglePin();
-              }}
+            <CardAction
+              icon={run.isPinned ? <PinOff size={15} /> : <Pin size={15} />}
               title={run.isPinned ? "Открепить" : "Закрепить"}
-              aria-label={
-                run.isPinned ? "Открепить проект" : "Закрепить проект"
-              }
-            >
-              {run.isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onRename();
-              }}
+              ariaLabel={run.isPinned ? "Открепить проект" : "Закрепить проект"}
+              onClick={onTogglePin}
+            />
+            <CardAction
+              icon={<Pencil size={15} />}
               title="Переименовать"
-              aria-label="Переименовать проект"
-            >
-              <Pencil size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete();
-              }}
+              ariaLabel="Переименовать проект"
+              onClick={onRename}
+            />
+            <CardAction
+              icon={<Trash2 size={15} />}
               title="Удалить"
-              aria-label="Удалить проект"
-            >
-              <Trash2 size={15} />
-            </button>
+              ariaLabel="Удалить проект"
+              onClick={onDelete}
+            />
           </span>
         </div>
       </div>

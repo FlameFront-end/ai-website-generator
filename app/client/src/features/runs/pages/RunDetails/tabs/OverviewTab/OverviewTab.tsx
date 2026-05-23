@@ -1,9 +1,8 @@
 import type { FC } from "react";
 
-import clsx from "clsx";
-
 import type { Run } from "@/api/services/runs";
 
+import { Panel } from "@/kit";
 import { stripTechnicalBriefPrefix } from "@/features/runs/lib";
 
 import { formatArtifactType } from "../../lib/utils";
@@ -30,12 +29,12 @@ const OverviewArtifactsSkeleton: FC = () => (
 export const OverviewTab: FC<OverviewTabProps> = ({ run }) => {
   return (
     <div className={shared.overviewGrid}>
-      <div className={shared.panel}>
+      <Panel>
         <h2>Бриф</h2>
         <pre>{stripTechnicalBriefPrefix(run.brief)}</pre>
-      </div>
+      </Panel>
 
-      <div className={clsx(shared.panel, local.overviewArtifactsPanel)}>
+      <Panel className={local.overviewArtifactsPanel}>
         <h2>Артефакты</h2>
         {run.artifacts.length === 0 ? (
           <OverviewArtifactsSkeleton />
@@ -48,7 +47,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({ run }) => {
             ))}
           </ul>
         )}
-      </div>
+      </Panel>
     </div>
   );
 };

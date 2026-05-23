@@ -1,0 +1,14 @@
+.track {
+  overflow: hidden;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--text-heading);
+    transition: width 0.35s ease;
+  }
+}

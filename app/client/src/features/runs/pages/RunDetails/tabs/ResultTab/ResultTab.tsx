@@ -5,6 +5,7 @@ import {
   useArtifactFileUrl,
 } from "@/api/services/runs";
 import type { RunArtifact } from "@/api/services/runs";
+import { Panel } from "@/kit";
 
 import shared from "../../lib/run-details-shared.module.scss";
 import local from "./ResultTab.module.scss";
@@ -20,7 +21,7 @@ interface ResultTabProps {
 const ResultSkeleton: FC = () => (
   <div className={local.resultLayout}>
     <div className={shared.overviewGrid}>
-      <div className={shared.panel}>
+      <Panel>
         <h2>Скриншоты</h2>
         <div className={local.screenshotsGrid}>
           <div className={local.screenshotContainer}>
@@ -32,15 +33,15 @@ const ResultSkeleton: FC = () => (
             <div className={local.resultSkeletonMobileImage} />
           </div>
         </div>
-      </div>
+      </Panel>
 
-      <div className={shared.panel}>
+      <Panel>
         <h2>Сравнение (Diff)</h2>
         <div className={local.resultSkeletonDiff} />
-      </div>
+      </Panel>
     </div>
 
-    <div className={shared.panel}>
+    <Panel>
       <h2>Отчет визуальной проверки</h2>
       <div className={local.resultSkeletonReport}>
         <span />
@@ -48,7 +49,7 @@ const ResultSkeleton: FC = () => (
         <span />
         <span />
       </div>
-    </div>
+    </Panel>
   </div>
 );
 
@@ -73,7 +74,7 @@ export const ResultTab: FC<ResultTabProps> = ({
   return (
     <div className={local.resultLayout}>
       <div className={shared.overviewGrid}>
-        <div className={shared.panel}>
+        <Panel>
           <h2>Скриншоты</h2>
           <div className={local.screenshotsGrid}>
             {desktopScreenshot && (
@@ -105,10 +106,10 @@ export const ResultTab: FC<ResultTabProps> = ({
               </div>
             )}
           </div>
-        </div>
+        </Panel>
 
         {diffImage && (
-          <div className={shared.panel}>
+          <Panel>
             <h2>Сравнение (Diff)</h2>
             {diffFile.isError ? (
               <p className={shared.error}>Изображение сравнения недоступно</p>
@@ -121,17 +122,17 @@ export const ResultTab: FC<ResultTabProps> = ({
                 />
               </div>
             )}
-          </div>
+          </Panel>
         )}
       </div>
 
       {visualReport && (
-        <div className={shared.panel}>
+        <Panel>
           <h2>Отчет визуальной проверки</h2>
           {reportQuery.isLoading && <p>Загружаем отчет...</p>}
           {reportQuery.isError && <p>Не удалось загрузить отчет.</p>}
           {reportQuery.data && <pre>{reportQuery.data.content}</pre>}
-        </div>
+        </Panel>
       )}
     </div>
   );

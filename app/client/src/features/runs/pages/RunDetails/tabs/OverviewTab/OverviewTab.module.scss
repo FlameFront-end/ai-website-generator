@@ -1,3 +1,5 @@
+@use "@/shared/styles/skeleton-shimmer" as *;
+
 .overviewArtifactsPanel {
   width: 100%;
 }
@@ -7,22 +9,5 @@
   width: min(240px, 64%);
   height: 16px;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--skeleton-from) 0%,
-    var(--skeleton-to) 45%,
-    var(--skeleton-from) 100%
-  );
-  background-size: 220% 100%;
-  animation: skeletonPulse 1.25s ease-in-out infinite;
-}
-
-@keyframes skeletonPulse {
-  from {
-    background-position: 100% 0;
-  }
-
-  to {
-    background-position: -100% 0;
-  }
+  @include skeleton-shimmer;
 }

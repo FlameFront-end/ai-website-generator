@@ -1,6 +1,11 @@
+import { useMemo } from "react";
 import type { FC } from "react";
 
+import clsx from "clsx";
 import { CheckCircle2 } from "lucide-react";
+
+import { Tabs } from "@/kit";
+import type { TabItem } from "@/kit";
 
 import { TABS, isTabAvailable } from "../../lib/constants";
 import type { RunDetailsTab } from "../../lib/types";
@@ -36,46 +41,49 @@ export const RunTabs: FC<RunTabsProps> = ({
 }) => {
   const approvalTab = STATUS_TO_TAB[status];
 
+  const items: TabItem<RunDetailsTab>[] = useMemo(
+    () =>
+      TABS.map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        disabled: !isTabAvailable(tab.id, status, currentStep),
+      })),
+    [status, currentStep],
+  );
+
   return (
-    <nav className={styles.tabs} aria-label="Разделы проекта">
-      {TABS.map((tab) => {
-        const isAvailable = isTabAvailable(tab.id, status, currentStep);
-        const needsApproval = tab.id === approvalTab;
+    <Tabs<RunDetailsTab>
+      items={items}
+      value={activeTab}
+      onChange={onChange}
+      ariaLabel="Разделы проекта"
+      renderExtra={(item) => {
+        const needsApproval = item.id === approvalTab;
+        if (!needsApproval || !onApprove) return null;
         return (
-          <button
-            key={tab.id}
-            type="button"
-            className={[
-              activeTab === tab.id ? styles.activeTab : "",
-              !isAvailable ? styles.disabledTab : "",
-              needsApproval ? styles.approvalTab : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onClick={() => isAvailable && onChange(tab.id)}
-            disabled={!isAvailable}
-          >
-            {tab.label}
-            {needsApproval && onApprove && (
-              <span
-                className={styles.approveButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isApproving || isApproveDisabled) return;
-                  onApprove();
-                }}
-                role="button"
-                tabIndex={isApproving || isApproveDisabled ? -1 : 0}
-                aria-disabled={isApproving || isApproveDisabled}
-                title={approveDisabledReason || "Подтвердить этап"}
-              >
-                <CheckCircle2 className={styles.approveIcon} />
-                <span>Подтвердить</span>
-              </span>
-            )}
-          </button>
+          <>
+            <span className={styles.approvalDot} />
+            <span
+              className={clsx(
+                styles.approveButton,
+                (isApproving || isApproveDisabled) && styles.approveDisabled,
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isApproving || isApproveDisabled) return;
+                onApprove();
+              }}
+              role="button"
+              tabIndex={isApproving || isApproveDisabled ? -1 : 0}
+              aria-disabled={isApproving || isApproveDisabled}
+              title={approveDisabledReason || "Подтвердить этап"}
+            >
+              <CheckCircle2 className={styles.approveIcon} />
+              <span>Подтвердить</span>
+            </span>
+          </>
         );
-      })}
-    </nav>
+      }}
+    />
   );
 };

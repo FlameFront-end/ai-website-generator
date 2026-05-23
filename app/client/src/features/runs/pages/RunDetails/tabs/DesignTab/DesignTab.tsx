@@ -2,7 +2,7 @@ import type { FC } from "react";
 
 import ReactMarkdown from "react-markdown";
 
-import { Skeleton } from "@/kit";
+import { Panel, Skeleton } from "@/kit";
 import { useArtifactContentQuery } from "@/api/services/runs";
 import type { RunArtifact } from "@/api/services/runs";
 
@@ -29,7 +29,7 @@ export const DesignTab: FC<DesignTabProps> = ({
 
   return (
     <div className={shared.overviewGrid}>
-      <div className={shared.panel}>
+      <Panel>
         <h2>Описание дизайна</h2>
         {!designDescription && <Skeleton lines={9} />}
         {descriptionQuery.isLoading && <p>Загружаем описание дизайна...</p>}
@@ -41,16 +41,16 @@ export const DesignTab: FC<DesignTabProps> = ({
             <ReactMarkdown>{descriptionQuery.data.content}</ReactMarkdown>
           </div>
         )}
-      </div>
+      </Panel>
 
-      <div className={shared.panel}>
+      <Panel>
         <h2>Дизайн-токены</h2>
         {!designTokens && <Skeleton lines={9} />}
         {tokensQuery.isLoading && <p>Загружаем дизайн-токены...</p>}
         {tokensQuery.isError && <p>Не удалось загрузить дизайн-токены.</p>}
         {tokensQuery.data &&
           renderDesignTokens(tokensQuery.data.content, shared.spec)}
-      </div>
+      </Panel>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-import { Skeleton } from "@/kit";
+import { Panel, Skeleton } from "@/kit";
 import { useArtifactContentQuery } from "@/api/services/runs";
 import type { RunArtifact } from "@/api/services/runs";
 
@@ -17,7 +17,7 @@ export const SpecTab: FC<SpecTabProps> = ({ runId, artifact }) => {
   const contentQuery = useArtifactContentQuery(runId, artifact?.id);
 
   return (
-    <div className={shared.panel}>
+    <Panel>
       <h2>Спецификация проекта</h2>
       {!artifact && <Skeleton lines={8} />}
       {contentQuery.isLoading && <p>Загружаем спецификацию проекта...</p>}
@@ -26,6 +26,6 @@ export const SpecTab: FC<SpecTabProps> = ({ runId, artifact }) => {
       )}
       {contentQuery.data &&
         renderProjectSpec(contentQuery.data.content, shared.spec)}
-    </div>
+    </Panel>
   );
 };

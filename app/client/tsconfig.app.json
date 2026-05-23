@@ -16,6 +16,7 @@
       "@/kit": ["src/shared/kit"],
       "@/widgets": ["src/shared/widgets"],
       "@/lib": ["src/shared/lib"],
+      "@/lib/*": ["src/shared/lib/*"],
       "@/hooks": ["src/shared/hooks"],
       "@/model": ["src/shared/model"],
       "@/api": ["src/shared/api"],

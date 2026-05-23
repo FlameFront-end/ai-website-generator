@@ -3,6 +3,8 @@ import type { FC } from "react";
 import clsx from "clsx";
 import { CheckCircle2 } from "lucide-react";
 
+import { ProgressTrack } from "@/kit";
+
 import { formatStep, getProgress } from "../../lib/utils";
 
 import styles from "./ProgressBar.module.scss";
@@ -41,17 +43,7 @@ export const ProgressBar: FC<ProgressBarProps> = ({ step, status }) => {
           <span className={styles.completedScore}>{progress}%</span>
         )}
       </div>
-      <div
-        className={clsx(
-          styles.progressTrack,
-          isCompleted && styles.completedTrack,
-        )}
-      >
-        <span
-          style={{ width: `${progress}%` }}
-          className={isCompleted ? styles.completedBar : ""}
-        />
-      </div>
+      <ProgressTrack value={progress} />
     </div>
   );
 };

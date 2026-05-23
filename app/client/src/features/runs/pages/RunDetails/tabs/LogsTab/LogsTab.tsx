@@ -3,9 +3,9 @@ import type { FC } from "react";
 import { useArtifactContentQuery } from "@/api/services/runs";
 import type { RunArtifact, RunLog } from "@/api/services/runs";
 
-import { LogsPanel } from "../../../../components/LogsPanel/LogsPanel";
+import { Panel } from "@/kit";
 
-import shared from "../../lib/run-details-shared.module.scss";
+import { LogsPanel } from "../../../../components/LogsPanel/LogsPanel";
 
 interface LogsTabProps {
   runId: string;
@@ -21,12 +21,12 @@ export const LogsTab: FC<LogsTabProps> = ({
   const buildLogQuery = useArtifactContentQuery(runId, buildLogArtifact?.id);
 
   return (
-    <div className={shared.panel}>
+    <Panel>
       <LogsPanel
         logs={logs}
         buildLogArtifact={buildLogArtifact}
         buildLogQuery={buildLogQuery}
       />
-    </div>
+    </Panel>
   );
 };

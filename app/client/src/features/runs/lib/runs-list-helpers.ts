@@ -1,4 +1,5 @@
 import type { Run } from "@/api/services/runs";
+import { pluralize } from "@/lib/pluralize";
 
 import type { BriefDraft } from "./brief-drafts";
 import { stripTechnicalBriefPrefix } from "./brief-display";
@@ -102,7 +103,7 @@ export function getRunDescription(run: Run) {
 export function getDraftProgress(draft: BriefDraft) {
   if (draft.finalBrief) return "Финальный бриф готов";
   if (draft.answers.length > 0) {
-    return `${draft.answers.length} ${getQuestionWord(draft.answers.length)} отвечено`;
+    return `${draft.answers.length} ${pluralize(draft.answers.length, "вопрос", "вопроса", "вопросов")} отвечено`;
   }
 
   return draft.rawBrief.trim() ? "Исходный бриф заполнен" : "Пустой черновик";
@@ -111,53 +112,14 @@ export function getDraftProgress(draft: BriefDraft) {
 export function getRunMeta(run: Run) {
   if (run.currentStep) return getStepLabel(run.currentStep);
   if (run.artifacts.length > 0) {
-    return `${run.artifacts.length} ${getArtifactWord(run.artifacts.length)}`;
+    return `${run.artifacts.length} ${pluralize(run.artifacts.length, "артефакт", "артефакта", "артефактов")}`;
   }
   if (run.score !== null) return `Оценка ${Math.round(run.score)}%`;
 
   return run.slug;
 }
 
-export function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-// ── Pluralization ───────────────────────────────────────────────────
-
-function getQuestionWord(count: number) {
-  const remainder = count % 10;
-  const hundredRemainder = count % 100;
-
-  if (remainder === 1 && hundredRemainder !== 11) return "вопрос";
-  if (
-    [2, 3, 4].includes(remainder) &&
-    ![12, 13, 14].includes(hundredRemainder)
-  ) {
-    return "вопроса";
-  }
-
-  return "вопросов";
-}
-
-function getArtifactWord(count: number) {
-  const remainder = count % 10;
-  const hundredRemainder = count % 100;
-
-  if (remainder === 1 && hundredRemainder !== 11) return "артефакт";
-  if (
-    [2, 3, 4].includes(remainder) &&
-    ![12, 13, 14].includes(hundredRemainder)
-  ) {
-    return "артефакта";
-  }
-
-  return "артефактов";
-}
+export { formatDate } from "@/lib/format";
 
 function getStepLabel(step: string) {
   // Lazy import to avoid circular dep — formatStep lives in RunDetails/utils

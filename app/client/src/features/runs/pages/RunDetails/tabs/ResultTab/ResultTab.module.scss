@@ -1,3 +1,5 @@
+@use "@/shared/styles/skeleton-shimmer" as *;
+
 .resultLayout {
   display: grid;
   gap: 20px;
@@ -54,14 +56,7 @@
 .resultSkeletonReport span {
   display: block;
   border-radius: 12px;
-  background: linear-gradient(
-    90deg,
-    var(--skeleton-from) 0%,
-    var(--skeleton-to) 45%,
-    var(--skeleton-from) 100%
-  );
-  background-size: 220% 100%;
-  animation: skeletonPulse 1.25s ease-in-out infinite;
+  @include skeleton-shimmer;
 }
 
 .resultSkeletonTitle {
@@ -110,15 +105,5 @@
     &:nth-child(4) {
       width: 54%;
     }
-  }
-}
-
-@keyframes skeletonPulse {
-  from {
-    background-position: 100% 0;
-  }
-
-  to {
-    background-position: -100% 0;
   }
 }

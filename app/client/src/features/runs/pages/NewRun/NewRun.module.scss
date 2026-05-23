@@ -45,17 +45,6 @@
   }
 }
 
-.stepBadge {
-  flex: 0 0 auto;
-  border: 1px solid var(--border-soft);
-  border-radius: 6px;
-  padding: 6px 9px;
-  background: var(--bg-muted);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .intro {
   display: grid;
   gap: 12px;
@@ -66,22 +55,6 @@
 
   p {
     margin: 0;
-  }
-}
-
-.progressTrack {
-  overflow: hidden;
-  width: min(100%, 320px);
-  height: 4px;
-  border-radius: 999px;
-  background: var(--bg-muted);
-
-  span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--text-heading);
-    transition: width 0.25s ease;
   }
 }
 

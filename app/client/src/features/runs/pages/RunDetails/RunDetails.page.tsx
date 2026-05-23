@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useRunQuery } from "@/api/services/runs";
 import { runsApi } from "@/shared/api/services/runs/runs-api";
+import { EmptyState } from "@/kit";
 import { ROUTES } from "@/model";
 
 import { DeleteRunDialog, ProgressBar, RunHeader, RunTabs } from "./components";
@@ -96,11 +97,11 @@ export default function RunDetailsPage() {
   if (runQuery.isLoading) {
     return (
       <section className={styles.page}>
-        <div className={styles.loadingState}>
-          <span />
-          <h1>Загружаем проект...</h1>
-          <p>Подготавливаем статус, артефакты и доступные действия.</p>
-        </div>
+        <EmptyState
+          loading
+          title="Загружаем проект..."
+          description="Подготавливаем статус, артефакты и доступные действия."
+        />
       </section>
     );
   }
@@ -110,13 +111,12 @@ export default function RunDetailsPage() {
   if (runQuery.isError || !run) {
     return (
       <section className={styles.page}>
-        <div className={styles.emptyPageState}>
+        <EmptyState
+          title="Проект недоступен"
+          description="Не удалось загрузить данные проекта. Попробуйте обновить страницу."
+        >
           <Link to={ROUTES.RUNS}>Назад к проектам</Link>
-          <h1>Проект недоступен</h1>
-          <p>
-            Не удалось загрузить данные проекта. Попробуйте обновить страницу.
-          </p>
-        </div>
+        </EmptyState>
       </section>
     );
   }

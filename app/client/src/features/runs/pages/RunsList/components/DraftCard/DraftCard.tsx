@@ -10,6 +10,8 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { Badge, CardAction } from "@/kit";
+
 import type { BriefDraft } from "../../../../lib/brief-drafts";
 import {
   formatDate,
@@ -60,43 +62,28 @@ export const DraftCard: FC<DraftCardProps> = ({
         <div className={styles.cardHeader}>
           <span className={styles.cardTitle}>{getDraftTitle(draft)}</span>
           <div className={styles.cardHeaderRight}>
-            <span className={styles.draftBadge}>Черновик</span>
+            <Badge>Черновик</Badge>
             <span className={styles.cardActions}>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onTogglePin();
-                }}
+              <CardAction
+                icon={isPinned ? <PinOff size={15} /> : <Pin size={15} />}
                 title={isPinned ? "Открепить" : "Закрепить"}
-                aria-label={
+                ariaLabel={
                   isPinned ? "Открепить черновик" : "Закрепить черновик"
                 }
-              >
-                {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRename();
-                }}
+                onClick={onTogglePin}
+              />
+              <CardAction
+                icon={<Pencil size={15} />}
                 title="Переименовать"
-                aria-label="Переименовать черновик"
-              >
-                <Pencil size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDelete();
-                }}
+                ariaLabel="Переименовать черновик"
+                onClick={onRename}
+              />
+              <CardAction
+                icon={<Trash2 size={15} />}
                 title="Удалить черновик"
-                aria-label="Удалить черновик"
-              >
-                <Trash2 size={15} />
-              </button>
+                ariaLabel="Удалить черновик"
+                onClick={onDelete}
+              />
             </span>
           </div>
         </div>

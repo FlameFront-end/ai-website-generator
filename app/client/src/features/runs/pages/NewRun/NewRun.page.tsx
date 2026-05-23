@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { BriefForm } from "@/features/runs/components/BriefForm/BriefForm";
-import { Button } from "@/kit";
+import { Badge, Button, ProgressTrack } from "@/kit";
 import { ROUTES } from "@/model";
 
 import { getProgressLabel } from "../../lib/brief-wizard";
@@ -63,16 +63,14 @@ function NewRunDraftPage({
               <p className={sharedStyles.eyebrow}>Подготовка брифа</p>
               <h1>Уточним детали проекта</h1>
             </div>
-            <span className={styles.stepBadge}>
+            <Badge variant="subtle">
               Шаг {w.displayedStep} из ~{w.estimatedTotalQuestions}
-            </span>
+            </Badge>
           </div>
 
           <div className={styles.intro}>
             <p>{progressLabel}</p>
-            <div className={styles.progressTrack}>
-              <span style={{ width: `${w.progressPercent}%` }} />
-            </div>
+            <ProgressTrack value={w.progressPercent} />
           </div>
 
           <AnswerHistory

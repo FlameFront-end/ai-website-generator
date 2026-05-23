@@ -1,6 +1,5 @@
 import type { RunStatus } from "@/api/services/runs";
-
-import styles from "./RunStatusBadge.module.scss";
+import { Badge } from "@/kit";
 
 interface RunStatusBadgeProps {
   status: RunStatus;
@@ -22,5 +21,5 @@ const STATUS_LABELS: Record<RunStatus, string> = {
 };
 
 export function RunStatusBadge({ status }: RunStatusBadgeProps) {
-  return <span className={styles.badge}>{STATUS_LABELS[status]}</span>;
+  return <Badge variant="info">{STATUS_LABELS[status]}</Badge>;
 }
