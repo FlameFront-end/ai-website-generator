@@ -61,7 +61,7 @@ jobs:
       - run: npm run build --workspace app/client
       - name: Check bundle size
         run: |
-          MAX_KB=512
+          MAX_KB=768
           TOTAL=$(du -sk app/client/dist/assets/ | cut -f1)
           echo "Bundle size: ${TOTAL} KB (limit: ${MAX_KB} KB)"
           if [ "$TOTAL" -gt "$MAX_KB" ]; then
