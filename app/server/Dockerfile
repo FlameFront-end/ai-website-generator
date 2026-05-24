@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1 — Install ALL dependencies (dev + prod) for the TypeScript build
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS deps
+FROM node:26-bookworm-slim AS deps
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN npm ci --workspace app/server --include-workspace-root
 # ---------------------------------------------------------------------------
 # Stage 2 — Compile TypeScript
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ RUN npm exec --workspace app/server -- tsc -p tsconfig.json
 # ---------------------------------------------------------------------------
 # Stage 3 — Production dependencies only (no devDependencies)
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS prod-deps
+FROM node:26-bookworm-slim AS prod-deps
 
 WORKDIR /app
 
@@ -38,7 +38,7 @@ RUN npm ci --workspace app/server --include-workspace-root --omit=dev
 # ---------------------------------------------------------------------------
 # Stage 4 — Minimal runtime image
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
