@@ -3,7 +3,8 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { promises as fs } from 'node:fs';
 import { DataSource, Repository } from 'typeorm';
 
-import { RunEntity, RunLogEntity, RunStatus } from '../../db/entities';
+import { RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { PipelineService } from '../pipeline/pipeline.service';
 import { RunLogService } from './run-log.service';
@@ -26,8 +27,6 @@ export class RunsCrudService {
     private readonly dataSource: DataSource,
     @InjectRepository(RunEntity)
     private readonly runsRepository: Repository<RunEntity>,
-    @InjectRepository(RunLogEntity)
-    private readonly logsRepository: Repository<RunLogEntity>,
     private readonly storageService: StorageService,
     private readonly pipelineService: PipelineService,
     private readonly runLogService: RunLogService,
@@ -74,21 +73,7 @@ export class RunsCrudService {
       take: 25,
     });
     await Promise.all(runs.map((run) => this.failRunIfStale(run)));
-    return this.runsRepository.find({
-      where: { userId },
-      relations: {
-        artifacts: true,
-        logs: true,
-      },
-      order: {
-        isPinned: 'DESC',
-        createdAt: 'DESC',
-        logs: {
-          createdAt: 'DESC',
-        },
-      },
-      take: 25,
-    });
+    return runs;
   }
 
   async getRun(id: string, userId: string): Promise<RunEntity | null> {
@@ -105,22 +90,6 @@ export class RunsCrudService {
       },
     });
     await this.failRunIfStale(run);
-
-    if (run?.status === RunStatus.Running) {
-      return this.runsRepository.findOne({
-        where: { id, userId },
-        relations: {
-          artifacts: true,
-          logs: true,
-        },
-        order: {
-          logs: {
-            createdAt: 'DESC',
-          },
-        },
-      });
-    }
-
     return run;
   }
 
@@ -227,10 +196,13 @@ export class RunsCrudService {
       return;
     }
 
-    await this.markRunStopped(
-      run,
-      'Step timed out and was automatically stopped',
-    );
+    const message = 'Step timed out and was automatically stopped';
+    await this.markRunStopped(run, message);
+
+    // Update in-memory entity so callers get correct state without a second query
+    run.status = RunStatus.Failed;
+    run.currentStep = run.currentStep || 'pipeline_failed';
+    run.errorMessage = `PIPELINE_STOPPED: ${message}`;
   }
 
   private async createQueuedRun({

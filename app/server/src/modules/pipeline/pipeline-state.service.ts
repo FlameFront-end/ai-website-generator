@@ -1,83 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { Repository } from 'typeorm';
 
-import {
-  ArtifactType,
-  RunArtifactEntity,
-  RunEntity,
-  RunLogEntity,
-  RunStatus,
-} from '../../db/entities';
-import { sleep } from '../../common/utils';
+import { RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
 import { RunLogService } from '../runs/run-log.service';
 import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class PipelineStateService {
-  private readonly logger = new Logger(PipelineStateService.name);
-
   constructor(
     @InjectRepository(RunEntity)
     private readonly runsRepository: Repository<RunEntity>,
-    @InjectRepository(RunArtifactEntity)
-    private readonly artifactsRepository: Repository<RunArtifactEntity>,
-    @InjectRepository(RunLogEntity)
-    private readonly logsRepository: Repository<RunLogEntity>,
     private readonly runLogService: RunLogService,
     private readonly storageService: StorageService,
   ) {}
-
-  getRunAbsolutePath(
-    userId: string,
-    slug: string,
-    ...segments: string[]
-  ): string {
-    return path.join(this.storageService.getRunPath(userId, slug), ...segments);
-  }
-
-  getRunRelativePath(
-    userId: string,
-    slug: string,
-    ...segments: string[]
-  ): string {
-    return this.storageService.getRunRelativePath(userId, slug, ...segments);
-  }
-
-  async writeGeneratedFile(
-    absolutePath: string,
-    content: string | Buffer,
-  ): Promise<void> {
-    const dir = path.dirname(absolutePath);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(absolutePath, content);
-    this.logger.debug(
-      `File written: ${absolutePath} (${Buffer.byteLength(content)} bytes)`,
-    );
-  }
-
-  async saveArtifact(
-    runId: string,
-    type: ArtifactType,
-    relativePath: string,
-    mimeType: string,
-  ): Promise<void> {
-    await this.artifactsRepository.save({
-      runId,
-      type,
-      path: relativePath,
-      mimeType,
-    });
-  }
-
-  async deleteArtifactsByType(
-    runId: string,
-    type: ArtifactType,
-  ): Promise<void> {
-    await this.artifactsRepository.delete({ runId, type });
-  }
 
   async touchRun(runId: string): Promise<void> {
     await this.runsRepository.update(runId, { updatedAt: new Date() });
@@ -161,44 +98,6 @@ export class PipelineStateService {
     return updatedRun;
   }
 
-  sleep(ms: number): Promise<void> {
-    return sleep(ms);
-  }
-
-  async getArtifactByType(
-    runId: string,
-    type: ArtifactType,
-  ): Promise<RunArtifactEntity | null> {
-    return this.artifactsRepository.findOne({
-      where: { runId, type },
-    });
-  }
-
-  async getArtifactsByType(
-    runId: string,
-    type: ArtifactType,
-  ): Promise<RunArtifactEntity[]> {
-    return this.artifactsRepository.find({
-      where: { runId, type },
-      order: { path: 'ASC' },
-    });
-  }
-
-  async readArtifactFile(relativePath: string): Promise<string> {
-    const absolutePath = path.resolve(
-      this.storageService.getGeneratedRootPath(),
-      relativePath,
-    );
-    return fs.readFile(absolutePath, 'utf8');
-  }
-
-  getArtifactAbsolutePath(relativePath: string): string {
-    return path.resolve(
-      this.storageService.getGeneratedRootPath(),
-      relativePath,
-    );
-  }
-
   async getRun(runId: string): Promise<RunEntity | null> {
     return this.runsRepository.findOne({
       where: { id: runId },
@@ -224,35 +123,5 @@ export class PipelineStateService {
       where: { id: run.id },
     });
     return updatedRun || run;
-  }
-
-  async updateArtifact(
-    runId: string,
-    type: ArtifactType,
-    relativePath: string,
-    mimeType?: string,
-  ): Promise<void> {
-    const result = await this.artifactsRepository.update(
-      { runId, type },
-      { path: relativePath, ...(mimeType ? { mimeType } : {}) },
-    );
-
-    if (!result.affected) {
-      await this.saveArtifact(
-        runId,
-        type,
-        relativePath,
-        mimeType ?? 'application/octet-stream',
-      );
-    }
-  }
-
-  async fileExists(filePath: string): Promise<boolean> {
-    try {
-      await fs.access(filePath);
-      return true;
-    } catch {
-      return false;
-    }
   }
 }

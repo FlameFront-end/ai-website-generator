@@ -12,7 +12,7 @@ import {
 
 import { RunArtifactEntity } from './run-artifact.entity';
 import { RunLogEntity } from './run-log.entity';
-import { RunStatus } from './run-status.enum';
+import { RunStatus } from '../../common/enums';
 import { UserEntity } from './user.entity';
 
 @Entity({ name: 'runs' })

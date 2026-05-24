@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { getAppConfig } from '../../app/app-config.module';
+import { getAppConfig } from '../../config/config.module';
 import type { RunEntity } from '../../db/entities';
 
 @Injectable()
@@ -23,12 +23,24 @@ export class StorageService {
     return path.join(this.getGeneratedRootPath(), userId, 'runs', slug);
   }
 
+  getRunAbsolutePath(
+    userId: string,
+    slug: string,
+    ...segments: string[]
+  ): string {
+    return path.join(this.getRunPath(userId, slug), ...segments);
+  }
+
   getRunRelativePath(
     userId: string,
     slug: string,
     ...segments: string[]
   ): string {
     return path.join(userId, 'runs', slug, ...segments).replaceAll('\\', '/');
+  }
+
+  getArtifactAbsolutePath(relativePath: string): string {
+    return path.resolve(this.getGeneratedRootPath(), relativePath);
   }
 
   resolveArtifactPath(artifactPath: string): string {
@@ -62,6 +74,32 @@ export class StorageService {
       ),
     );
     this.logger.debug(`Run folders created: ${slug}`);
+  }
+
+  async writeGeneratedFile(
+    absolutePath: string,
+    content: string | Buffer,
+  ): Promise<void> {
+    const dir = path.dirname(absolutePath);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(absolutePath, content);
+    this.logger.debug(
+      `File written: ${absolutePath} (${Buffer.byteLength(content)} bytes)`,
+    );
+  }
+
+  async readArtifactFile(relativePath: string): Promise<string> {
+    const absolutePath = this.getArtifactAbsolutePath(relativePath);
+    return fs.readFile(absolutePath, 'utf8');
+  }
+
+  async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async writeStatusFile(

@@ -2,21 +2,23 @@ import { Injectable } from '@nestjs/common';
 import path from 'node:path';
 
 import type { StyleVariant } from '../ai/types';
-import { StyleToSpecMapper } from './style-to-spec.mapper';
+import { StyleToSpecMapper } from '../ai/mappers/style-to-spec.mapper';
 import { loadImageAsDataUrl } from '../ai/image-attachment';
-import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
+import { ArtifactType, RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
+import { sleep } from '../../common/utils';
+import { PIPELINE_STEP_DELAY_MS } from '../../common/constants/pipeline';
 import { StorageService } from '../storage/storage.service';
 import type {
   CodegenArtifactKind,
   CodegenArtifactPayload,
 } from '../code-generator/code-generator.service';
 import { CodeGeneratorService } from '../code-generator/code-generator.service';
+import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
 import { BuildService } from './build.service';
 import { ScreenshotService } from './screenshot.service';
 import { VisualQAService } from './visual-qa.service';
-
-const PIPELINE_STEP_DELAY_MS = 1200;
 const MAX_BUILD_REPAIR_ATTEMPTS = 3;
 
 @Injectable()
@@ -24,6 +26,7 @@ export class CodegenStepService {
   constructor(
     private readonly state: PipelineStateService,
     private readonly storageService: StorageService,
+    private readonly artifactService: ArtifactService,
     private readonly codeGeneratorService: CodeGeneratorService,
     private readonly buildService: BuildService,
     private readonly screenshotService: ScreenshotService,
@@ -43,7 +46,7 @@ export class CodegenStepService {
       userId,
     );
     await this.state.addLog(run.id, 'Generating website code');
-    await this.state.sleep(PIPELINE_STEP_DELAY_MS);
+    await sleep(PIPELINE_STEP_DELAY_MS);
 
     const codePath = path.join(
       this.storageService.getRunPath(userId, codeRun.id),
@@ -205,7 +208,7 @@ export class CodegenStepService {
     instruction: string,
     userId: string,
   ): Promise<void> {
-    const selectedStyleArtifact = await this.state.getArtifactByType(
+    const selectedStyleArtifact = await this.artifactService.getArtifactByType(
       run.id,
       ArtifactType.SelectedStyle,
     );
@@ -215,7 +218,7 @@ export class CodegenStepService {
       return;
     }
 
-    const styleContent = await this.state.readArtifactFile(
+    const styleContent = await this.storageService.readArtifactFile(
       selectedStyleArtifact.path,
     );
     const selectedStyle = JSON.parse(styleContent) as StyleVariant;
@@ -258,25 +261,25 @@ export class CodegenStepService {
       'sections-module': 'sections-module.json',
     };
 
-    const relativePath = this.state.getRunRelativePath(
+    const relativePath = this.storageService.getRunRelativePath(
       userId,
       runId,
       'codegen',
       filenameMap[kind],
     );
-    const absolutePath = this.state.getRunAbsolutePath(
+    const absolutePath = this.storageService.getRunAbsolutePath(
       userId,
       runId,
       'codegen',
       filenameMap[kind],
     );
 
-    await this.state.writeGeneratedFile(
+    await this.storageService.writeGeneratedFile(
       absolutePath,
       JSON.stringify(data, null, 2),
     );
 
-    await this.state.saveArtifact(
+    await this.artifactService.saveArtifact(
       runId,
       artifactTypeMap[kind],
       relativePath,
@@ -288,11 +291,11 @@ export class CodegenStepService {
     fullPageImageDataUrl: string | null;
     sectionImageMap: Map<string, string>;
   }> {
-    const referenceArtifact = await this.state.getArtifactByType(
+    const referenceArtifact = await this.artifactService.getArtifactByType(
       runId,
       ArtifactType.ReferenceImage,
     );
-    const referenceBlocks = await this.state.getArtifactsByType(
+    const referenceBlocks = await this.artifactService.getArtifactsByType(
       runId,
       ArtifactType.ReferenceBlock,
     );
@@ -302,7 +305,7 @@ export class CodegenStepService {
       return { fullPageImageDataUrl: null, sectionImageMap };
     }
 
-    const fullPagePath = this.state.getArtifactAbsolutePath(
+    const fullPagePath = this.storageService.getArtifactAbsolutePath(
       referenceArtifact.path,
     );
     const fullPageImageDataUrl = await loadImageAsDataUrl(fullPagePath);
@@ -321,7 +324,9 @@ export class CodegenStepService {
     for (const block of referenceBlocks) {
       const fileName = path.basename(block.path).replace(/\.[^.]+$/, '');
       const sectionId = fileName.replace(/^\d+-/, '');
-      const absolutePath = this.state.getArtifactAbsolutePath(block.path);
+      const absolutePath = this.storageService.getArtifactAbsolutePath(
+        block.path,
+      );
       sectionImageMap.set(sectionId, await loadImageAsDataUrl(absolutePath));
     }
 

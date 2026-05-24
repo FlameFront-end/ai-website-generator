@@ -1,4 +1,4 @@
-import type { DesignTokens, ProjectSpec, StyleVariant } from '../ai/types';
+import type { DesignTokens, ProjectSpec, StyleVariant } from '../types';
 
 /**
  * Pure utility: maps a StyleVariant to ProjectSpec, DesignTokens,
@@ -92,15 +92,14 @@ export class StyleToSpecMapper {
   }
 
   static toDesignTokens(style: StyleVariant): DesignTokens {
+    if (style.colorPalette.length < 6) {
+      throw new Error(
+        `StyleVariant "${style.name}" has insufficient color palette (${style.colorPalette.length}/6 required)`,
+      );
+    }
+
     const [background, accent, accentSecondary, surface, textPrimary, border] =
-      [
-        style.colorPalette[0] ?? '#0F172A',
-        style.colorPalette[1] ?? '#3B82F6',
-        style.colorPalette[2] ?? '#8B5CF6',
-        style.colorPalette[3] ?? '#FFFFFF',
-        style.colorPalette[4] ?? '#111827',
-        style.colorPalette[5] ?? '#E5E7EB',
-      ];
+      style.colorPalette;
 
     return {
       colors: {

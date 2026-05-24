@@ -14,9 +14,13 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 
+import { RunStatus } from '../../common/enums';
 import type { RequestWithUser } from '../../common/types/request.types';
-import { AiService } from '../ai/ai.service';
+import { RunEntity } from '../../db/entities';
+import { BriefAiService } from '../ai/brief-ai.service';
+import type { BriefClarificationResult } from '../ai/types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ArtifactReaderService } from './artifact-reader.service';
 import { ApproveStepDto } from './dto/approve-step.dto';
 import { ClarifyBriefDto } from './dto/clarify-brief.dto';
 import { CreateRunDto } from './dto/create-run.dto';
@@ -24,19 +28,24 @@ import { EditRequestDto } from './dto/edit-request.dto';
 import { SelectStyleDto } from './dto/select-style.dto';
 import { UpdateRunPinnedDto } from './dto/update-run-pinned.dto';
 import { UpdateRunDto } from './dto/update-run.dto';
-import { RunsService } from './runs.service';
+import { RunsCrudService } from './runs-crud.service';
+import { RunsWorkflowService } from './runs-workflow.service';
 
 @Controller('runs')
 @UseGuards(JwtAuthGuard)
 export class RunsController {
   constructor(
-    private readonly runsService: RunsService,
-    private readonly aiService: AiService,
+    private readonly crud: RunsCrudService,
+    private readonly workflow: RunsWorkflowService,
+    private readonly artifacts: ArtifactReaderService,
+    private readonly briefAiService: BriefAiService,
   ) {}
 
   @Post('brief/clarify')
-  clarifyBrief(@Body() body: ClarifyBriefDto) {
-    return this.aiService.clarifyBrief(
+  clarifyBrief(
+    @Body() body: ClarifyBriefDto,
+  ): Promise<BriefClarificationResult> {
+    return this.briefAiService.clarifyBrief(
       body.brief,
       body.answers ?? [],
       body.siteLanguage,
@@ -44,18 +53,24 @@ export class RunsController {
   }
 
   @Post()
-  createRun(@Body() body: CreateRunDto, @Request() req: RequestWithUser) {
-    return this.runsService.createRun(body, req.user.id);
+  createRun(
+    @Body() body: CreateRunDto,
+    @Request() req: RequestWithUser,
+  ): Promise<{ id: string; slug: string; status: RunStatus }> {
+    return this.crud.createRun(body, req.user.id);
   }
 
   @Get()
-  getRuns(@Request() req: RequestWithUser) {
-    return this.runsService.getRuns(req.user.id);
+  getRuns(@Request() req: RequestWithUser): Promise<RunEntity[]> {
+    return this.crud.getRuns(req.user.id);
   }
 
   @Get(':id')
-  async getRun(@Param('id') id: string, @Request() req: RequestWithUser) {
-    const run = await this.runsService.getRun(id, req.user.id);
+  async getRun(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<RunEntity> {
+    const run = await this.crud.getRun(id, req.user.id);
 
     if (!run) {
       throw new NotFoundException('Run not found');
@@ -69,8 +84,8 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: UpdateRunDto,
     @Request() req: RequestWithUser,
-  ) {
-    return this.runsService.updateRun(id, body, req.user.id);
+  ): Promise<RunEntity> {
+    return this.crud.updateRun(id, body, req.user.id);
   }
 
   @Patch(':id/pinned')
@@ -78,13 +93,16 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: UpdateRunPinnedDto,
     @Request() req: RequestWithUser,
-  ) {
-    return this.runsService.updateRunPinned(id, body.isPinned, req.user.id);
+  ): Promise<RunEntity> {
+    return this.crud.updateRunPinned(id, body.isPinned, req.user.id);
   }
 
   @Delete(':id')
-  deleteRun(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.runsService.deleteRun(id, req.user.id);
+  deleteRun(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<{ id: string; deleted: boolean }> {
+    return this.crud.deleteRun(id, req.user.id);
   }
 
   @Get(':id/artifacts/:artifactId/content')
@@ -92,8 +110,14 @@ export class RunsController {
     @Param('id') id: string,
     @Param('artifactId') artifactId: string,
     @Request() req: RequestWithUser,
-  ) {
-    return this.runsService.getArtifactContent(id, artifactId, req.user.id);
+  ): Promise<{
+    artifactId: string;
+    type: string;
+    path: string;
+    mimeType: string;
+    content: string;
+  }> {
+    return this.artifacts.getArtifactContent(id, artifactId, req.user.id);
   }
 
   @Get(':id/artifacts/:artifactId/file')
@@ -102,19 +126,22 @@ export class RunsController {
     @Param('artifactId') artifactId: string,
     @Res() response: Response,
     @Request() req: RequestWithUser,
-  ) {
-    const file = await this.runsService.getArtifactFile(
+  ): Promise<void> {
+    const file = await this.artifacts.getArtifactFile(
       id,
       artifactId,
       req.user.id,
     );
     response.type(file.mimeType);
-    return response.sendFile(file.absolutePath);
+    response.sendFile(file.absolutePath);
   }
 
   @Get(':id/code-files')
-  getCodeFiles(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.runsService.getCodeFiles(id, req.user.id);
+  getCodeFiles(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<{ path: string; size: number }[]> {
+    return this.artifacts.getCodeFiles(id, req.user.id);
   }
 
   @Get(':id/code-file')
@@ -122,8 +149,8 @@ export class RunsController {
     @Param('id') id: string,
     @Query('path') filePath: string,
     @Request() req: RequestWithUser,
-  ) {
-    return this.runsService.getCodeFileContent(id, filePath, req.user.id);
+  ): Promise<{ path: string; content: string; mimeType: string }> {
+    return this.artifacts.getCodeFileContent(id, filePath, req.user.id);
   }
 
   @Get(':id/download-code')
@@ -131,32 +158,44 @@ export class RunsController {
     @Param('id') id: string,
     @Res() response: Response,
     @Request() req: RequestWithUser,
-  ) {
-    const buffer = await this.runsService.downloadCode(id, req.user.id);
+  ): Promise<void> {
+    const buffer = await this.artifacts.downloadCode(id, req.user.id);
     response.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': 'attachment; filename="frontend-project.zip"',
     });
-    return response.send(buffer);
+    response.send(buffer);
   }
 
   @Post(':id/rebuild')
-  rebuild(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.runsService.rebuildRun(id, req.user.id);
+  rebuild(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<{ id: string; status: string }> {
+    return this.workflow.rebuildRun(id, req.user.id);
   }
 
   @Post(':id/restart-current-step')
-  restartCurrentStep(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.runsService.restartCurrentStep(id, req.user.id);
+  restartCurrentStep(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<{ id: string; status: string }> {
+    return this.workflow.restartCurrentStep(id, req.user.id);
   }
 
   @Post(':id/stop-current-step')
-  stopCurrentStep(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.runsService.stopCurrentStep(id, req.user.id);
+  stopCurrentStep(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<{ id: string; status: string }> {
+    return this.workflow.stopCurrentStep(id, req.user.id);
   }
   @Post(':id/restart-code-step')
-  restartCodeStep(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.runsService.restartCodeStep(id, req.user.id);
+  restartCodeStep(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<{ id: string; status: string }> {
+    return this.workflow.restartCodeStep(id, req.user.id);
   }
 
   @Post(':id/approve')
@@ -164,8 +203,8 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: ApproveStepDto,
     @Request() req: RequestWithUser,
-  ) {
-    return this.runsService.approveStep(id, body.step, req.user.id);
+  ): Promise<{ id: string; status: string }> {
+    return this.workflow.approveStep(id, body.step, req.user.id);
   }
 
   @Post(':id/edit-request')
@@ -173,8 +212,8 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: EditRequestDto,
     @Request() req: RequestWithUser,
-  ) {
-    return this.runsService.requestEdit(
+  ): Promise<{ id: string; status: string }> {
+    return this.workflow.requestEdit(
       id,
       body.step,
       body.instruction,
@@ -187,7 +226,7 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: SelectStyleDto,
     @Request() req: RequestWithUser,
-  ) {
-    return this.runsService.selectStyle(id, body.styleVariantId, req.user.id);
+  ): Promise<{ id: string; status: string }> {
+    return this.workflow.selectStyle(id, body.styleVariantId, req.user.id);
   }
 }

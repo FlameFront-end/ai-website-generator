@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 
 import { AppModule } from './app.module';
-import { getAppConfig } from './app/app-config.module';
+import { getAppConfig } from './config/config.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {

@@ -21,10 +21,10 @@ const env = cleanEnv(process.env, {
   DB_PASSWORD: str({ default: 'ai_generator' }),
   POSTGRES_DB: str({ default: undefined }),
   DB_NAME: str({ default: 'ai_website_generator' }),
-  DB_SYNCHRONIZE: bool({ default: true }),
+  DB_SYNCHRONIZE: bool({ default: false }),
   DB_LOGGING: bool({ default: false }),
   GENERATED_ROOT: str({ default: '' }),
-  JWT_SECRET: str({ default: 'default-secret-change-in-production' }),
+  JWT_SECRET: str({ devDefault: 'default-secret-change-in-production' }),
   JWT_EXPIRES_IN: str({ default: '7d' }),
   AI_ANALYSIS_PROVIDER: str({
     default: 'lmstudio',
@@ -36,8 +36,8 @@ const env = cleanEnv(process.env, {
   AI_ANALYSIS_TIMEOUT: str({ default: '' }),
   AI_ANALYSIS_STRICT_JSON: str({ default: '' }),
   AI_IMAGE_PROVIDER: str({
-    default: 'replicate',
-    choices: ['lmstudio', 'openai', 'openrouter', 'llm7', 'replicate'],
+    default: 'openai',
+    choices: ['openai'],
   }),
   AI_IMAGE_BASE_URL: str({ default: '' }),
   AI_IMAGE_API_KEY: str({ default: '' }),
@@ -58,6 +58,15 @@ const env = cleanEnv(process.env, {
   THROTTLE_AUTH_TTL: num({ default: 60 }),
   THROTTLE_AUTH_LIMIT: num({ default: 10 }),
 });
+
+const INSECURE_JWT_SECRET = 'default-secret-change-in-production';
+
+if (env.JWT_SECRET === INSECURE_JWT_SECRET && env.APP_ENV !== 'local') {
+  console.warn(
+    '[SECURITY] JWT_SECRET is using the insecure development default. ' +
+      'Set a strong, unique JWT_SECRET environment variable before deploying.',
+  );
+}
 
 function defaultForEnvironment<T>(local: T, docker: T): T {
   return env.APP_ENV === 'docker' ? docker : local;
@@ -83,13 +92,7 @@ function buildDatabaseUrl(): string {
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
 
-export type AiProviderType =
-  | 'lmstudio'
-  | 'openai'
-  | 'openrouter'
-  | 'llm7'
-  | 'replicate'
-  | 'chatgpt';
+export type AiProviderType = 'lmstudio' | 'openai' | 'openrouter' | 'llm7';
 export type AiProviderRole = 'analysis' | 'image' | 'code';
 
 function normalizeTimeout(timeout: string): number | undefined {
@@ -116,7 +119,7 @@ function normalizeBoolean(value: string): boolean | undefined {
 }
 
 function defaultStrictJson(provider: AiProviderType): boolean {
-  return provider !== 'llm7' && provider !== 'replicate';
+  return provider !== 'llm7';
 }
 
 function buildAiRoleConfig(role: AiProviderRole) {

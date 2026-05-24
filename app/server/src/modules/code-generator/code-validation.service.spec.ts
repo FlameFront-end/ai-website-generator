@@ -1,6 +1,5 @@
 import { CodeValidationService } from './code-validation.service';
-import type { GeneratedFile } from './code-generator.service';
-import type { CodePlan, ProjectSpec } from '../ai/types';
+import type { CodePlan, GeneratedFile, ProjectSpec } from '../ai/types';
 
 describe('CodeValidationService', () => {
   let service: CodeValidationService;
@@ -14,10 +13,20 @@ describe('CodeValidationService', () => {
   // ---------------------------------------------------------------------------
   describe('normalizeGeneratedFiles', () => {
     const validFiles: GeneratedFile[] = [
-      { path: 'src/app/page.tsx', content: 'export default function Page() {}' },
-      { path: 'src/app/layout.tsx', content: 'export default function Layout({ children }: any) { return children; }' },
+      {
+        path: 'src/app/page.tsx',
+        content: 'export default function Page() {}',
+      },
+      {
+        path: 'src/app/layout.tsx',
+        content:
+          'export default function Layout({ children }: any) { return children; }',
+      },
       { path: 'src/app/globals.css', content: ':root { --bg: #fff; }' },
-      { path: 'src/components/landing/landing-page.tsx', content: 'export default function LP() {}' },
+      {
+        path: 'src/components/landing/landing-page.tsx',
+        content: 'export default function LP() {}',
+      },
     ];
 
     it('should return valid files unchanged', () => {
@@ -125,10 +134,20 @@ describe('CodeValidationService', () => {
 
     it('should canonicalize known path aliases', () => {
       const files: GeneratedFile[] = [
-        { path: 'src/app/page.tsx', content: 'export default function Page() {}' },
-        { path: 'src/app/layout.tsx', content: 'export default function Layout({ children }: any) { return children; }' },
+        {
+          path: 'src/app/page.tsx',
+          content: 'export default function Page() {}',
+        },
+        {
+          path: 'src/app/layout.tsx',
+          content:
+            'export default function Layout({ children }: any) { return children; }',
+        },
         { path: 'src/app/globals.css', content: ':root {}' },
-        { path: 'src/components/landing/landingpage.tsx', content: 'export default function LP() {}' },
+        {
+          path: 'src/components/landing/landingpage.tsx',
+          content: 'export default function LP() {}',
+        },
       ];
       const result = service.normalizeGeneratedFiles(files);
 
@@ -140,9 +159,16 @@ describe('CodeValidationService', () => {
     it('should throw on parent-directory imports (../)', () => {
       const files: GeneratedFile[] = [
         { path: 'src/app/page.tsx', content: 'import X from "../lib/x";' },
-        { path: 'src/app/layout.tsx', content: 'export default function L({ children }: any) { return children; }' },
+        {
+          path: 'src/app/layout.tsx',
+          content:
+            'export default function L({ children }: any) { return children; }',
+        },
         { path: 'src/app/globals.css', content: ':root {}' },
-        { path: 'src/components/landing/landing-page.tsx', content: 'export default function LP() {}' },
+        {
+          path: 'src/components/landing/landing-page.tsx',
+          content: 'export default function LP() {}',
+        },
       ];
 
       expect(() => service.normalizeGeneratedFiles(files)).toThrow(
@@ -152,10 +178,20 @@ describe('CodeValidationService', () => {
 
     it('should throw on missing local imports', () => {
       const files: GeneratedFile[] = [
-        { path: 'src/app/page.tsx', content: 'import { Foo } from "@/components/foo";' },
-        { path: 'src/app/layout.tsx', content: 'export default function L({ children }: any) { return children; }' },
+        {
+          path: 'src/app/page.tsx',
+          content: 'import { Foo } from "@/components/foo";',
+        },
+        {
+          path: 'src/app/layout.tsx',
+          content:
+            'export default function L({ children }: any) { return children; }',
+        },
         { path: 'src/app/globals.css', content: ':root {}' },
-        { path: 'src/components/landing/landing-page.tsx', content: 'export default function LP() {}' },
+        {
+          path: 'src/components/landing/landing-page.tsx',
+          content: 'export default function LP() {}',
+        },
       ];
 
       expect(() => service.normalizeGeneratedFiles(files)).toThrow(
@@ -165,10 +201,20 @@ describe('CodeValidationService', () => {
 
     it('should allow @/ imports that resolve to existing files', () => {
       const files: GeneratedFile[] = [
-        { path: 'src/app/page.tsx', content: 'import LP from "@/components/landing/landing-page";' },
-        { path: 'src/app/layout.tsx', content: 'export default function L({ children }: any) { return children; }' },
+        {
+          path: 'src/app/page.tsx',
+          content: 'import LP from "@/components/landing/landing-page";',
+        },
+        {
+          path: 'src/app/layout.tsx',
+          content:
+            'export default function L({ children }: any) { return children; }',
+        },
         { path: 'src/app/globals.css', content: ':root {}' },
-        { path: 'src/components/landing/landing-page.tsx', content: 'export default function LP() {}' },
+        {
+          path: 'src/components/landing/landing-page.tsx',
+          content: 'export default function LP() {}',
+        },
       ];
 
       expect(() => service.normalizeGeneratedFiles(files)).not.toThrow();
@@ -222,7 +268,12 @@ describe('CodeValidationService', () => {
         architecture: 'Next.js app',
         files: ['a.ts'],
         sections: [
-          { id: 'hero', componentName: 'Hero', filePath: 'src/hero.tsx', purpose: 'Hero' },
+          {
+            id: 'hero',
+            componentName: 'Hero',
+            filePath: 'src/hero.tsx',
+            purpose: 'Hero',
+          },
         ],
         sharedComponents: [],
       };
@@ -251,12 +302,16 @@ describe('CodeValidationService', () => {
       const plan: CodePlan = {
         architecture: '',
         files: [],
-        sections: [{ id: 'x', componentName: 'X', filePath: 'x.tsx', purpose: 'x' }],
+        sections: [
+          { id: 'x', componentName: 'X', filePath: 'x.tsx', purpose: 'x' },
+        ],
         sharedComponents: [],
       };
       const result = service.normalizeCodePlan(plan, baseSpec);
 
-      expect(result.architecture).toBe('Next.js App Router landing page modules');
+      expect(result.architecture).toBe(
+        'Next.js App Router landing page modules',
+      );
     });
   });
 
@@ -277,9 +332,7 @@ describe('CodeValidationService', () => {
     });
 
     it('should normalize backslashes', () => {
-      const files: GeneratedFile[] = [
-        { path: 'src\\a.tsx', content: 'ok' },
-      ];
+      const files: GeneratedFile[] = [{ path: 'src\\a.tsx', content: 'ok' }];
       const result = service.mergeGeneratedFiles(files);
 
       expect(result[0].path).toBe('src/a.tsx');

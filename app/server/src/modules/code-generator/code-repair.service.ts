@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import type { DesignTokens, ProjectSpec } from '../ai/types';
-import { AiService } from '../ai/ai.service';
-import type { GeneratedFile } from './code-generator.service';
+import type { DesignTokens, GeneratedFile, ProjectSpec } from '../ai/types';
+import { extractErrorMessage } from '../../common/utils';
+import { CodegenAiService } from '../ai/codegen-ai.service';
 import { CodeValidationService } from './code-validation.service';
 
 type RepairableCodegenModule =
@@ -17,7 +17,7 @@ export class CodeRepairService {
   private readonly logger = new Logger(CodeRepairService.name);
 
   constructor(
-    private readonly aiService: AiService,
+    private readonly codegenAiService: CodegenAiService,
     private readonly validationService: CodeValidationService,
   ) {}
 
@@ -41,7 +41,7 @@ export class CodeRepairService {
     try {
       return this.validationService.normalizeGeneratedFiles(files);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       this.logger.warn(
         `Split code validation failed, trying module repair: ${message}`,
       );
@@ -59,17 +59,14 @@ export class CodeRepairService {
         try {
           return this.validationService.normalizeGeneratedFiles(moduleRepair);
         } catch (repairError) {
-          const repairMessage =
-            repairError instanceof Error
-              ? repairError.message
-              : String(repairError);
+          const repairMessage = extractErrorMessage(repairError);
           this.logger.warn(
             `Split module repair failed validation, trying full repair: ${repairMessage}`,
           );
         }
       }
 
-      const repairedCode = await this.aiService.repairCodeFiles(
+      const repairedCode = await this.codegenAiService.repairCodeFiles(
         brief,
         projectSpec,
         designTokens,
@@ -91,7 +88,7 @@ export class CodeRepairService {
     codePath: string,
   ): Promise<GeneratedFile[]> {
     const currentFiles = await this.readGeneratedUiFiles(codePath);
-    const repairedCode = await this.aiService.repairCodeFiles(
+    const repairedCode = await this.codegenAiService.repairCodeFiles(
       brief,
       projectSpec,
       designTokens,
@@ -128,7 +125,7 @@ export class CodeRepairService {
       );
 
     try {
-      const repairedModule = await this.aiService.repairCodeModule(
+      const repairedModule = await this.codegenAiService.repairCodeModule(
         brief,
         projectSpec,
         designTokens,
@@ -144,7 +141,7 @@ export class CodeRepairService {
         ...repairedModule.files,
       ]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       this.logger.warn(`Split module repair failed: ${message}`);
       return null;
     }

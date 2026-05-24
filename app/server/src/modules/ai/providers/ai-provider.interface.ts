@@ -28,7 +28,7 @@ export interface ChatCompletionResult {
   };
 }
 
-export type AiProviderRole = 'analysis' | 'image' | 'code';
+export type { AiProviderRole } from '../../../config/config';
 
 export interface AiProviderConfig {
   provider: string;

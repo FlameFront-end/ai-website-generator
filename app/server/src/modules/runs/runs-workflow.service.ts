@@ -2,12 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import {
-  ArtifactType,
-  RunArtifactEntity,
-  RunEntity,
-  RunStatus,
-} from '../../db/entities';
+import { ArtifactType, RunStatus } from '../../common/enums';
+import { RunArtifactEntity, RunEntity } from '../../db/entities';
 import { PipelineService } from '../pipeline/pipeline.service';
 import { RunsCrudService } from './runs-crud.service';
 

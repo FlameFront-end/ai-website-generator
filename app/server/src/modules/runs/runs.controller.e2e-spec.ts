@@ -16,9 +16,11 @@ import request from 'supertest';
 import { AllExceptionsFilter } from '../../common/filters/all-exceptions.filter';
 import { AuthService } from '../auth/auth.service';
 import { JwtStrategy } from '../auth/strategies/jwt.strategy';
-import { AiService } from '../ai/ai.service';
+import { BriefAiService } from '../ai/brief-ai.service';
+import { ArtifactReaderService } from './artifact-reader.service';
+import { RunsCrudService } from './runs-crud.service';
+import { RunsWorkflowService } from './runs-workflow.service';
 import { RunsController } from './runs.controller';
-import { RunsService } from './runs.service';
 
 const JWT_SECRET = 'e2e-test-secret';
 const MOCK_USER = { id: 'user-1', email: 'test@test.com', avatarUrl: null };
@@ -37,17 +39,22 @@ function mockConfigService(): Partial<ConfigService> {
 describe('RunsController (e2e)', () => {
   let app: INestApplication;
   let authToken: string;
-  let runsService: Record<string, jest.Mock>;
-  let aiService: Record<string, jest.Mock>;
+  let crudService: Record<string, jest.Mock>;
+  let workflowService: Record<string, jest.Mock>;
+  let artifactsService: Record<string, jest.Mock>;
+  let briefAiService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
-    runsService = {
+    crudService = {
       createRun: jest.fn(),
       getRuns: jest.fn(),
       getRun: jest.fn(),
       updateRun: jest.fn(),
       updateRunPinned: jest.fn(),
       deleteRun: jest.fn(),
+    };
+
+    workflowService = {
       rebuildRun: jest.fn(),
       restartCurrentStep: jest.fn(),
       stopCurrentStep: jest.fn(),
@@ -55,6 +62,9 @@ describe('RunsController (e2e)', () => {
       approveStep: jest.fn(),
       requestEdit: jest.fn(),
       selectStyle: jest.fn(),
+    };
+
+    artifactsService = {
       getArtifactContent: jest.fn(),
       getArtifactFile: jest.fn(),
       getCodeFiles: jest.fn(),
@@ -62,7 +72,7 @@ describe('RunsController (e2e)', () => {
       downloadCode: jest.fn(),
     };
 
-    aiService = {
+    briefAiService = {
       clarifyBrief: jest.fn(),
     };
 
@@ -86,8 +96,10 @@ describe('RunsController (e2e)', () => {
       ],
       controllers: [RunsController],
       providers: [
-        { provide: RunsService, useValue: runsService },
-        { provide: AiService, useValue: aiService },
+        { provide: RunsCrudService, useValue: crudService },
+        { provide: RunsWorkflowService, useValue: workflowService },
+        { provide: ArtifactReaderService, useValue: artifactsService },
+        { provide: BriefAiService, useValue: briefAiService },
         { provide: AuthService, useValue: mockAuthService },
         { provide: ConfigService, useValue: mockConfigService() },
         JwtStrategy,
@@ -143,7 +155,7 @@ describe('RunsController (e2e)', () => {
   describe('POST /api/runs/brief/clarify', () => {
     it('should clarify a brief', async () => {
       const result = { status: 'ready', finalBrief: 'Improved brief text' };
-      aiService.clarifyBrief.mockResolvedValue(result);
+      briefAiService.clarifyBrief.mockResolvedValue(result);
 
       const res = await request(app.getHttpServer())
         .post('/api/runs/brief/clarify')
@@ -152,7 +164,7 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual(result);
-      expect(aiService.clarifyBrief).toHaveBeenCalledWith(
+      expect(briefAiService.clarifyBrief).toHaveBeenCalledWith(
         'Build me a landing page',
         [],
         undefined,
@@ -160,7 +172,7 @@ describe('RunsController (e2e)', () => {
     });
 
     it('should pass siteLanguage and answers', async () => {
-      aiService.clarifyBrief.mockResolvedValue({ status: 'ready' });
+      briefAiService.clarifyBrief.mockResolvedValue({ status: 'ready' });
 
       await request(app.getHttpServer())
         .post('/api/runs/brief/clarify')
@@ -172,7 +184,7 @@ describe('RunsController (e2e)', () => {
         })
         .expect(201);
 
-      expect(aiService.clarifyBrief).toHaveBeenCalledWith(
+      expect(briefAiService.clarifyBrief).toHaveBeenCalledWith(
         'Build a SaaS landing',
         [{ questionId: 'q1', question: 'What?', value: 'Answer' }],
         'en',
@@ -194,7 +206,7 @@ describe('RunsController (e2e)', () => {
   describe('POST /api/runs', () => {
     it('should create a run', async () => {
       const created = { id: 'run-1', slug: 'run-001', status: 'queued' };
-      runsService.createRun.mockResolvedValue(created);
+      crudService.createRun.mockResolvedValue(created);
 
       const res = await request(app.getHttpServer())
         .post('/api/runs')
@@ -203,14 +215,14 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual(created);
-      expect(runsService.createRun).toHaveBeenCalledWith(
+      expect(crudService.createRun).toHaveBeenCalledWith(
         expect.objectContaining({ brief: 'Build a modern SaaS landing page' }),
         MOCK_USER.id,
       );
     });
 
     it('should accept optional displayName', async () => {
-      runsService.createRun.mockResolvedValue({
+      crudService.createRun.mockResolvedValue({
         id: 'run-2',
         slug: 'run-002',
         status: 'queued',
@@ -225,7 +237,7 @@ describe('RunsController (e2e)', () => {
         })
         .expect(201);
 
-      expect(runsService.createRun).toHaveBeenCalledWith(
+      expect(crudService.createRun).toHaveBeenCalledWith(
         expect.objectContaining({ displayName: 'My Project' }),
         MOCK_USER.id,
       );
@@ -257,7 +269,7 @@ describe('RunsController (e2e)', () => {
         { id: 'run-1', slug: 'run-001', status: 'completed' },
         { id: 'run-2', slug: 'run-002', status: 'queued' },
       ];
-      runsService.getRuns.mockResolvedValue(runs);
+      crudService.getRuns.mockResolvedValue(runs);
 
       const res = await request(app.getHttpServer())
         .get('/api/runs')
@@ -265,7 +277,7 @@ describe('RunsController (e2e)', () => {
         .expect(200);
 
       expect(res.body).toEqual(runs);
-      expect(runsService.getRuns).toHaveBeenCalledWith(MOCK_USER.id);
+      expect(crudService.getRuns).toHaveBeenCalledWith(MOCK_USER.id);
     });
   });
 
@@ -275,7 +287,7 @@ describe('RunsController (e2e)', () => {
   describe('GET /api/runs/:id', () => {
     it('should return a single run', async () => {
       const run = { id: 'run-1', slug: 'run-001', status: 'completed' };
-      runsService.getRun.mockResolvedValue(run);
+      crudService.getRun.mockResolvedValue(run);
 
       const res = await request(app.getHttpServer())
         .get('/api/runs/run-1')
@@ -283,11 +295,11 @@ describe('RunsController (e2e)', () => {
         .expect(200);
 
       expect(res.body).toEqual(run);
-      expect(runsService.getRun).toHaveBeenCalledWith('run-1', MOCK_USER.id);
+      expect(crudService.getRun).toHaveBeenCalledWith('run-1', MOCK_USER.id);
     });
 
     it('should return 404 when run not found', async () => {
-      runsService.getRun.mockResolvedValue(null);
+      crudService.getRun.mockResolvedValue(null);
 
       await request(app.getHttpServer())
         .get('/api/runs/nonexistent')
@@ -302,7 +314,7 @@ describe('RunsController (e2e)', () => {
   describe('PATCH /api/runs/:id', () => {
     it('should update a run', async () => {
       const updated = { id: 'run-1', displayName: 'New Name' };
-      runsService.updateRun.mockResolvedValue(updated);
+      crudService.updateRun.mockResolvedValue(updated);
 
       const res = await request(app.getHttpServer())
         .patch('/api/runs/run-1')
@@ -311,7 +323,7 @@ describe('RunsController (e2e)', () => {
         .expect(200);
 
       expect(res.body).toEqual(updated);
-      expect(runsService.updateRun).toHaveBeenCalledWith(
+      expect(crudService.updateRun).toHaveBeenCalledWith(
         'run-1',
         expect.objectContaining({ displayName: 'New Name' }),
         MOCK_USER.id,
@@ -333,7 +345,7 @@ describe('RunsController (e2e)', () => {
   describe('PATCH /api/runs/:id/pinned', () => {
     it('should update pinned status', async () => {
       const updated = { id: 'run-1', isPinned: true };
-      runsService.updateRunPinned.mockResolvedValue(updated);
+      crudService.updateRunPinned.mockResolvedValue(updated);
 
       const res = await request(app.getHttpServer())
         .patch('/api/runs/run-1/pinned')
@@ -342,7 +354,7 @@ describe('RunsController (e2e)', () => {
         .expect(200);
 
       expect(res.body).toEqual(updated);
-      expect(runsService.updateRunPinned).toHaveBeenCalledWith(
+      expect(crudService.updateRunPinned).toHaveBeenCalledWith(
         'run-1',
         true,
         MOCK_USER.id,
@@ -363,7 +375,7 @@ describe('RunsController (e2e)', () => {
   // ---------------------------------------------------------------------------
   describe('DELETE /api/runs/:id', () => {
     it('should delete a run', async () => {
-      runsService.deleteRun.mockResolvedValue({ id: 'run-1', deleted: true });
+      crudService.deleteRun.mockResolvedValue({ id: 'run-1', deleted: true });
 
       const res = await request(app.getHttpServer())
         .delete('/api/runs/run-1')
@@ -371,7 +383,7 @@ describe('RunsController (e2e)', () => {
         .expect(200);
 
       expect(res.body).toEqual({ id: 'run-1', deleted: true });
-      expect(runsService.deleteRun).toHaveBeenCalledWith('run-1', MOCK_USER.id);
+      expect(crudService.deleteRun).toHaveBeenCalledWith('run-1', MOCK_USER.id);
     });
   });
 
@@ -380,7 +392,7 @@ describe('RunsController (e2e)', () => {
   // ---------------------------------------------------------------------------
   describe('POST /api/runs/:id/approve', () => {
     it('should approve a step', async () => {
-      runsService.approveStep.mockResolvedValue({ success: true });
+      workflowService.approveStep.mockResolvedValue({ success: true });
 
       const res = await request(app.getHttpServer())
         .post('/api/runs/run-1/approve')
@@ -389,7 +401,7 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual({ success: true });
-      expect(runsService.approveStep).toHaveBeenCalledWith(
+      expect(workflowService.approveStep).toHaveBeenCalledWith(
         'run-1',
         'style',
         MOCK_USER.id,
@@ -410,7 +422,7 @@ describe('RunsController (e2e)', () => {
   // ---------------------------------------------------------------------------
   describe('POST /api/runs/:id/select-style', () => {
     it('should select a style variant', async () => {
-      runsService.selectStyle.mockResolvedValue({ success: true });
+      workflowService.selectStyle.mockResolvedValue({ success: true });
 
       const res = await request(app.getHttpServer())
         .post('/api/runs/run-1/select-style')
@@ -419,7 +431,7 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual({ success: true });
-      expect(runsService.selectStyle).toHaveBeenCalledWith(
+      expect(workflowService.selectStyle).toHaveBeenCalledWith(
         'run-1',
         'variant-1',
         MOCK_USER.id,
@@ -440,7 +452,7 @@ describe('RunsController (e2e)', () => {
   // ---------------------------------------------------------------------------
   describe('POST /api/runs/:id/edit-request', () => {
     it('should submit an edit request', async () => {
-      runsService.requestEdit.mockResolvedValue({ success: true });
+      workflowService.requestEdit.mockResolvedValue({ success: true });
 
       const res = await request(app.getHttpServer())
         .post('/api/runs/run-1/edit-request')
@@ -449,7 +461,7 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual({ success: true });
-      expect(runsService.requestEdit).toHaveBeenCalledWith(
+      expect(workflowService.requestEdit).toHaveBeenCalledWith(
         'run-1',
         'code',
         'Make the header bigger',
@@ -479,7 +491,7 @@ describe('RunsController (e2e)', () => {
   // ---------------------------------------------------------------------------
   describe('POST /api/runs/:id/rebuild', () => {
     it('should rebuild a run', async () => {
-      runsService.rebuildRun.mockResolvedValue({ success: true });
+      workflowService.rebuildRun.mockResolvedValue({ success: true });
 
       const res = await request(app.getHttpServer())
         .post('/api/runs/run-1/rebuild')
@@ -487,7 +499,7 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual({ success: true });
-      expect(runsService.rebuildRun).toHaveBeenCalledWith(
+      expect(workflowService.rebuildRun).toHaveBeenCalledWith(
         'run-1',
         MOCK_USER.id,
       );
@@ -499,7 +511,7 @@ describe('RunsController (e2e)', () => {
   // ---------------------------------------------------------------------------
   describe('POST /api/runs/:id/restart-current-step', () => {
     it('should restart current step', async () => {
-      runsService.restartCurrentStep.mockResolvedValue({ success: true });
+      workflowService.restartCurrentStep.mockResolvedValue({ success: true });
 
       const res = await request(app.getHttpServer())
         .post('/api/runs/run-1/restart-current-step')
@@ -507,7 +519,7 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual({ success: true });
-      expect(runsService.restartCurrentStep).toHaveBeenCalledWith(
+      expect(workflowService.restartCurrentStep).toHaveBeenCalledWith(
         'run-1',
         MOCK_USER.id,
       );
@@ -519,7 +531,7 @@ describe('RunsController (e2e)', () => {
   // ---------------------------------------------------------------------------
   describe('POST /api/runs/:id/stop-current-step', () => {
     it('should stop current step', async () => {
-      runsService.stopCurrentStep.mockResolvedValue({ success: true });
+      workflowService.stopCurrentStep.mockResolvedValue({ success: true });
 
       const res = await request(app.getHttpServer())
         .post('/api/runs/run-1/stop-current-step')
@@ -527,7 +539,7 @@ describe('RunsController (e2e)', () => {
         .expect(201);
 
       expect(res.body).toEqual({ success: true });
-      expect(runsService.stopCurrentStep).toHaveBeenCalledWith(
+      expect(workflowService.stopCurrentStep).toHaveBeenCalledWith(
         'run-1',
         MOCK_USER.id,
       );
@@ -540,7 +552,7 @@ describe('RunsController (e2e)', () => {
   describe('GET /api/runs/:id/code-files', () => {
     it('should return code file list', async () => {
       const files = [{ path: 'src/app/page.tsx', size: 512 }];
-      runsService.getCodeFiles.mockResolvedValue(files);
+      artifactsService.getCodeFiles.mockResolvedValue(files);
 
       const res = await request(app.getHttpServer())
         .get('/api/runs/run-1/code-files')
@@ -548,7 +560,7 @@ describe('RunsController (e2e)', () => {
         .expect(200);
 
       expect(res.body).toEqual(files);
-      expect(runsService.getCodeFiles).toHaveBeenCalledWith(
+      expect(artifactsService.getCodeFiles).toHaveBeenCalledWith(
         'run-1',
         MOCK_USER.id,
       );
@@ -564,7 +576,7 @@ describe('RunsController (e2e)', () => {
         path: 'src/app/page.tsx',
         content: 'export default function() {}',
       };
-      runsService.getCodeFileContent.mockResolvedValue(content);
+      artifactsService.getCodeFileContent.mockResolvedValue(content);
 
       const res = await request(app.getHttpServer())
         .get('/api/runs/run-1/code-file?path=src/app/page.tsx')
@@ -572,7 +584,7 @@ describe('RunsController (e2e)', () => {
         .expect(200);
 
       expect(res.body).toEqual(content);
-      expect(runsService.getCodeFileContent).toHaveBeenCalledWith(
+      expect(artifactsService.getCodeFileContent).toHaveBeenCalledWith(
         'run-1',
         'src/app/page.tsx',
         MOCK_USER.id,

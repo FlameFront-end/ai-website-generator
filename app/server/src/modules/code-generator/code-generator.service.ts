@@ -2,19 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import type { DesignTokens, ProjectSpec } from '../ai/types';
-import { AiService } from '../ai/ai.service';
+import type { DesignTokens, GeneratedFile, ProjectSpec } from '../ai/types';
+import { CodegenAiService } from '../ai/codegen-ai.service';
+import { DesignAiService } from '../ai/design-ai.service';
 import { CodeRepairService } from './code-repair.service';
 import { CodeValidationService } from './code-validation.service';
 import { ScaffoldTemplateService } from './scaffold-template.service';
 
 const RESET_OUTPUT_ATTEMPTS = 6;
 const RESET_OUTPUT_RETRY_DELAY_MS = 1000;
-
-export interface GeneratedFile {
-  path: string;
-  content: string;
-}
 
 export interface ProjectManifest {
   projectType: string;
@@ -52,7 +48,8 @@ export class CodeGeneratorService {
   private readonly logger = new Logger(CodeGeneratorService.name);
 
   constructor(
-    private readonly aiService: AiService,
+    private readonly codegenAiService: CodegenAiService,
+    private readonly designAiService: DesignAiService,
     private readonly scaffoldService: ScaffoldTemplateService,
     private readonly validationService: CodeValidationService,
     private readonly repairService: CodeRepairService,
@@ -87,26 +84,15 @@ export class CodeGeneratorService {
         `Split AI code generation failed, falling back to single prompt: ${splitMessage}`,
       );
 
-      try {
-        const aiCode = await this.aiService.generateCode(
-          brief,
-          projectSpec,
-          designTokens,
-          designDescription,
-        );
-        generatedUiFiles = this.validationService.normalizeGeneratedFiles(
-          aiCode.files,
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `AI code generation failed, using deterministic fallback: ${message}`,
-        );
-        generatedUiFiles = this.scaffoldService.createFallbackUiFiles(
-          projectSpec,
-          designTokens,
-        );
-      }
+      const aiCode = await this.codegenAiService.generateCode(
+        brief,
+        projectSpec,
+        designTokens,
+        designDescription,
+      );
+      generatedUiFiles = this.validationService.normalizeGeneratedFiles(
+        aiCode.files,
+      );
     }
 
     const scaffolding =
@@ -130,7 +116,7 @@ export class CodeGeneratorService {
     codegenContext: string,
     options: GenerateProjectFilesOptions,
   ): Promise<GeneratedFile[]> {
-    const codePlan = await this.aiService.generateCodePlan(
+    const codePlan = await this.codegenAiService.generateCodePlan(
       brief,
       projectSpec,
       designTokens,
@@ -145,7 +131,7 @@ export class CodeGeneratorService {
       data: normalizedPlan,
     });
 
-    const contentModule = await this.aiService.generateCodeContent(
+    const contentModule = await this.codegenAiService.generateCodeContent(
       brief,
       projectSpec,
       designTokens,
@@ -158,7 +144,7 @@ export class CodeGeneratorService {
     });
 
     const contentFiles = JSON.stringify(contentModule.files, null, 2);
-    const layoutModule = await this.aiService.generateCodeLayout(
+    const layoutModule = await this.codegenAiService.generateCodeLayout(
       brief,
       projectSpec,
       designTokens,
@@ -188,7 +174,7 @@ export class CodeGeneratorService {
         );
       }
 
-      const sectionModule = await this.aiService.generateCodeSection(
+      const sectionModule = await this.codegenAiService.generateCodeSection(
         brief,
         projectSpec,
         designTokens,
@@ -247,7 +233,7 @@ export class CodeGeneratorService {
     designTokens: DesignTokens,
     designDescription: string,
   ): Promise<string> {
-    return this.aiService.generateReferenceSvg(
+    return this.designAiService.generateReferenceSvg(
       brief,
       projectSpec,
       designTokens,

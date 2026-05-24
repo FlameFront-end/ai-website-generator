@@ -3,19 +3,25 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import type { StyleVariant } from '../ai/types';
-import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
-import { AiService } from '../ai/ai.service';
-import { ImagesService } from '../images/images.service';
+import { ArtifactType, RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
+import { PIPELINE_STEP_DELAY_MS } from '../../common/constants/pipeline';
+import { writeImageResultToFile } from '../../common/utils';
+import { sleep } from '../../common/utils';
+import { DesignAiService } from '../ai/design-ai.service';
+import { ImageGenerationService } from '../image-generation/image-generation.service';
+import { StorageService } from '../storage/storage.service';
+import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
-
-const PIPELINE_STEP_DELAY_MS = 1200;
 
 @Injectable()
 export class StyleStepService {
   constructor(
     private readonly state: PipelineStateService,
-    private readonly aiService: AiService,
-    private readonly imagesService: ImagesService,
+    private readonly storageService: StorageService,
+    private readonly artifactService: ArtifactService,
+    private readonly designAiService: DesignAiService,
+    private readonly imageGenerationService: ImageGenerationService,
   ) {}
 
   async generateStyleVariantsStep(
@@ -29,31 +35,31 @@ export class StyleStepService {
       userId,
     );
     await this.state.addLog(styleRun.id, 'Generating style variants');
-    await this.state.sleep(PIPELINE_STEP_DELAY_MS);
+    await sleep(PIPELINE_STEP_DELAY_MS);
 
-    const styleVariants = await this.aiService.generateStyleVariants(
+    const styleVariants = await this.designAiService.generateStyleVariants(
       styleRun.brief,
     );
 
-    const variantsRelativePath = this.state.getRunRelativePath(
+    const variantsRelativePath = this.storageService.getRunRelativePath(
       userId,
       styleRun.id,
       'style',
       'style-variants.json',
     );
-    const variantsAbsolutePath = this.state.getRunAbsolutePath(
+    const variantsAbsolutePath = this.storageService.getRunAbsolutePath(
       userId,
       styleRun.id,
       'style',
       'style-variants.json',
     );
 
-    await this.state.writeGeneratedFile(
+    await this.storageService.writeGeneratedFile(
       variantsAbsolutePath,
       JSON.stringify(styleVariants, null, 2),
     );
 
-    await this.state.saveArtifact(
+    await this.artifactService.saveArtifact(
       styleRun.id,
       ArtifactType.StyleVariants,
       variantsRelativePath,
@@ -93,27 +99,27 @@ export class StyleStepService {
     await this.state.updateRun(run, { brief: updatedBrief });
 
     const styleVariants =
-      await this.aiService.generateStyleVariants(updatedBrief);
+      await this.designAiService.generateStyleVariants(updatedBrief);
 
-    const variantsRelativePath = this.state.getRunRelativePath(
+    const variantsRelativePath = this.storageService.getRunRelativePath(
       userId,
       run.id,
       'style',
       'style-variants.json',
     );
-    const variantsAbsolutePath = this.state.getRunAbsolutePath(
+    const variantsAbsolutePath = this.storageService.getRunAbsolutePath(
       userId,
       run.id,
       'style',
       'style-variants.json',
     );
 
-    await this.state.writeGeneratedFile(
+    await this.storageService.writeGeneratedFile(
       variantsAbsolutePath,
       JSON.stringify(styleVariants, null, 2),
     );
 
-    await this.state.updateArtifact(
+    await this.artifactService.updateArtifact(
       run.id,
       ArtifactType.StyleVariants,
       variantsRelativePath,
@@ -132,7 +138,11 @@ export class StyleStepService {
     runId: string,
   ): Promise<string[]> {
     const savedPaths: string[] = [];
-    const outputDir = this.state.getRunAbsolutePath(userId, runId, 'style');
+    const outputDir = this.storageService.getRunAbsolutePath(
+      userId,
+      runId,
+      'style',
+    );
     await fs.mkdir(outputDir, { recursive: true });
 
     for (const variant of variants) {
@@ -142,20 +152,20 @@ export class StyleStepService {
       );
 
       const prompt = this.buildStyleVariantImagePrompt(brief, variant);
-      const result = await this.imagesService.generateImage(prompt);
+      const result = await this.imageGenerationService.generateImage(prompt);
       const filename = `${variant.id}.png`;
       const absolutePath = path.join(outputDir, filename);
 
-      await this.writeImageResultToFile(result.image, absolutePath);
+      await writeImageResultToFile(result.image, absolutePath);
 
-      const relativePath = this.state.getRunRelativePath(
+      const relativePath = this.storageService.getRunRelativePath(
         userId,
         runId,
         'style',
         filename,
       );
 
-      await this.state.saveArtifact(
+      await this.artifactService.saveArtifact(
         runId,
         ArtifactType.StyleVariantImage,
         relativePath,
@@ -191,28 +201,5 @@ export class StyleStepService {
       'The image must clearly communicate this distinct website style direction.',
       'Use polished modern UI, realistic spacing, production-quality composition.',
     ].join('\n');
-  }
-
-  async writeImageResultToFile(
-    image: string,
-    absolutePath: string,
-  ): Promise<void> {
-    if (image.startsWith('data:image/')) {
-      const base64 = image.replace(/^data:image\/\w+;base64,/, '');
-      await fs.writeFile(absolutePath, Buffer.from(base64, 'base64'));
-      return;
-    }
-
-    if (/^[A-Za-z0-9+/=]+$/.test(image)) {
-      await fs.writeFile(absolutePath, Buffer.from(image, 'base64'));
-      return;
-    }
-
-    const response = await fetch(image);
-    if (!response.ok) {
-      throw new Error(`Failed to download generated image: ${response.status}`);
-    }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.writeFile(absolutePath, buffer);
   }
 }

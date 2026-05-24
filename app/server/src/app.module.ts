@@ -4,14 +4,14 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AppConfigModule, getAppConfig } from './app/app-config.module';
-import { AppService } from './app.service';
+import { AppConfigModule, getAppConfig } from './config/config.module';
+
 import { createTypeOrmModuleOptions } from './db/data-source';
 import { AiModule } from './modules/ai/ai.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CodeGeneratorModule } from './modules/code-generator/code-generator.module';
 import { HealthModule } from './modules/health/health.module';
-import { ImagesModule } from './modules/images/images.module';
+import { ImageGenerationModule } from './modules/image-generation/image-generation.module';
 import { PipelineModule } from './modules/pipeline/pipeline.module';
 import { RunsModule } from './modules/runs/runs.module';
 import { StorageModule } from './modules/storage/storage.module';
@@ -37,13 +37,13 @@ import { StorageModule } from './modules/storage/storage.module';
     AiModule,
     CodeGeneratorModule,
     HealthModule,
-    ImagesModule,
+    ImageGenerationModule,
     StorageModule,
     PipelineModule,
     AuthModule,
     RunsModule,
   ],
   controllers: [],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }, AppService],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

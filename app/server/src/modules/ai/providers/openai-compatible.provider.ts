@@ -1,6 +1,6 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 
-import { sleep } from '../../../common/utils';
+import { extractErrorMessage, sleep } from '../../../common/utils';
 import type {
   AiProvider,
   AiProviderConfig,
@@ -23,10 +23,6 @@ interface OpenAiChatResponse {
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 800;
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function getErrorCode(error: unknown) {
   if (
@@ -156,7 +152,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
         }
 
         this.logger.warn(
-          `AI request failed, retrying ${attempt}/${MAX_ATTEMPTS}: ${getErrorCode(error) || getErrorMessage(error)}`,
+          `AI request failed, retrying ${attempt}/${MAX_ATTEMPTS}: ${getErrorCode(error) || extractErrorMessage(error)}`,
         );
         await sleep(RETRY_DELAY_MS * attempt);
       } finally {
@@ -165,7 +161,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     }
 
     throw new ServiceUnavailableException(
-      `AI provider is temporarily unavailable: ${getErrorCode(lastError) || getErrorMessage(lastError)}`,
+      `AI provider is temporarily unavailable: ${getErrorCode(lastError) || extractErrorMessage(lastError)}`,
     );
   }
 }

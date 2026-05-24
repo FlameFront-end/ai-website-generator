@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSource, type DataSourceOptions } from 'typeorm';
 
-import { appConfig } from '../app/config';
+import { appConfig } from '../config/config';
 import { dbEntities } from './entities';
 
 function toGlobPath(...segments: string[]): string {

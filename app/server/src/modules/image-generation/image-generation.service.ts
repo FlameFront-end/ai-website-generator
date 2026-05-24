@@ -4,44 +4,24 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Replicate from 'replicate';
 
-import { getAppConfig } from '../../app/app-config.module';
-import type { AppConfig } from '../../app/config';
-
-type ReplicateFileOutput = {
-  url?: () => URL | string;
-};
-
-type ReplicateModelIdentifier =
-  | `${string}/${string}`
-  | `${string}/${string}:${string}`;
+import { getAppConfig } from '../../config/config.module';
+import { extractErrorMessage } from '../../common/utils';
+import type { AppConfig } from '../../config/config';
 
 @Injectable()
-export class ImagesService {
-  private readonly logger = new Logger(ImagesService.name);
-  private readonly replicate: Replicate | null;
+export class ImageGenerationService {
+  private readonly logger = new Logger(ImageGenerationService.name);
   private readonly imageConfig: AppConfig['ai']['roles']['image'];
 
   constructor(configService: ConfigService) {
     this.imageConfig = getAppConfig(configService).ai.roles.image;
-
-    this.replicate =
-      this.imageConfig.provider === 'replicate' && this.imageConfig.apiKey
-        ? new Replicate({ auth: this.imageConfig.apiKey })
-        : null;
   }
 
   async generateImage(
     prompt: string,
   ): Promise<{ image: string; model: string }> {
-    const provider = this.imageConfig.provider;
-
-    if (provider === 'openai') {
-      return this.generateImageViaOpenAI(prompt);
-    }
-
-    return this.generateImageViaReplicate(prompt);
+    return this.generateImageViaOpenAI(prompt);
   }
 
   /* ------------------------------------------------------------------ */
@@ -148,7 +128,7 @@ export class ImagesService {
       throw new Error('OpenAI image API returned neither b64_json nor url');
     } catch (error) {
       const elapsedMs = Date.now() - startedAt;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       this.logger.error(
         `[openai-image] ERROR after ${elapsedMs}ms: ${message}`,
       );
@@ -158,80 +138,5 @@ export class ImagesService {
     } finally {
       clearTimeout(timer);
     }
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Replicate provider                                                 */
-  /* ------------------------------------------------------------------ */
-
-  private async generateImageViaReplicate(
-    prompt: string,
-  ): Promise<{ image: string; model: string }> {
-    if (this.imageConfig.provider !== 'replicate') {
-      throw new ServiceUnavailableException(
-        'AI_IMAGE_PROVIDER must be set to replicate or openai for image generation',
-      );
-    }
-
-    if (!this.replicate) {
-      throw new ServiceUnavailableException(
-        'AI_IMAGE_API_KEY is not configured',
-      );
-    }
-
-    const model = this.getImageModel();
-    this.logger.log(`Generating image with Replicate model: ${model}`);
-
-    try {
-      const output = await this.replicate.run(model, {
-        input: {
-          prompt,
-        },
-      });
-
-      const image = this.extractImageUrl(output);
-
-      if (!image) {
-        throw new Error('Replicate returned no image URL');
-      }
-
-      return { image, model };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new ServiceUnavailableException(
-        `Image generation failed: ${message}`,
-      );
-    }
-  }
-
-  private extractImageUrl(output: unknown): string | null {
-    const firstOutput: unknown = Array.isArray(output) ? output[0] : output;
-
-    if (typeof firstOutput === 'string') {
-      return firstOutput;
-    }
-
-    if (
-      firstOutput &&
-      typeof firstOutput === 'object' &&
-      'url' in firstOutput &&
-      typeof (firstOutput as ReplicateFileOutput).url === 'function'
-    ) {
-      return String((firstOutput as ReplicateFileOutput).url?.());
-    }
-
-    return null;
-  }
-
-  private getImageModel(): ReplicateModelIdentifier {
-    const model = this.imageConfig.model.trim();
-
-    if (!/^[^/\s]+\/[^:\s]+(?::\S+)?$/.test(model)) {
-      throw new ServiceUnavailableException(
-        'AI_IMAGE_MODEL must use Replicate owner/name or owner/name:version format',
-      );
-    }
-
-    return model as ReplicateModelIdentifier;
   }
 }

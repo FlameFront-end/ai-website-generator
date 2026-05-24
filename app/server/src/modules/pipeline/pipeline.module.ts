@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module';
 import { CodeGeneratorModule } from '../code-generator/code-generator.module';
-import { ImagesModule } from '../images/images.module';
+import { ImageGenerationModule } from '../image-generation/image-generation.module';
 import { StorageModule } from '../storage/storage.module';
-import { RunArtifactEntity, RunEntity, RunLogEntity } from '../../db/entities';
-import { RunLogService } from '../runs/run-log.service';
+import { RunArtifactEntity, RunEntity } from '../../db/entities';
+import { RunLogModule } from '../runs/run-log.module';
+import { ArtifactService } from './artifact.service';
 import { PipelineService } from './pipeline.service';
 import { PipelineStateService } from './pipeline-state.service';
 import { BuildService } from './build.service';
@@ -17,14 +18,15 @@ import { CodegenStepService } from './codegen-step.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RunEntity, RunArtifactEntity, RunLogEntity]),
+    TypeOrmModule.forFeature([RunEntity, RunArtifactEntity]),
     AiModule,
     CodeGeneratorModule,
-    ImagesModule,
+    ImageGenerationModule,
     StorageModule,
+    RunLogModule,
   ],
   providers: [
-    RunLogService,
+    ArtifactService,
     PipelineStateService,
     BuildService,
     ScreenshotService,

@@ -7,8 +7,11 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import type { Page } from 'playwright';
 
-import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
+import { ArtifactType, RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
+import { extractErrorMessage, sleep } from '../../common/utils';
 import { StorageService } from '../storage/storage.service';
+import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
 
 const SERVER_STARTUP_TIMEOUT_MS = 45_000;
@@ -24,6 +27,7 @@ export class ScreenshotService {
   constructor(
     private readonly state: PipelineStateService,
     private readonly storageService: StorageService,
+    private readonly artifactService: ArtifactService,
   ) {}
 
   async takeScreenshots(
@@ -86,26 +90,26 @@ export class ScreenshotService {
       });
       await this.state.addLog(run.id, 'Mobile screenshot ready');
 
-      const desktopRelativePath = this.state.getRunRelativePath(
+      const desktopRelativePath = this.storageService.getRunRelativePath(
         userId,
         slug,
         'screenshots',
         'rendered-desktop.png',
       );
-      const mobileRelativePath = this.state.getRunRelativePath(
+      const mobileRelativePath = this.storageService.getRunRelativePath(
         userId,
         slug,
         'screenshots',
         'rendered-mobile.png',
       );
 
-      await this.state.saveArtifact(
+      await this.artifactService.saveArtifact(
         screenshotRun.id,
         ArtifactType.DesktopScreenshot,
         desktopRelativePath,
         'image/png',
       );
-      await this.state.saveArtifact(
+      await this.artifactService.saveArtifact(
         screenshotRun.id,
         ArtifactType.MobileScreenshot,
         mobileRelativePath,
@@ -119,7 +123,7 @@ export class ScreenshotService {
         userId,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       this.logger.error(`Screenshot capture failed: ${message}`);
       await this.state.addLog(run.id, 'Failed to capture screenshots', {
         error: message,
@@ -176,10 +180,10 @@ export class ScreenshotService {
 
         lastError = `${response.status} ${response.statusText}`;
       } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
+        lastError = extractErrorMessage(error);
       }
 
-      await this.state.sleep(SERVER_POLL_INTERVAL_MS);
+      await sleep(SERVER_POLL_INTERVAL_MS);
     }
 
     throw new Error(

@@ -8,8 +8,12 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import type { RequestWithUser } from '../../common/types/request.types';
+import type {
+  RequestUser,
+  RequestWithUser,
+} from '../../common/types/request.types';
 import { AuthService } from './auth.service';
+import type { AuthResponse } from './auth.types';
 import { LoginDto, RegisterDto } from './dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -19,19 +23,19 @@ export class AuthController {
 
   @Throttle({ auth: {} })
   @Post('register')
-  register(@Body() dto: RegisterDto) {
+  register(@Body() dto: RegisterDto): Promise<AuthResponse> {
     return this.authService.register(dto);
   }
 
   @Throttle({ auth: {} })
   @Post('login')
-  login(@Body() dto: LoginDto) {
+  login(@Body() dto: LoginDto): Promise<AuthResponse> {
     return this.authService.login(dto);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getProfile(@Request() req: RequestWithUser) {
+  getProfile(@Request() req: RequestWithUser): RequestUser {
     return req.user;
   }
 }

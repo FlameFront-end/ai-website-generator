@@ -3,11 +3,14 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import type { ReferenceContextSummary, StyleVariant } from '../ai/types';
-import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
-import { ImagesService } from '../images/images.service';
+import { ArtifactType, RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
+import { PIPELINE_STEP_DELAY_MS } from '../../common/constants/pipeline';
+import { writeImageResultToFile, sleep } from '../../common/utils';
+import { ImageGenerationService } from '../image-generation/image-generation.service';
+import { StorageService } from '../storage/storage.service';
+import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
-
-const PIPELINE_STEP_DELAY_MS = 1200;
 
 interface ReferenceSectionPlan {
   id: string;
@@ -26,7 +29,9 @@ interface GeneratedReferenceBlock {
 export class ReferenceStepService {
   constructor(
     private readonly state: PipelineStateService,
-    private readonly imagesService: ImagesService,
+    private readonly storageService: StorageService,
+    private readonly artifactService: ArtifactService,
+    private readonly imageGenerationService: ImageGenerationService,
   ) {}
 
   async prepareReferenceImage(
@@ -44,7 +49,7 @@ export class ReferenceStepService {
       run.id,
       `Preparing visual reference for style: ${selectedStyle.name}`,
     );
-    await this.state.sleep(PIPELINE_STEP_DELAY_MS);
+    await sleep(PIPELINE_STEP_DELAY_MS);
 
     const referenceBlocks = await this.generateReferenceBlockImages(
       referenceRun.brief,
@@ -54,7 +59,7 @@ export class ReferenceStepService {
     );
 
     for (const block of referenceBlocks) {
-      await this.state.saveArtifact(
+      await this.artifactService.saveArtifact(
         referenceRun.id,
         ArtifactType.ReferenceBlock,
         block.relativePath,
@@ -65,7 +70,7 @@ export class ReferenceStepService {
     const primaryReference = referenceBlocks[0];
 
     if (primaryReference) {
-      await this.state.saveArtifact(
+      await this.artifactService.saveArtifact(
         referenceRun.id,
         ArtifactType.ReferenceImage,
         primaryReference.relativePath,
@@ -106,7 +111,7 @@ export class ReferenceStepService {
     instruction: string,
     userId: string,
   ): Promise<void> {
-    const selectedStyleArtifact = await this.state.getArtifactByType(
+    const selectedStyleArtifact = await this.artifactService.getArtifactByType(
       run.id,
       ArtifactType.SelectedStyle,
     );
@@ -116,7 +121,7 @@ export class ReferenceStepService {
       return;
     }
 
-    const styleContent = await this.state.readArtifactFile(
+    const styleContent = await this.storageService.readArtifactFile(
       selectedStyleArtifact.path,
     );
     const selectedStyle = JSON.parse(styleContent) as StyleVariant;
@@ -137,7 +142,11 @@ export class ReferenceStepService {
     userId: string,
     runId: string,
   ): Promise<GeneratedReferenceBlock[]> {
-    const outputDir = this.state.getRunAbsolutePath(userId, runId, 'reference');
+    const outputDir = this.storageService.getRunAbsolutePath(
+      userId,
+      runId,
+      'reference',
+    );
     await fs.mkdir(outputDir, { recursive: true });
 
     const sections = this.buildReferenceSectionsFromBrief(brief);
@@ -158,14 +167,14 @@ export class ReferenceStepService {
         index,
         sections.length,
       );
-      const result = await this.imagesService.generateImage(prompt);
+      const result = await this.imageGenerationService.generateImage(prompt);
       const filename = `${String(index + 1).padStart(2, '0')}-${section.id}.png`;
       const absolutePath = path.join(outputDir, filename);
-      await this.writeImageResultToFile(result.image, absolutePath);
+      await writeImageResultToFile(result.image, absolutePath);
 
       blocks.push({
         section,
-        relativePath: this.state.getRunRelativePath(
+        relativePath: this.storageService.getRunRelativePath(
           userId,
           runId,
           'reference',
@@ -327,25 +336,25 @@ export class ReferenceStepService {
       ],
     };
 
-    const summaryRelativePath = this.state.getRunRelativePath(
+    const summaryRelativePath = this.storageService.getRunRelativePath(
       userId,
       runId,
       'reference',
       'reference-context.summary.json',
     );
-    const summaryAbsolutePath = this.state.getRunAbsolutePath(
+    const summaryAbsolutePath = this.storageService.getRunAbsolutePath(
       userId,
       runId,
       'reference',
       'reference-context.summary.json',
     );
 
-    await this.state.writeGeneratedFile(
+    await this.storageService.writeGeneratedFile(
       summaryAbsolutePath,
       JSON.stringify(summary, null, 2),
     );
 
-    await this.state.saveArtifact(
+    await this.artifactService.saveArtifact(
       runId,
       ArtifactType.ReferenceContextSummary,
       summaryRelativePath,
@@ -353,29 +362,6 @@ export class ReferenceStepService {
     );
 
     return summaryRelativePath;
-  }
-
-  private async writeImageResultToFile(
-    image: string,
-    absolutePath: string,
-  ): Promise<void> {
-    if (image.startsWith('data:image/')) {
-      const base64 = image.replace(/^data:image\/\w+;base64,/, '');
-      await fs.writeFile(absolutePath, Buffer.from(base64, 'base64'));
-      return;
-    }
-
-    if (/^[A-Za-z0-9+/=]+$/.test(image)) {
-      await fs.writeFile(absolutePath, Buffer.from(image, 'base64'));
-      return;
-    }
-
-    const response = await fetch(image);
-    if (!response.ok) {
-      throw new Error(`Failed to download generated image: ${response.status}`);
-    }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.writeFile(absolutePath, buffer);
   }
 
   private buildStylePrompt(selectedStyle: StyleVariant): string {

@@ -1,8 +1,8 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { getAppConfig } from '../../../app/app-config.module';
-import type { AppConfig } from '../../../app/config';
+import { getAppConfig } from '../../../config/config.module';
+import type { AppConfig } from '../../../config/config';
 import type {
   AiProvider,
   AiProviderRole,
@@ -51,8 +51,6 @@ export class AiProviderRegistry {
       case 'openrouter':
       case 'llm7':
         return new OpenAiCompatibleProvider(role, config);
-      case 'replicate':
-        return new UnsupportedChatProvider(role);
       default:
         return new UnsupportedChatProvider(role);
     }

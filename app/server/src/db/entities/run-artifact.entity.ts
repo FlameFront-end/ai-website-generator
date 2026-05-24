@@ -8,7 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-import { ArtifactType } from './artifact-type.enum';
+import { ArtifactType } from '../../common/enums';
 import { RunEntity } from './run.entity';
 
 @Entity({ name: 'run_artifacts' })

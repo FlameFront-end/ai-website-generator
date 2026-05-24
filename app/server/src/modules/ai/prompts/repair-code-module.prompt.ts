@@ -1,5 +1,4 @@
-import type { DesignTokens, ProjectSpec } from '../types';
-import type { GeneratedCodeFile } from '../ai.service';
+import type { DesignTokens, GeneratedFile, ProjectSpec } from '../types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
 import {
   buildSkillContext,
@@ -37,8 +36,8 @@ export function buildRepairCodeModuleMessages(
   tokens: DesignTokens,
   targetModule: string,
   validationError: string,
-  moduleFiles: GeneratedCodeFile[],
-  contextFiles: GeneratedCodeFile[],
+  moduleFiles: GeneratedFile[],
+  contextFiles: GeneratedFile[],
   codegenContext: string,
 ): ChatMessage[] {
   return [

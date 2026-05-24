@@ -5,12 +5,20 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import sharp from 'sharp';
 
-import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
+import { ArtifactType, RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
+import { extractErrorMessage } from '../../common/utils';
+import { StorageService } from '../storage/storage.service';
+import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
 
 @Injectable()
 export class VisualQAService {
-  constructor(private readonly state: PipelineStateService) {}
+  constructor(
+    private readonly state: PipelineStateService,
+    private readonly storageService: StorageService,
+    private readonly artifactService: ArtifactService,
+  ) {}
 
   async runVisualQA(
     run: RunEntity,
@@ -27,7 +35,7 @@ export class VisualQAService {
     await this.state.addLog(run.id, 'Comparing result with reference');
 
     try {
-      const referenceArtifact = await this.state.getArtifactByType(
+      const referenceArtifact = await this.artifactService.getArtifactByType(
         runId,
         ArtifactType.ReferenceImage,
       );
@@ -36,22 +44,22 @@ export class VisualQAService {
         throw new Error('Visual reference artifact not found');
       }
 
-      const referencePath = this.state.getArtifactAbsolutePath(
+      const referencePath = this.storageService.getArtifactAbsolutePath(
         referenceArtifact.path,
       );
-      const renderedPath = this.state.getRunAbsolutePath(
+      const renderedPath = this.storageService.getRunAbsolutePath(
         userId,
         slug,
         'screenshots',
         'rendered-desktop.png',
       );
-      const diffPath = this.state.getRunAbsolutePath(
+      const diffPath = this.storageService.getRunAbsolutePath(
         userId,
         slug,
         'qa',
         'diff.png',
       );
-      const reportPath = this.state.getRunAbsolutePath(
+      const reportPath = this.storageService.getRunAbsolutePath(
         userId,
         slug,
         'qa',
@@ -95,26 +103,26 @@ export class VisualQAService {
       );
       await fs.writeFile(reportPath, report);
 
-      const diffRelativePath = this.state.getRunRelativePath(
+      const diffRelativePath = this.storageService.getRunRelativePath(
         userId,
         slug,
         'qa',
         'diff.png',
       );
-      const reportRelativePath = this.state.getRunRelativePath(
+      const reportRelativePath = this.storageService.getRunRelativePath(
         userId,
         slug,
         'qa',
         'visual-report.md',
       );
 
-      await this.state.saveArtifact(
+      await this.artifactService.saveArtifact(
         runId,
         ArtifactType.DiffImage,
         diffRelativePath,
         'image/png',
       );
-      await this.state.saveArtifact(
+      await this.artifactService.saveArtifact(
         runId,
         ArtifactType.VisualReport,
         reportRelativePath,
@@ -128,7 +136,7 @@ export class VisualQAService {
 
       return this.state.completeRun(qaRun, Math.round(score), userId, slug);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = extractErrorMessage(error);
       await this.state.addLog(runId, 'Visual QA failed with an error', {
         error: message,
       });
@@ -193,7 +201,7 @@ export class VisualQAService {
 
 ## Overall Score
 
-${score}/10 (${status})
+${score}/100 (${status})
 
 ## Metrics
 

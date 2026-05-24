@@ -10,9 +10,9 @@ export const dbEntities = [
   RunLogEntity,
 ];
 
-export * from './artifact-type.enum';
+export * from '../../common/enums/artifact-type.enum';
 export * from './run-artifact.entity';
 export * from './run-log.entity';
-export * from './run-status.enum';
+export * from '../../common/enums/run-status.enum';
 export * from './run.entity';
 export * from './user.entity';

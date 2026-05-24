@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import path from 'node:path';
 
-import type { CodePlan, ProjectSpec } from '../ai/types';
-import type { GeneratedFile } from './code-generator.service';
+import type { CodePlan, GeneratedFile, ProjectSpec } from '../ai/types';
 
 @Injectable()
 export class CodeValidationService {

@@ -1,3 +1,8 @@
+export interface GeneratedFile {
+  path: string;
+  content: string;
+}
+
 export interface CodePlanSection {
   id: string;
   componentName: string;
@@ -12,15 +17,10 @@ export interface CodePlan {
   sharedComponents: string[];
 }
 
-export interface GeneratedContentModule {
-  path: string;
-  content: string;
-}
-
 export interface GeneratedLayoutModule {
-  files: GeneratedContentModule[];
+  files: GeneratedFile[];
 }
 
 export interface GeneratedSectionModule {
-  files: GeneratedContentModule[];
+  files: GeneratedFile[];
 }

@@ -1,12 +1,19 @@
 import { StyleToSpecMapper } from './style-to-spec.mapper';
-import type { StyleVariant } from '../ai/types';
+import type { StyleVariant } from '../types';
 
 const mockStyle: StyleVariant = {
   id: 'style-1',
   name: 'Modern Dark',
   description: 'A sleek dark-themed design with bold gradients',
   visualStyle: 'Bold gradient overlays',
-  colorPalette: ['#0F172A', '#3B82F6', '#8B5CF6', '#FFFFFF', '#111827', '#E5E7EB'],
+  colorPalette: [
+    '#0F172A',
+    '#3B82F6',
+    '#8B5CF6',
+    '#FFFFFF',
+    '#111827',
+    '#E5E7EB',
+  ],
   typographyStyle: 'Inter, sans-serif',
   layoutStyle: 'Full-width hero with split content',
   moodKeywords: ['modern', 'tech', 'premium'],
@@ -84,16 +91,15 @@ describe('StyleToSpecMapper', () => {
       expect(tokens.colors.border).toBe('#E5E7EB');
     });
 
-    it('should use fallback colors when palette is short', () => {
+    it('should throw when palette has fewer than 6 colors', () => {
       const shortStyle: StyleVariant = {
         ...mockStyle,
         colorPalette: ['#000'],
       };
-      const tokens = StyleToSpecMapper.toDesignTokens(shortStyle);
 
-      expect(tokens.colors.background).toBe('#000');
-      expect(tokens.colors.accent).toBe('#3B82F6');
-      expect(tokens.colors.surface).toBe('#FFFFFF');
+      expect(() => StyleToSpecMapper.toDesignTokens(shortStyle)).toThrow(
+        /insufficient color palette/i,
+      );
     });
 
     it('should set 2 columns when layout includes "split"', () => {
@@ -124,9 +130,7 @@ describe('StyleToSpecMapper', () => {
       expect(tokens.sections?.hero?.layout).toBe(
         'Full-width hero with split content',
       );
-      expect(tokens.sections?.hero?.visualRole).toBe(
-        'Bold gradient overlays',
-      );
+      expect(tokens.sections?.hero?.visualRole).toBe('Bold gradient overlays');
     });
   });
 

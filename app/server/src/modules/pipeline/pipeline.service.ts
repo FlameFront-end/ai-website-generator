@@ -2,14 +2,17 @@ import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 
 import type { StyleVariant } from '../ai/types';
-import { ArtifactType, RunEntity, RunStatus } from '../../db/entities';
+import { ArtifactType, RunStatus } from '../../common/enums';
+import { RunEntity } from '../../db/entities';
+import { sleep } from '../../common/utils';
+import { PIPELINE_STEP_DELAY_MS } from '../../common/constants/pipeline';
+import { StorageService } from '../storage/storage.service';
+import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
 import { StyleStepService } from './style-step.service';
 import { ReferenceStepService } from './reference-step.service';
 import { CodegenStepService } from './codegen-step.service';
-import { StyleToSpecMapper } from './style-to-spec.mapper';
-
-const PIPELINE_STEP_DELAY_MS = 1200;
+import { StyleToSpecMapper } from '../ai/mappers/style-to-spec.mapper';
 const SHUTDOWN_DRAIN_TIMEOUT_MS = 15_000;
 
 @Injectable()
@@ -20,6 +23,8 @@ export class PipelineService implements OnApplicationShutdown {
 
   constructor(
     private readonly state: PipelineStateService,
+    private readonly storageService: StorageService,
+    private readonly artifactService: ArtifactService,
     private readonly styleStep: StyleStepService,
     private readonly referenceStep: ReferenceStepService,
     private readonly codegenStep: CodegenStepService,
@@ -64,7 +69,7 @@ export class PipelineService implements OnApplicationShutdown {
     if (this.shuttingDown) return;
     this.trackRun(run.id, async () => {
       try {
-        await this.state.sleep(PIPELINE_STEP_DELAY_MS);
+        await sleep(PIPELINE_STEP_DELAY_MS);
         await this.styleStep.generateStyleVariantsStep(run, userId);
       } catch (error) {
         const message =
@@ -135,7 +140,7 @@ export class PipelineService implements OnApplicationShutdown {
     userId: string,
   ): Promise<void> {
     if (this.shuttingDown) return;
-    const variantsArtifact = await this.state.getArtifactByType(
+    const variantsArtifact = await this.artifactService.getArtifactByType(
       run.id,
       ArtifactType.StyleVariants,
     );
@@ -144,7 +149,7 @@ export class PipelineService implements OnApplicationShutdown {
       return;
     }
 
-    const variantsContent = await this.state.readArtifactFile(
+    const variantsContent = await this.storageService.readArtifactFile(
       variantsArtifact.path,
     );
     const variants = JSON.parse(variantsContent) as {
@@ -160,25 +165,25 @@ export class PipelineService implements OnApplicationShutdown {
     }
 
     // Save selected style as artifact
-    const selectedStylePath = this.state.getRunRelativePath(
+    const selectedStylePath = this.storageService.getRunRelativePath(
       userId,
       run.id,
       'style',
       'selected-style.json',
     );
-    const selectedStyleAbsolutePath = this.state.getRunAbsolutePath(
+    const selectedStyleAbsolutePath = this.storageService.getRunAbsolutePath(
       userId,
       run.id,
       'style',
       'selected-style.json',
     );
 
-    await this.state.writeGeneratedFile(
+    await this.storageService.writeGeneratedFile(
       selectedStyleAbsolutePath,
       JSON.stringify(selectedStyle, null, 2),
     );
 
-    await this.state.updateArtifact(
+    await this.artifactService.updateArtifact(
       run.id,
       ArtifactType.SelectedStyle,
       selectedStylePath,
@@ -198,10 +203,11 @@ export class PipelineService implements OnApplicationShutdown {
   startReferenceFromSelectedStyle(run: RunEntity, userId: string): void {
     if (this.shuttingDown) return;
     this.trackRun(run.id, async () => {
-      const selectedStyleArtifact = await this.state.getArtifactByType(
-        run.id,
-        ArtifactType.SelectedStyle,
-      );
+      const selectedStyleArtifact =
+        await this.artifactService.getArtifactByType(
+          run.id,
+          ArtifactType.SelectedStyle,
+        );
 
       if (!selectedStyleArtifact) {
         await this.state.failRun(run, 'Please select a visual style first');
@@ -209,7 +215,7 @@ export class PipelineService implements OnApplicationShutdown {
       }
 
       const selectedStyle = JSON.parse(
-        await this.state.readArtifactFile(selectedStyleArtifact.path),
+        await this.storageService.readArtifactFile(selectedStyleArtifact.path),
       ) as StyleVariant;
 
       await this.referenceStep.prepareReferenceImage(
@@ -310,7 +316,7 @@ export class PipelineService implements OnApplicationShutdown {
     run: RunEntity,
     userId: string,
   ): Promise<void> {
-    const selectedStyleArtifact = await this.state.getArtifactByType(
+    const selectedStyleArtifact = await this.artifactService.getArtifactByType(
       run.id,
       ArtifactType.SelectedStyle,
     );
@@ -320,7 +326,7 @@ export class PipelineService implements OnApplicationShutdown {
       return;
     }
 
-    const styleContent = await this.state.readArtifactFile(
+    const styleContent = await this.storageService.readArtifactFile(
       selectedStyleArtifact.path,
     );
     const selectedStyle = JSON.parse(styleContent) as StyleVariant;
@@ -337,7 +343,7 @@ export class PipelineService implements OnApplicationShutdown {
   }
 
   private async resumeFromCode(run: RunEntity, userId: string): Promise<void> {
-    const referenceArtifact = await this.state.getArtifactByType(
+    const referenceArtifact = await this.artifactService.getArtifactByType(
       run.id,
       ArtifactType.ReferenceImage,
     );
@@ -347,7 +353,7 @@ export class PipelineService implements OnApplicationShutdown {
       return;
     }
 
-    const selectedStyleArtifact = await this.state.getArtifactByType(
+    const selectedStyleArtifact = await this.artifactService.getArtifactByType(
       run.id,
       ArtifactType.SelectedStyle,
     );
@@ -419,12 +425,12 @@ export class PipelineService implements OnApplicationShutdown {
     const types = this.getStepArtifactTypes(step);
 
     for (const folder of folders) {
-      const dir = this.state.getRunAbsolutePath(userId, runId, folder);
+      const dir = this.storageService.getRunAbsolutePath(userId, runId, folder);
       await fs.rm(dir, { recursive: true, force: true });
     }
 
     for (const type of types) {
-      await this.state.deleteArtifactsByType(runId, type);
+      await this.artifactService.deleteArtifactsByType(runId, type);
     }
   }
 
