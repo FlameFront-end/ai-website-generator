@@ -1,6 +1,8 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-import { appConfig } from '../../../app/config';
+import { getAppConfig } from '../../../app/app-config.module';
+import type { AppConfig } from '../../../app/config';
 import type {
   AiProvider,
   AiProviderRole,
@@ -22,8 +24,10 @@ class UnsupportedChatProvider implements AiProvider {
 @Injectable()
 export class AiProviderRegistry {
   private readonly providers: Record<AiProviderRole, AiProvider>;
+  private readonly aiConfig: AppConfig['ai'];
 
-  constructor() {
+  constructor(configService: ConfigService) {
+    this.aiConfig = getAppConfig(configService).ai;
     this.providers = {
       analysis: this.createProvider('analysis'),
       image: this.createProvider('image'),
@@ -39,7 +43,7 @@ export class AiProviderRegistry {
   }
 
   private createProvider(role: AiProviderRole): AiProvider {
-    const config = appConfig.ai.roles[role];
+    const config = this.aiConfig.roles[role];
 
     switch (config.provider) {
       case 'lmstudio':

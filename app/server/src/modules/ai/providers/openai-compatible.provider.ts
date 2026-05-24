@@ -1,5 +1,6 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 
+import { sleep } from '../../../common/utils';
 import type {
   AiProvider,
   AiProviderConfig,
@@ -22,10 +23,6 @@ interface OpenAiChatResponse {
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 800;
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);

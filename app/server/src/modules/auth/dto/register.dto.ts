@@ -8,18 +8,18 @@ import {
 } from 'class-validator';
 
 export class RegisterDto {
-  @IsEmail({}, { message: 'Некорректный email' })
+  @IsEmail({}, { message: 'Invalid email address' })
   email!: string;
 
   @IsString()
-  @MinLength(6, { message: 'Пароль должен содержать минимум 6 символов' })
+  @MinLength(6, { message: 'Password must be at least 6 characters' })
   password!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(1_400_000, { message: 'Аватар слишком большой' })
+  @MaxLength(1_400_000, { message: 'Avatar is too large' })
   @Matches(/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/]+={0,2}$/i, {
-    message: 'Некорректный формат аватара',
+    message: 'Invalid avatar format',
   })
   avatarUrl?: string;
 }

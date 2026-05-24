@@ -22,9 +22,9 @@ export class BriefClarificationAnswerDto {
 }
 
 export class ClarifyBriefDto {
-  @IsString({ message: 'Бриф должен быть строкой' })
-  @MinLength(3, { message: 'Бриф должен содержать минимум 3 символа' })
-  @MaxLength(10000, { message: 'Бриф не должен быть длиннее 10000 символов' })
+  @IsString({ message: 'Brief must be a string' })
+  @MinLength(3, { message: 'Brief must be at least 3 characters' })
+  @MaxLength(10000, { message: 'Brief must not exceed 10000 characters' })
   brief!: string;
 
   @IsOptional()

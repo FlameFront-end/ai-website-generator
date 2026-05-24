@@ -2,7 +2,7 @@ import type {
   DesignContextSummary,
   ProjectSpecSummary,
   ReferenceContextSummary,
-} from './ai.types';
+} from './types';
 
 export interface CodegenContextInput {
   projectSpecSummary?: ProjectSpecSummary;

@@ -4,7 +4,7 @@ import type {
   ProjectSpec,
   ProjectSpecSummary,
   ReferenceContextSummary,
-} from './ai.types';
+} from './types';
 
 interface ReferenceManifestBlock {
   sectionId: string;

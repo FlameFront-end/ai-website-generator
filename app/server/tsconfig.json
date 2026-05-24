@@ -18,10 +18,15 @@
     "ignoreDeprecations": "5.0",
     "incremental": false,
     "skipLibCheck": true,
-    "strictNullChecks": true,
+    "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
-  }
+  },
+  "exclude": [
+    "jest.config.ts",
+    "dist",
+    "node_modules",
+    "src/**/*.spec.ts",
+    "src/**/*.e2e-spec.ts"
+  ]
 }

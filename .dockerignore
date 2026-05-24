@@ -1,21 +1,52 @@
+# ---- Dependencies ----
 node_modules
 **/node_modules
-npm-debug.log*
+
+# ---- Build artifacts & runtime data ----
+**/dist
+**/build
+**/coverage
+**/generated
+runs
+
+# ---- Docker & CI ----
 Dockerfile*
 docker-compose*.yml
+.github
+.husky
+
+# ---- Git ----
 .git
 .gitignore
+
+# ---- Environment ----
 .env
 .env.*
 !.env.example
-**/dist
-**/build
-coverage
-**/coverage
-generated
-**/generated
-runs
+
+# ---- IDE & OS ----
 .vscode
 .idea
+.windsurf
 .DS_Store
 Thumbs.db
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+
+# ---- Documentation (root-level only; skills pack .md files are kept) ----
+/README.md
+/docs
+app/server/REFACTORING_PLAN.md
+
+# ---- Test files ----
+**/*.spec.ts
+**/*.e2e-spec.ts
+app/server/test
+
+# ---- Dev config not needed in image ----
+**/.prettierrc
+**/jest.config*
+**/.eslintrc*
+**/eslint.config*

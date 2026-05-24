@@ -5,10 +5,10 @@ import type { PipelineStep } from './approve-step.dto';
 const PIPELINE_STEPS = ['style', 'reference', 'code', 'final'] as const;
 
 export class EditRequestDto {
-  @IsIn(PIPELINE_STEPS, { message: 'Некорректный шаг пайплайна' })
+  @IsIn(PIPELINE_STEPS, { message: 'Invalid pipeline step' })
   step!: PipelineStep;
 
-  @IsString({ message: 'Инструкция должна быть строкой' })
-  @MinLength(3, { message: 'Инструкция должна содержать минимум 3 символа' })
+  @IsString({ message: 'Instruction must be a string' })
+  @MinLength(3, { message: 'Instruction must be at least 3 characters' })
   instruction!: string;
 }

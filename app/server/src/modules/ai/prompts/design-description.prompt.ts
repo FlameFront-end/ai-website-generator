@@ -1,4 +1,4 @@
-import type { DesignTokens, ProjectSpec } from '../ai.types';
+import type { DesignTokens, ProjectSpec } from '../types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
 import {
   buildSkillContext,

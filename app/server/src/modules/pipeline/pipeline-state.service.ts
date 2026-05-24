@@ -9,9 +9,10 @@ import {
   RunArtifactEntity,
   RunEntity,
   RunLogEntity,
-  RunLogLevel,
   RunStatus,
 } from '../../db/entities';
+import { sleep } from '../../common/utils';
+import { RunLogService } from '../runs/run-log.service';
 import { StorageService } from '../storage/storage.service';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class PipelineStateService {
     private readonly artifactsRepository: Repository<RunArtifactEntity>,
     @InjectRepository(RunLogEntity)
     private readonly logsRepository: Repository<RunLogEntity>,
+    private readonly runLogService: RunLogService,
     private readonly storageService: StorageService,
   ) {}
 
@@ -121,12 +123,7 @@ export class PipelineStateService {
     message: string,
     metadata: Record<string, unknown> | null = null,
   ): Promise<void> {
-    await this.logsRepository.save({
-      runId,
-      level: RunLogLevel.Info,
-      message,
-      metadata,
-    });
+    await this.runLogService.addLog(runId, message, metadata);
   }
 
   async failRun(run: RunEntity, message: string): Promise<void> {
@@ -135,9 +132,17 @@ export class PipelineStateService {
       currentStep: run.currentStep || 'pipeline_failed',
       errorMessage: message,
     });
-    await this.addLog(run.id, 'Процесс остановлен из-за ошибки', {
+    await this.addLog(run.id, 'Pipeline stopped due to an error', {
       error: message,
     });
+  }
+
+  async stopRunById(runId: string, reason: string): Promise<void> {
+    await this.runsRepository.update(runId, {
+      status: RunStatus.Failed,
+      errorMessage: `PIPELINE_STOPPED: ${reason}`,
+    });
+    await this.addLog(runId, `Pipeline stopped: ${reason}`);
   }
 
   async completeRun(
@@ -157,7 +162,7 @@ export class PipelineStateService {
   }
 
   sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return sleep(ms);
   }
 
   async getArtifactByType(

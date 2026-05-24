@@ -3,6 +3,6 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class AppService {
   getHello(): string {
-    return 'Сервис генератора сайтов работает';
+    return 'AI Website Generator service is running';
   }
 }

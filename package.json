@@ -30,7 +30,7 @@
     "app/client/src/**/*.{ts,tsx}": [
       "npx --workspace app/client eslint --max-warnings 0"
     ],
-    "app/server/src/**/*.ts": [
+    "app/server/src/**/!(*.spec|*.e2e-spec).ts": [
       "npx --workspace app/server eslint --max-warnings 0"
     ]
   },

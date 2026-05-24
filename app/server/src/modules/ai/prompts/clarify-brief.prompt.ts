@@ -1,4 +1,4 @@
-import type { BriefClarificationAnswer } from '../ai.types';
+import type { BriefClarificationAnswer } from '../types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
 import {
   buildSkillContext,

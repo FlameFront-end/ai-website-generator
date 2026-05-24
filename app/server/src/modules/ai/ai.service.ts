@@ -12,7 +12,7 @@ import type {
   GeneratedSectionModule,
   ProjectSpec,
   StyleVariantsResult,
-} from './ai.types';
+} from './types';
 import { AiProviderRegistry } from './providers/ai-provider.registry';
 import { buildExtractSpecMessages } from './prompts/extract-spec.prompt';
 import { buildDesignTokensMessages } from './prompts/design-tokens.prompt';
@@ -142,10 +142,10 @@ export class AiService {
       .find(Boolean);
 
     return [
-      'Понятно, что нужно создать современный сайт на основе вашего брифа.',
+      'Understood, a modern website needs to be created based on your brief.',
       firstSentence
-        ? `Основная идея: ${firstSentence}`
-        : 'Я учту аудиторию, цель, структуру, визуальный стиль и ключевое действие пользователя.',
+        ? `Core idea: ${firstSentence}`
+        : 'I will consider the audience, goal, structure, visual style, and primary user action.',
     ].join(' ');
   }
 
@@ -212,17 +212,17 @@ export class AiService {
       .join('\n');
 
     return [
-      'Идея сайта',
+      'Website Idea',
       brief.trim(),
       '',
-      'Уточнённый контекст',
+      'Clarified Context',
       answeredContext,
       '',
-      'Проектная задача',
-      'Нужно сгенерировать полноценный современный сайт на основе исходной идеи и уточнённого контекста. Сайт должен понятно объяснять предложение, быть ориентирован на выбранную аудиторию и вести пользователя к целевому действию.',
+      'Project Goal',
+      'Generate a full modern website based on the original idea and clarified context. The website must clearly explain the offering, target the chosen audience, and guide the user toward the primary action.',
       '',
-      'Требования к генерации',
-      'Использовать уточнения как требования к структуре, содержанию, визуальному стилю, тону коммуникации и приоритетам интерфейса. Если часть деталей не указана явно, аккуратно додумать их в рамках исходной идеи, аудитории и выбранного направления сайта.',
+      'Generation Requirements',
+      'Use clarifications as requirements for structure, content, visual style, communication tone, and interface priorities. If some details are not explicitly stated, infer them within the scope of the original idea, audience, and chosen direction.',
     ]
       .filter(Boolean)
       .join('\n');
@@ -236,7 +236,7 @@ export class AiService {
       .slice(0, 60)
       .trim();
 
-    return title || 'Новый проект';
+    return title || 'New Project';
   }
 
   /**
@@ -562,7 +562,7 @@ export class AiService {
       this.logger.error(
         `Failed to parse ${label} JSON: ${cleaned.slice(0, 300)}`,
       );
-      throw new Error(`AI вернул невалидный JSON для ${label}`);
+      throw new Error(`AI returned invalid JSON for ${label}`);
     }
   }
 
@@ -583,7 +583,7 @@ export class AiService {
       this.logger.error(
         `No <svg> tag found in AI response: ${cleaned.slice(0, 200)}`,
       );
-      throw new Error('AI не вернул валидный SVG');
+      throw new Error('AI did not return valid SVG');
     }
 
     return cleaned.slice(svgStart);

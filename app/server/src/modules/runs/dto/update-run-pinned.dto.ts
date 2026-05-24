@@ -1,6 +1,6 @@
 import { IsBoolean } from 'class-validator';
 
 export class UpdateRunPinnedDto {
-  @IsBoolean({ message: 'Флаг закрепления должен быть boolean' })
+  @IsBoolean({ message: 'isPinned must be a boolean' })
   isPinned!: boolean;
 }

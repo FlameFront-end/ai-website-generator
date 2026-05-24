@@ -2,9 +2,9 @@ import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateRunDto {
   @IsOptional()
-  @IsString({ message: 'Название запуска должно быть строкой' })
+  @IsString({ message: 'Display name must be a string' })
   @MaxLength(80, {
-    message: 'Название запуска не должно быть длиннее 80 символов',
+    message: 'Display name must not exceed 80 characters',
   })
   displayName?: string;
 }

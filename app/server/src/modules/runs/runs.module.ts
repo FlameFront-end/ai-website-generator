@@ -10,6 +10,10 @@ import {
 import { AiModule } from '../ai/ai.module';
 import { PipelineModule } from '../pipeline/pipeline.module';
 import { StorageModule } from '../storage/storage.module';
+import { RunLogService } from './run-log.service';
+import { RunsCrudService } from './runs-crud.service';
+import { RunsWorkflowService } from './runs-workflow.service';
+import { ArtifactReaderService } from './artifact-reader.service';
 import { RunsController } from './runs.controller';
 import { RunsService } from './runs.service';
 
@@ -26,7 +30,13 @@ import { RunsService } from './runs.service';
     ]),
   ],
   controllers: [RunsController],
-  providers: [RunsService],
-  exports: [RunsService],
+  providers: [
+    RunLogService,
+    RunsCrudService,
+    RunsWorkflowService,
+    ArtifactReaderService,
+    RunsService,
+  ],
+  exports: [RunLogService, RunsService],
 })
 export class RunsModule {}

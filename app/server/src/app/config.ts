@@ -53,6 +53,10 @@ const env = cleanEnv(process.env, {
   AI_CODE_MODEL: str({ default: '' }),
   AI_CODE_TIMEOUT: str({ default: '' }),
   AI_CODE_STRICT_JSON: str({ default: '' }),
+  THROTTLE_TTL: num({ default: 60 }),
+  THROTTLE_LIMIT: num({ default: 60 }),
+  THROTTLE_AUTH_TTL: num({ default: 60 }),
+  THROTTLE_AUTH_LIMIT: num({ default: 10 }),
 });
 
 function defaultForEnvironment<T>(local: T, docker: T): T {
@@ -168,6 +172,12 @@ export type AppConfig = Readonly<{
       >
     >;
   }>;
+  throttle: Readonly<{
+    ttl: number;
+    limit: number;
+    authTtl: number;
+    authLimit: number;
+  }>;
 }>;
 
 export const appConfig: AppConfig = Object.freeze({
@@ -199,5 +209,11 @@ export const appConfig: AppConfig = Object.freeze({
       image: buildAiRoleConfig('image'),
       code: buildAiRoleConfig('code'),
     }),
+  }),
+  throttle: Object.freeze({
+    ttl: env.THROTTLE_TTL,
+    limit: env.THROTTLE_LIMIT,
+    authTtl: env.THROTTLE_AUTH_TTL,
+    authLimit: env.THROTTLE_AUTH_LIMIT,
   }),
 });

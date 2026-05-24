@@ -58,7 +58,7 @@ export class RunsController {
     const run = await this.runsService.getRun(id, req.user.id);
 
     if (!run) {
-      throw new NotFoundException('Запуск не найден');
+      throw new NotFoundException('Run not found');
     }
 
     return run;

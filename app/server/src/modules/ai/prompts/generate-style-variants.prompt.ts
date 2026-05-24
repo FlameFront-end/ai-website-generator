@@ -1,4 +1,4 @@
-import type { StyleVariantsResult } from '../ai.types';
+import type { StyleVariantsResult } from '../types';
 
 export function buildGenerateStyleVariantsMessages(
   brief: string,

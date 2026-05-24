@@ -3,9 +3,11 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Replicate from 'replicate';
 
-import { appConfig } from '../../app/config';
+import { getAppConfig } from '../../app/app-config.module';
+import type { AppConfig } from '../../app/config';
 
 type ReplicateFileOutput = {
   url?: () => URL | string;
@@ -19,20 +21,21 @@ type ReplicateModelIdentifier =
 export class ImagesService {
   private readonly logger = new Logger(ImagesService.name);
   private readonly replicate: Replicate | null;
+  private readonly imageConfig: AppConfig['ai']['roles']['image'];
 
-  constructor() {
-    const imageConfig = appConfig.ai.roles.image;
+  constructor(configService: ConfigService) {
+    this.imageConfig = getAppConfig(configService).ai.roles.image;
 
     this.replicate =
-      imageConfig.provider === 'replicate' && imageConfig.apiKey
-        ? new Replicate({ auth: imageConfig.apiKey })
+      this.imageConfig.provider === 'replicate' && this.imageConfig.apiKey
+        ? new Replicate({ auth: this.imageConfig.apiKey })
         : null;
   }
 
   async generateImage(
     prompt: string,
   ): Promise<{ image: string; model: string }> {
-    const provider = appConfig.ai.roles.image.provider;
+    const provider = this.imageConfig.provider;
 
     if (provider === 'openai') {
       return this.generateImageViaOpenAI(prompt);
@@ -48,7 +51,7 @@ export class ImagesService {
   private async generateImageViaOpenAI(
     prompt: string,
   ): Promise<{ image: string; model: string }> {
-    const imageConfig = appConfig.ai.roles.image;
+    const imageConfig = this.imageConfig;
 
     if (!imageConfig.baseUrl) {
       throw new ServiceUnavailableException(
@@ -164,7 +167,7 @@ export class ImagesService {
   private async generateImageViaReplicate(
     prompt: string,
   ): Promise<{ image: string; model: string }> {
-    if (appConfig.ai.roles.image.provider !== 'replicate') {
+    if (this.imageConfig.provider !== 'replicate') {
       throw new ServiceUnavailableException(
         'AI_IMAGE_PROVIDER must be set to replicate or openai for image generation',
       );
@@ -221,7 +224,7 @@ export class ImagesService {
   }
 
   private getImageModel(): ReplicateModelIdentifier {
-    const model = appConfig.ai.roles.image.model.trim();
+    const model = this.imageConfig.model.trim();
 
     if (!/^[^/\s]+\/[^:\s]+(?::\S+)?$/.test(model)) {
       throw new ServiceUnavailableException(

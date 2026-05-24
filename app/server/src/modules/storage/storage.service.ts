@@ -1,21 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { appConfig } from '../../app/config';
+import { getAppConfig } from '../../app/app-config.module';
 import type { RunEntity } from '../../db/entities';
 
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
+  private readonly generatedRoot: string;
+
+  constructor(configService: ConfigService) {
+    this.generatedRoot = getAppConfig(configService).storage.generatedRoot;
+  }
 
   getGeneratedRootPath(): string {
-    return path.resolve(
-      process.cwd(),
-      '..',
-      '..',
-      appConfig.storage.generatedRoot,
-    );
+    return path.resolve(process.cwd(), '..', '..', this.generatedRoot);
   }
 
   getRunPath(userId: string, slug: string): string {
@@ -31,7 +32,7 @@ export class StorageService {
   }
 
   resolveArtifactPath(artifactPath: string): string {
-    const prefix = appConfig.storage.generatedRoot + '/';
+    const prefix = this.generatedRoot + '/';
 
     if (!artifactPath.startsWith(prefix)) {
       throw new Error(

@@ -1,4 +1,4 @@
-import type { ProjectSpec } from '../ai.types';
+import type { ProjectSpec } from '../types';
 import type { ChatMessage } from '../providers/ai-provider.interface';
 import {
   buildSkillContext,

@@ -3,7 +3,7 @@ import type {
   CodePlanSection,
   DesignTokens,
   ProjectSpec,
-} from '../ai.types';
+} from '../types';
 import type {
   ChatContentPart,
   ChatMessage,

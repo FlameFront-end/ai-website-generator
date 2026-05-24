@@ -24,7 +24,7 @@ export class VisualQAService {
       'visual_qa',
       userId,
     );
-    await this.state.addLog(run.id, 'Сравниваем результат с референсом');
+    await this.state.addLog(run.id, 'Comparing result with reference');
 
     try {
       const referenceArtifact = await this.state.getArtifactByType(
@@ -33,7 +33,7 @@ export class VisualQAService {
       );
 
       if (!referenceArtifact) {
-        throw new Error('Артефакт визуального референса не найден');
+        throw new Error('Visual reference artifact not found');
       }
 
       const referencePath = this.state.getArtifactAbsolutePath(
@@ -70,7 +70,7 @@ export class VisualQAService {
         .catch(() => false);
 
       if (!referenceExists || !renderedExists) {
-        throw new Error('Файлы для сравнения не найдены');
+        throw new Error('Comparison files not found');
       }
 
       const referenceData = await fs.readFile(referencePath);
@@ -123,19 +123,15 @@ export class VisualQAService {
 
       await this.state.addLog(
         runId,
-        `Визуальная проверка завершена: ${Math.round(score)}/100`,
+        `Visual QA completed: ${Math.round(score)}/100`,
       );
 
       return this.state.completeRun(qaRun, Math.round(score), userId, slug);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.state.addLog(
-        runId,
-        'Визуальная проверка завершилась ошибкой',
-        {
-          error: message,
-        },
-      );
+      await this.state.addLog(runId, 'Visual QA failed with an error', {
+        error: message,
+      });
       return this.state.updateRunStatus(
         qaRun,
         RunStatus.VisualFailed,
@@ -186,45 +182,45 @@ export class VisualQAService {
   ): string {
     const status =
       score >= 80
-        ? 'Отлично'
+        ? 'Excellent'
         : score >= 60
-          ? 'Хорошо'
+          ? 'Good'
           : score >= 40
-            ? 'Удовлетворительно'
-            : 'Требуется доработка';
+            ? 'Acceptable'
+            : 'Needs improvement';
 
     return `# Visual QA Report
 
-## Общая оценка
+## Overall Score
 
 ${score}/10 (${status})
 
-## Метрики
+## Metrics
 
-- Отличающихся пикселей: ${diffPixels.toLocaleString()} из ${totalPixels.toLocaleString()} (${diffPercent.toFixed(2)}%)
-- Порог сравнения: 0.1
+- Different pixels: ${diffPixels.toLocaleString()} of ${totalPixels.toLocaleString()} (${diffPercent.toFixed(2)}%)
+- Comparison threshold: 0.1
 
-## Что совпало
+## What matched
 
-- Базовая структура страницы создана
-- Цветовая схема применена
-- Компоненты размещены на странице
+- Basic page structure created
+- Color scheme applied
+- Components placed on the page
 
-## Что не совпало
+## What did not match
 
-- Возможны незначительные отклонения в позиционировании
-- Текст может отличаться от макета
-- Размеры элементов могут варьироваться
+- Minor positioning deviations may exist
+- Text may differ from the mockup
+- Element sizes may vary
 
-## Критичные проблемы
+## Critical issues
 
-- ${score < 60 ? 'Значительные визуальные отличия от референса' : 'Нет критичных проблем'}
+- ${score < 60 ? 'Significant visual differences from the reference' : 'No critical issues'}
 
-## Рекомендации
+## Recommendations
 
-1. Проверьте соответствие цветов дизайн-токенам
-2. Убедитесь в правильности отступов и размеров
-3. Проверьте позиционирование элементов относительно референса
+1. Verify color compliance with design tokens
+2. Ensure correct spacing and sizing
+3. Check element positioning against the reference
 `;
   }
 }

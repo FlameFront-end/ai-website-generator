@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import {
   Column,
   CreateDateColumn,
@@ -46,9 +47,11 @@ export class RunEntity {
   @Column({ type: 'text', nullable: true })
   errorMessage!: string | null;
 
+  @Exclude()
   @Column({ type: 'uuid', name: 'user_id', nullable: true })
   userId!: string | null;
 
+  @Exclude()
   @ManyToOne(() => UserEntity, (user) => user.runs, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user!: UserEntity | null;

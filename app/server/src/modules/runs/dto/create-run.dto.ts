@@ -1,15 +1,15 @@
 import { IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class CreateRunDto {
-  @IsString({ message: 'Бриф должен быть строкой' })
-  @MinLength(10, { message: 'Бриф должен содержать минимум 10 символов' })
-  @MaxLength(10000, { message: 'Бриф не должен быть длиннее 10000 символов' })
+  @IsString({ message: 'Brief must be a string' })
+  @MinLength(10, { message: 'Brief must be at least 10 characters' })
+  @MaxLength(10000, { message: 'Brief must not exceed 10000 characters' })
   brief!: string;
 
   @IsOptional()
-  @IsString({ message: 'Название проекта должно быть строкой' })
+  @IsString({ message: 'Display name must be a string' })
   @MaxLength(80, {
-    message: 'Название проекта не должно быть длиннее 80 символов',
+    message: 'Display name must not exceed 80 characters',
   })
   displayName?: string;
 }

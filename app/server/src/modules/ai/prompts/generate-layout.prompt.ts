@@ -1,4 +1,4 @@
-import type { CodePlan, DesignTokens, ProjectSpec } from '../ai.types';
+import type { CodePlan, DesignTokens, ProjectSpec } from '../types';
 import type {
   ChatContentPart,
   ChatMessage,

@@ -37,7 +37,7 @@ export class ScreenshotService {
       'take_screenshots',
       userId,
     );
-    await this.state.addLog(run.id, 'Готовим скриншоты результата');
+    await this.state.addLog(run.id, 'Preparing result screenshots');
 
     const runPath = this.storageService.getRunPath(userId, slug);
     const codePath = path.join(runPath, 'code');
@@ -51,7 +51,7 @@ export class ScreenshotService {
       const previewPort = await this.findAvailablePort();
       const previewUrl = `http://127.0.0.1:${previewPort}`;
 
-      await this.state.addLog(run.id, 'Запускаем предпросмотр сайта');
+      await this.state.addLog(run.id, 'Starting website preview');
       serverProcess = exec('npm run start', {
         cwd: codePath,
         env: {
@@ -64,7 +64,7 @@ export class ScreenshotService {
 
       await this.waitForServer(previewUrl);
 
-      await this.state.addLog(run.id, 'Создаём скриншоты страницы');
+      await this.state.addLog(run.id, 'Capturing page screenshots');
       browser = await chromium.launch();
       const page = await browser.newPage();
       page.setDefaultTimeout(PAGE_LOAD_TIMEOUT_MS);
@@ -76,7 +76,7 @@ export class ScreenshotService {
         path: path.join(screenshotsPath, 'rendered-desktop.png'),
         fullPage: false,
       });
-      await this.state.addLog(run.id, 'Desktop-скриншот готов');
+      await this.state.addLog(run.id, 'Desktop screenshot ready');
 
       await page.setViewportSize({ width: 390, height: 844 });
       await this.gotoReadyPage(page, previewUrl);
@@ -84,7 +84,7 @@ export class ScreenshotService {
         path: path.join(screenshotsPath, 'rendered-mobile.png'),
         fullPage: false,
       });
-      await this.state.addLog(run.id, 'Mobile-скриншот готов');
+      await this.state.addLog(run.id, 'Mobile screenshot ready');
 
       const desktopRelativePath = this.state.getRunRelativePath(
         userId,
@@ -121,7 +121,7 @@ export class ScreenshotService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Screenshot capture failed: ${message}`);
-      await this.state.addLog(run.id, 'Не удалось создать скриншоты', {
+      await this.state.addLog(run.id, 'Failed to capture screenshots', {
         error: message,
       });
 
@@ -152,7 +152,11 @@ export class ScreenshotService {
             return;
           }
 
-          reject(new Error('Не удалось выбрать порт для preview сервера'));
+          reject(
+            new Error(
+              'Failed to find an available port for the preview server',
+            ),
+          );
         });
       });
     });
