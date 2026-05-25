@@ -22,7 +22,7 @@ export class RunsWorkflowService {
     runId: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
 
     await this.crud.addLog(run.id, 'Rebuild started');
 
@@ -38,7 +38,7 @@ export class RunsWorkflowService {
     runId: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    let run = await this.crud.getRunOrFail(runId, userId);
+    let run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (run.status !== RunStatus.Failed) {
       throw new BadRequestException('Only a failed step can be restarted');
@@ -75,7 +75,7 @@ export class RunsWorkflowService {
     runId: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (run.status !== RunStatus.Running && run.status !== RunStatus.Queued) {
       throw new BadRequestException('Only an active step can be stopped');
@@ -102,7 +102,7 @@ export class RunsWorkflowService {
     path: string;
     model: string;
   }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (run.status !== RunStatus.AwaitingReferenceApproval) {
       throw new BadRequestException(
@@ -133,7 +133,7 @@ export class RunsWorkflowService {
     styleVariantId: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (run.status !== RunStatus.AwaitingStyleSelection) {
       throw new BadRequestException(
@@ -145,7 +145,7 @@ export class RunsWorkflowService {
 
     await this.pipelineService.selectStyle(run, styleVariantId, userId);
 
-    const updatedRun = await this.crud.getRunOrFail(runId, userId);
+    const updatedRun = await this.crud.getRunLightOrFail(runId, userId);
     return { id: updatedRun.id, status: updatedRun.status };
   }
 
@@ -153,7 +153,7 @@ export class RunsWorkflowService {
     runId: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (!this.canRestartCodeStep(run.status)) {
       throw new BadRequestException(
@@ -177,7 +177,7 @@ export class RunsWorkflowService {
     step: 'style' | 'reference' | 'code' | 'final',
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
 
     const stepToStatusMap: Record<typeof step, RunStatus> = {
       style: RunStatus.Running,
@@ -220,7 +220,7 @@ export class RunsWorkflowService {
       void this.pipelineService.resumeRun(run, userId);
     }
 
-    const updatedRun = await this.crud.getRunOrFail(runId, userId);
+    const updatedRun = await this.crud.getRunLightOrFail(runId, userId);
     return { id: updatedRun.id, status: updatedRun.status };
   }
 
@@ -230,7 +230,7 @@ export class RunsWorkflowService {
     instruction: string,
     userId: string,
   ): Promise<{ id: string; status: string }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
 
     await this.crud.addLog(
       run.id,

@@ -24,7 +24,7 @@ export class ArtifactReaderService {
   ) {}
 
   async getArtifactContent(runId: string, artifactId: string, userId: string) {
-    await this.crud.getRunOrFail(runId, userId);
+    await this.crud.getRunLightOrFail(runId, userId);
     const artifact = await this.getArtifactOrFail(artifactId, runId);
 
     let effectiveMimeType = artifact.mimeType;
@@ -59,7 +59,7 @@ export class ArtifactReaderService {
   }
 
   async getArtifactFile(runId: string, artifactId: string, userId: string) {
-    await this.crud.getRunOrFail(runId, userId);
+    await this.crud.getRunLightOrFail(runId, userId);
     const artifact = await this.getArtifactOrFail(artifactId, runId);
 
     if (!artifact.mimeType?.startsWith('image/')) {
@@ -84,7 +84,7 @@ export class ArtifactReaderService {
     runId: string,
     userId: string,
   ): Promise<{ path: string; size: number }[]> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
     const codePath = path.join(
       this.storageService.getRunPath(userId, run.id),
       'code',
@@ -120,7 +120,7 @@ export class ArtifactReaderService {
     filePath: string,
     userId: string,
   ): Promise<{ path: string; content: string; mimeType: string }> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
     const codePath = path.join(
       this.storageService.getRunPath(userId, run.id),
       'code',
@@ -159,7 +159,7 @@ export class ArtifactReaderService {
   }
 
   async downloadCode(runId: string, userId: string): Promise<Buffer> {
-    const run = await this.crud.getRunOrFail(runId, userId);
+    const run = await this.crud.getRunLightOrFail(runId, userId);
     const codePath = path.join(
       this.storageService.getRunPath(userId, run.id),
       'code',
@@ -185,7 +185,6 @@ export class ArtifactReaderService {
   ): Promise<RunArtifactEntity> {
     const artifact = await this.artifactsRepository.findOne({
       where: { id: artifactId, runId },
-      relations: { run: true },
     });
 
     if (!artifact) {

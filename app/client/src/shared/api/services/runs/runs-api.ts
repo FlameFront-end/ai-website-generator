@@ -14,6 +14,7 @@ import type {
   EditReferenceBlockResponse,
   Run,
   RunStatus,
+  RunStatusResponse,
   SelectStyleRequest,
   StyleVariantsResponse,
   UpdateRunPinnedRequest,
@@ -46,6 +47,13 @@ export const runsApi = {
 
   async getRun(id: string): Promise<Run> {
     const { data } = await axiosInstance.get<Run>(API_ENDPOINTS.run(id));
+    return data;
+  },
+
+  async getRunStatus(id: string): Promise<RunStatusResponse> {
+    const { data } = await axiosInstance.get<RunStatusResponse>(
+      API_ENDPOINTS.runStatus(id),
+    );
     return data;
   },
 

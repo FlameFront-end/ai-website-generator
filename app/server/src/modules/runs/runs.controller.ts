@@ -67,6 +67,26 @@ export class RunsController {
     return this.crud.getRuns(req.user.id);
   }
 
+  @Get(':id/status')
+  @SkipThrottle()
+  async getRunStatus(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<{
+    id: string;
+    status: RunStatus;
+    currentStep: string | null;
+    updatedAt: Date;
+  }> {
+    const result = await this.crud.getRunStatus(id, req.user.id);
+
+    if (!result) {
+      throw new NotFoundException('Run not found');
+    }
+
+    return result;
+  }
+
   @Get(':id')
   @SkipThrottle()
   async getRun(

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import { useRunQuery } from "@/api/services/runs";
+import { useRunQuery, useRunStatusQuery } from "@/api/services/runs";
 import { runsApi } from "@/shared/api/services/runs/runs-api";
 import { EmptyState, ErrorBoundary } from "@/kit";
 import { logger } from "@/lib";
@@ -50,6 +50,7 @@ export default function RunDetailsPage() {
   const [isApproving, setIsApproving] = useState(false);
 
   const runQuery = useRunQuery(runId);
+  useRunStatusQuery(runId);
   const { activeTab, setActiveTab } = useActiveTab();
   const actions = useRunActions();
   const artifacts = useRunArtifacts(runQuery.data);

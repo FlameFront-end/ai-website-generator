@@ -4,9 +4,12 @@ import { useEffect, useMemo } from "react";
 
 import { runsApi } from "./runs-api";
 
+import type { Run, RunStatusResponse } from "./types";
+
 export const runsQueryKeys = {
   all: ["runs"] as const,
   detail: (id: string) => ["runs", id] as const,
+  status: (id: string) => ["runs", id, "status"] as const,
   artifactContent: (runId: string, artifactId: string) =>
     ["runs", runId, "artifacts", artifactId, "content"] as const,
   artifactFile: (runId: string, artifactId: string) =>
@@ -20,6 +23,7 @@ export function useRunsQuery() {
   return useQuery({
     queryKey: runsQueryKeys.all,
     queryFn: runsApi.getRuns,
+    staleTime: 30_000,
   });
 }
 
@@ -38,6 +42,33 @@ export function useRunQuery(id: string) {
 
       return failureCount < 2;
     },
+  });
+}
+
+export function useRunStatusQuery(id: string) {
+  const queryClient = useQueryClient();
+
+  return useQuery<RunStatusResponse>({
+    queryKey: runsQueryKeys.status(id),
+    queryFn: async () => {
+      const status = await runsApi.getRunStatus(id);
+      queryClient.setQueryData<Run>(runsQueryKeys.detail(id), (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: status.status,
+          currentStep: status.currentStep,
+          updatedAt: status.updatedAt,
+        };
+      });
+      if (status.status !== "queued" && status.status !== "running") {
+        void queryClient.invalidateQueries({
+          queryKey: runsQueryKeys.detail(id),
+        });
+      }
+      return status;
+    },
+    enabled: Boolean(id),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === "queued" || status === "running" ? 5000 : false;
@@ -61,6 +92,7 @@ export function useArtifactContentQuery(runId: string, artifactId?: string) {
     queryKey: runsQueryKeys.artifactContent(runId, artifactId ?? ""),
     queryFn: () => runsApi.getArtifactContent(runId, artifactId ?? ""),
     enabled: Boolean(runId && artifactId),
+    staleTime: Infinity,
   });
 }
 
@@ -70,7 +102,7 @@ export function useArtifactFileUrl(runId: string, artifactId?: string) {
     queryFn: () => runsApi.getArtifactFile(runId, artifactId ?? ""),
     enabled: Boolean(runId && artifactId),
     retry: false,
-    staleTime: 60_000,
+    staleTime: Infinity,
   });
 
   const url = useMemo(
@@ -99,7 +131,6 @@ export function useUpdateRunMutation() {
       displayName: string | null;
     }) => runsApi.updateRun(runId, { displayName }),
     onSuccess: (run) => {
-      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
       void queryClient.setQueryData(runsQueryKeys.detail(run.id), run);
     },
   });
@@ -112,7 +143,6 @@ export function useUpdateRunPinnedMutation() {
     mutationFn: ({ runId, isPinned }: { runId: string; isPinned: boolean }) =>
       runsApi.updateRunPinned(runId, { isPinned }),
     onSuccess: (run) => {
-      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
       void queryClient.setQueryData(runsQueryKeys.detail(run.id), run);
     },
   });
@@ -150,6 +180,7 @@ export function useCodeFilesQuery(runId: string, enabled = true) {
     queryKey: runsQueryKeys.codeFiles(runId),
     queryFn: () => runsApi.getCodeFiles(runId),
     enabled: Boolean(runId) && enabled,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -161,6 +192,7 @@ export function useCodeFileContentQuery(
     queryKey: runsQueryKeys.codeFileContent(runId, filePath ?? ""),
     queryFn: () => runsApi.getCodeFileContent(runId, filePath ?? ""),
     enabled: Boolean(runId && filePath),
+    staleTime: Infinity,
   });
 }
 
@@ -169,8 +201,13 @@ export function useRebuildRunMutation() {
 
   return useMutation({
     mutationFn: runsApi.rebuildRun,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["runs"] });
+    onSuccess: (_result, runId) => {
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.detail(runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.codeFiles(runId),
+      });
     },
   });
 }
@@ -181,9 +218,11 @@ export function useRestartCurrentStepMutation() {
   return useMutation({
     mutationFn: runsApi.restartCurrentStep,
     onSuccess: (_result, runId) => {
-      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
       void queryClient.invalidateQueries({
         queryKey: runsQueryKeys.detail(runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.codeFiles(runId),
       });
     },
   });
@@ -195,7 +234,6 @@ export function useStopCurrentStepMutation() {
   return useMutation({
     mutationFn: runsApi.stopCurrentStep,
     onSuccess: (_result, runId) => {
-      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
       void queryClient.invalidateQueries({
         queryKey: runsQueryKeys.detail(runId),
       });
@@ -208,7 +246,6 @@ export function useRestartCodeStepMutation() {
   return useMutation({
     mutationFn: runsApi.restartCodeStep,
     onSuccess: (_result, runId) => {
-      void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
       void queryClient.invalidateQueries({
         queryKey: runsQueryKeys.detail(runId),
       });

@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   GENERATE_IMAGE: "/generate-image",
   RUNS: "/runs",
   run: (runId: string) => `/runs/${e(runId)}`,
+  runStatus: (runId: string) => `/runs/${e(runId)}/status`,
   rebuildRun: (runId: string) => `/runs/${e(runId)}/rebuild`,
   restartCurrentStep: (runId: string) =>
     `/runs/${e(runId)}/restart-current-step`,

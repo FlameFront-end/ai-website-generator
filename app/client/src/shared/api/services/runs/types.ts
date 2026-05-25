@@ -97,6 +97,13 @@ export interface Run {
   logs: RunLog[];
 }
 
+export interface RunStatusResponse {
+  id: string;
+  status: RunStatus;
+  currentStep: string | null;
+  updatedAt: string;
+}
+
 export interface CreateRunRequest {
   brief: string;
   displayName?: string | null;
@@ -143,10 +150,17 @@ export interface BriefClarificationAnswer {
   skipped?: boolean;
 }
 
+export interface ClarifyBriefAnswerPayload {
+  questionId: string;
+  question: string;
+  value: string | string[] | number | boolean;
+  skipped?: boolean;
+}
+
 export interface ClarifyBriefRequest {
   brief: string;
   siteLanguage?: string;
-  answers?: BriefClarificationAnswer[];
+  answers?: ClarifyBriefAnswerPayload[];
 }
 
 export interface ClarifyBriefResponse {

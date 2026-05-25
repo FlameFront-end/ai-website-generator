@@ -1,9 +1,15 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { promises as fs } from 'node:fs';
 import { DataSource, Repository } from 'typeorm';
 
-import { RunStatus } from '../../common/enums';
+import { ArtifactType, RunStatus } from '../../common/enums';
 import { RunEntity } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { PipelineService } from '../pipeline/pipeline.service';
@@ -13,14 +19,24 @@ import type { UpdateRunDto } from './dto/update-run.dto';
 
 const RUN_NUMBER_PAD = 3;
 const RUNNING_STEP_TIMEOUT_MS = 20 * 60 * 1000;
+const STALE_CHECK_INTERVAL_MS = 60_000;
+
+const INTERNAL_ARTIFACT_TYPES = new Set<ArtifactType>([
+  ArtifactType.CodePlan,
+  ArtifactType.CodeContentModule,
+  ArtifactType.CodeLayoutModule,
+  ArtifactType.CodeSectionsModule,
+  ArtifactType.ReferenceContextSummary,
+]);
 
 function toRunSlug(runNumber: number): string {
   return `run-${String(runNumber).padStart(RUN_NUMBER_PAD, '0')}`;
 }
 
 @Injectable()
-export class RunsCrudService {
+export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RunsCrudService.name);
+  private staleCheckTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectDataSource()
@@ -61,19 +77,42 @@ export class RunsCrudService {
       where: { userId },
       relations: {
         artifacts: true,
-        logs: true,
       },
       order: {
         isPinned: 'DESC',
         createdAt: 'DESC',
-        logs: {
-          createdAt: 'DESC',
-        },
       },
       take: 25,
     });
-    await Promise.all(runs.map((run) => this.failRunIfStale(run)));
+    for (const run of runs) {
+      run.logs = [];
+      run.artifacts = run.artifacts.filter(
+        (a) => !INTERNAL_ARTIFACT_TYPES.has(a.type),
+      );
+    }
     return runs;
+  }
+
+  async getRunStatus(
+    id: string,
+    userId: string,
+  ): Promise<{
+    id: string;
+    status: RunStatus;
+    currentStep: string | null;
+    updatedAt: Date;
+  } | null> {
+    const run = await this.runsRepository.findOne({
+      where: { id, userId },
+      select: ['id', 'status', 'currentStep', 'updatedAt'],
+    });
+    if (!run) return null;
+    return {
+      id: run.id,
+      status: run.status,
+      currentStep: run.currentStep,
+      updatedAt: run.updatedAt,
+    };
   }
 
   async getRun(id: string, userId: string): Promise<RunEntity | null> {
@@ -89,12 +128,16 @@ export class RunsCrudService {
         },
       },
     });
-    await this.failRunIfStale(run);
+    if (run) {
+      run.artifacts = run.artifacts.filter(
+        (a) => !INTERNAL_ARTIFACT_TYPES.has(a.type),
+      );
+    }
     return run;
   }
 
   async updateRun(id: string, dto: UpdateRunDto, userId: string) {
-    await this.getRunOrFail(id, userId);
+    await this.getRunLightOrFail(id, userId);
     const displayName = dto.displayName?.trim() || null;
 
     await this.runsRepository.update(id, { displayName });
@@ -118,7 +161,7 @@ export class RunsCrudService {
   }
 
   async updateRunPinned(id: string, isPinned: boolean, userId: string) {
-    await this.getRunOrFail(id, userId);
+    await this.getRunLightOrFail(id, userId);
 
     await this.runsRepository.update({ id, userId }, { isPinned });
 
@@ -136,7 +179,7 @@ export class RunsCrudService {
   }
 
   async deleteRun(id: string, userId: string) {
-    const run = await this.getRunOrFail(id, userId);
+    const run = await this.getRunLightOrFail(id, userId);
     const runPath = this.storageService.getRunPath(userId, run.id);
     const generatedRoot = this.storageService.getGeneratedRootPath();
 
@@ -150,6 +193,22 @@ export class RunsCrudService {
     await this.deleteRunDirectory(runPath);
 
     return { id, deleted: true };
+  }
+
+  async getRunLight(id: string, userId: string): Promise<RunEntity | null> {
+    return this.runsRepository.findOne({
+      where: { id, userId },
+    });
+  }
+
+  async getRunLightOrFail(id: string, userId: string): Promise<RunEntity> {
+    const run = await this.getRunLight(id, userId);
+
+    if (!run) {
+      throw new NotFoundException('Run not found');
+    }
+
+    return run;
   }
 
   async getRunOrFail(id: string, userId: string): Promise<RunEntity> {
@@ -182,27 +241,41 @@ export class RunsCrudService {
     });
   }
 
+  // ===================== Lifecycle =====================
+
+  onModuleInit() {
+    this.staleCheckTimer = setInterval(() => {
+      void this.failStaleRuns();
+    }, STALE_CHECK_INTERVAL_MS);
+  }
+
+  onModuleDestroy() {
+    if (this.staleCheckTimer) {
+      clearInterval(this.staleCheckTimer);
+      this.staleCheckTimer = null;
+    }
+  }
+
   // ===================== Private helpers =====================
 
-  private async failRunIfStale(run: RunEntity | null): Promise<void> {
-    if (!run || run.status !== RunStatus.Running) {
-      return;
+  private async failStaleRuns(): Promise<void> {
+    try {
+      const cutoff = new Date(Date.now() - RUNNING_STEP_TIMEOUT_MS);
+      const staleRuns = await this.runsRepository.find({
+        where: { status: RunStatus.Running },
+        select: ['id', 'currentStep', 'updatedAt'],
+      });
+
+      for (const run of staleRuns) {
+        if (new Date(run.updatedAt) < cutoff) {
+          const message = 'Step timed out and was automatically stopped';
+          await this.markRunStopped(run, message);
+          this.logger.warn(`Stale run ${run.id} marked as failed`);
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to check stale runs', error);
     }
-
-    const lastUpdateAt = new Date(run.updatedAt).getTime();
-    const isStale = Date.now() - lastUpdateAt > RUNNING_STEP_TIMEOUT_MS;
-
-    if (!isStale) {
-      return;
-    }
-
-    const message = 'Step timed out and was automatically stopped';
-    await this.markRunStopped(run, message);
-
-    // Update in-memory entity so callers get correct state without a second query
-    run.status = RunStatus.Failed;
-    run.currentStep = run.currentStep || 'pipeline_failed';
-    run.errorMessage = `PIPELINE_STOPPED: ${message}`;
   }
 
   private async createQueuedRun({

@@ -139,7 +139,12 @@ export function useBriefWizard(requestedDraftId: string | null) {
       const result = await runsApi.clarifyBrief({
         brief,
         siteLanguage,
-        answers: nextAnswers,
+        answers: nextAnswers.map((a) => ({
+          questionId: a.questionId,
+          question: a.question,
+          value: a.value,
+          skipped: a.skipped,
+        })),
       });
       setClarification(result);
       setAnswerMap({});
