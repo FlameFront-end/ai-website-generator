@@ -49,4 +49,18 @@ export class RunLogService {
       metadata,
     });
   }
+
+  async getLogs(
+    runId: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ items: RunLogEntity[]; total: number }> {
+    const [items, total] = await this.logsRepository.findAndCount({
+      where: { runId },
+      order: { createdAt: 'DESC' },
+      take: limit,
+      skip: offset,
+    });
+    return { items, total };
+  }
 }

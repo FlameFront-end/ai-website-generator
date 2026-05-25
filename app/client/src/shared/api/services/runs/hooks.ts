@@ -4,12 +4,13 @@ import { useEffect, useMemo } from "react";
 
 import { runsApi } from "./runs-api";
 
-import type { Run, RunStatusResponse } from "./types";
+import type { Run, RunLogsResponse, RunStatusResponse } from "./types";
 
 export const runsQueryKeys = {
   all: ["runs"] as const,
   detail: (id: string) => ["runs", id] as const,
   status: (id: string) => ["runs", id, "status"] as const,
+  logs: (runId: string) => ["runs", runId, "logs"] as const,
   artifactContent: (runId: string, artifactId: string) =>
     ["runs", runId, "artifacts", artifactId, "content"] as const,
   artifactFile: (runId: string, artifactId: string) =>
@@ -84,6 +85,15 @@ export function useCreateRunMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: runsQueryKeys.all });
     },
+  });
+}
+
+export function useRunLogsQuery(runId: string, limit = 50, offset = 0) {
+  return useQuery<RunLogsResponse>({
+    queryKey: [...runsQueryKeys.logs(runId), limit, offset],
+    queryFn: () => runsApi.getRunLogs(runId, limit, offset),
+    enabled: Boolean(runId),
+    staleTime: 10_000,
   });
 }
 

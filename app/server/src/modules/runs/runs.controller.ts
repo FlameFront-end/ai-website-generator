@@ -17,7 +17,7 @@ import type { Response } from 'express';
 
 import { RunStatus } from '../../common/enums';
 import type { RequestWithUser } from '../../common/types/request.types';
-import { RunEntity } from '../../db/entities';
+import { RunEntity, RunLogEntity } from '../../db/entities';
 import { BriefAiService } from '../ai/brief-ai.service';
 import type { BriefClarificationResult } from '../ai/types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -85,6 +85,19 @@ export class RunsController {
     }
 
     return result;
+  }
+
+  @Get(':id/logs')
+  @SkipThrottle()
+  getRunLogs(
+    @Param('id') id: string,
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Request() req: RequestWithUser,
+  ): Promise<{ items: RunLogEntity[]; total: number }> {
+    const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 200);
+    const offset = Math.max(Number(offsetRaw) || 0, 0);
+    return this.crud.getRunLogs(id, req.user.id, limit, offset);
   }
 
   @Get(':id')

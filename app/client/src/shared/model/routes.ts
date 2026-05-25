@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
     `/runs/${e(runId)}/artifacts/${e(artifactId)}/content`,
   artifactFile: (runId: string, artifactId: string) =>
     `/runs/${e(runId)}/artifacts/${e(artifactId)}/file`,
+  runLogs: (runId: string) => `/runs/${e(runId)}/logs`,
   codeFiles: (runId: string) => `/runs/${e(runId)}/code-files`,
   codeFile: (runId: string) => `/runs/${e(runId)}/code-file`,
   downloadCode: (runId: string) => `/runs/${e(runId)}/download-code`,

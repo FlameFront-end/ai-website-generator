@@ -205,11 +205,7 @@ export default function RunDetailsPage() {
           {activeTab === "artifacts" && <ArtifactsTab run={run} />}
 
           {activeTab === "logs" && (
-            <LogsTab
-              runId={run.id}
-              logs={run.logs}
-              buildLogArtifact={artifacts.build_log}
-            />
+            <LogsTab runId={run.id} buildLogArtifact={artifacts.build_log} />
           )}
         </div>
       </ErrorBoundary>

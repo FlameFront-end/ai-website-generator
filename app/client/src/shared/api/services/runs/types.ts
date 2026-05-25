@@ -208,6 +208,11 @@ export interface EditReferenceBlockResponse {
   model: string;
 }
 
+export interface RunLogsResponse {
+  items: RunLog[];
+  total: number;
+}
+
 export interface CodeFile {
   path: string;
   size: number;

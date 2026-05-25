@@ -13,6 +13,7 @@ import type {
   EditReferenceBlockRequest,
   EditReferenceBlockResponse,
   Run,
+  RunLogsResponse,
   RunStatus,
   RunStatusResponse,
   SelectStyleRequest,
@@ -53,6 +54,18 @@ export const runsApi = {
   async getRunStatus(id: string): Promise<RunStatusResponse> {
     const { data } = await axiosInstance.get<RunStatusResponse>(
       API_ENDPOINTS.runStatus(id),
+    );
+    return data;
+  },
+
+  async getRunLogs(
+    runId: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<RunLogsResponse> {
+    const { data } = await axiosInstance.get<RunLogsResponse>(
+      API_ENDPOINTS.runLogs(runId),
+      { params: { limit, offset } },
     );
     return data;
   },

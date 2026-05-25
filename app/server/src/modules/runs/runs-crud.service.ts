@@ -10,7 +10,7 @@ import { promises as fs } from 'node:fs';
 import { DataSource, Repository } from 'typeorm';
 
 import { ArtifactType, RunStatus } from '../../common/enums';
-import { RunEntity } from '../../db/entities';
+import { RunEntity, RunLogEntity } from '../../db/entities';
 import { StorageService } from '../storage/storage.service';
 import { PipelineService } from '../pipeline/pipeline.service';
 import { RunLogService } from './run-log.service';
@@ -120,20 +120,25 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
       where: { id, userId },
       relations: {
         artifacts: true,
-        logs: true,
-      },
-      order: {
-        logs: {
-          createdAt: 'DESC',
-        },
       },
     });
     if (run) {
       run.artifacts = run.artifacts.filter(
         (a) => !INTERNAL_ARTIFACT_TYPES.has(a.type),
       );
+      run.logs = [];
     }
     return run;
+  }
+
+  async getRunLogs(
+    id: string,
+    userId: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ items: RunLogEntity[]; total: number }> {
+    await this.getRunLightOrFail(id, userId);
+    return this.runLogService.getLogs(id, limit, offset);
   }
 
   async updateRun(id: string, dto: UpdateRunDto, userId: string) {
