@@ -5,6 +5,16 @@ import {
   joinPromptSections,
 } from '../skills/prompt-context';
 
+function compactJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function qualityReference(url: string): string {
+  return url.trim()
+    ? `\n\nCode quality reference repository: ${url.trim()}\nMatch its code quality, structure, component boundaries, imports and naming.`
+    : '';
+}
+
 const SYSTEM = joinPromptSections(
   buildSkillContext(
     [
@@ -75,12 +85,13 @@ export function buildGenerateCodeMessages(
   spec: ProjectSpec,
   tokens: DesignTokens,
   designDescription: string,
+  codeQualityReferenceUrl: string,
 ): ChatMessage[] {
   return [
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Original brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}\n\nDesignDescription and visual references:\n${designDescription}`,
+      content: `Original brief:\n${brief}\n\nProjectSpec:${compactJson(spec)}\n\nDesignTokens:${compactJson(tokens)}\n\nDesignDescription and visual references:\n${designDescription}${qualityReference(codeQualityReferenceUrl)}`,
     },
   ];
 }

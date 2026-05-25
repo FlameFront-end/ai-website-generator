@@ -173,6 +173,27 @@ export interface DeleteRunResponse {
   deleted: boolean;
 }
 
+export interface ReferenceBlockBbox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface EditReferenceBlockRequest {
+  artifactId: string;
+  bbox: ReferenceBlockBbox;
+  instruction: string;
+}
+
+export interface EditReferenceBlockResponse {
+  id: string;
+  status: RunStatus;
+  artifactId: string;
+  path: string;
+  model: string;
+}
+
 export interface CodeFile {
   path: string;
   size: number;

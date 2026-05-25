@@ -13,6 +13,16 @@ import {
   joinPromptSections,
 } from '../skills/prompt-context';
 
+function compactJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function qualityReference(url: string): string {
+  return url.trim()
+    ? `\n\nCode quality reference repository: ${url.trim()}\nMatch its component quality, naming, composition, imports and production structure while following THIS block image visually.`
+    : '';
+}
+
 const SYSTEM = joinPromptSections(
   buildSkillContext(
     ['product-global-rules', 'image-to-code', 'taste-image-to-code'],
@@ -20,7 +30,7 @@ const SYSTEM = joinPromptSections(
   ),
   `Generate React component files for ONE landing section plus any local shared UI it needs.
 
-If a reference image is attached to the user message, treat it as the AUTHORITATIVE visual source for this section: layout, hierarchy, spacing, palette, typography weights, components, copy placement and decorative elements all come from the image. Text descriptions and tokens are secondary clarification.
+Exactly one section/block is generated per request. If a reference image is attached, treat it as the AUTHORITATIVE visual source for this section only: layout, hierarchy, spacing, palette, typography weights, components, copy placement and decorative elements all come from this block image. Never infer layout from a full-page screenshot.
 
 Return ONLY valid JSON:
 {
@@ -46,6 +56,7 @@ export function buildGenerateSectionMessages(
   contentFiles: string,
   codegenContext: string,
   sectionImageDataUrl: string | null,
+  codeQualityReferenceUrl: string,
 ): ChatMessage[] {
   const userParts: ChatContentPart[] = [];
 
@@ -56,13 +67,13 @@ export function buildGenerateSectionMessages(
     });
     userParts.push({
       type: 'text',
-      text: 'The image above is the approved visual reference for THIS section. Reproduce it faithfully.',
+      text: 'The image above is the approved visual reference for THIS block only. Reproduce this block faithfully and do not use any full-page image context.',
     });
   }
 
   userParts.push({
     type: 'text',
-    text: `Brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}\n\nCodePlan:\n${JSON.stringify(codePlan, null, 2)}\n\nTarget section:\n${JSON.stringify(section, null, 2)}\n\nContent files:\n${contentFiles}\n\nCodegen context:\n${codegenContext}`,
+    text: `Brief:\n${brief}\n\nProjectSpec:${compactJson(spec)}\n\nDesignTokens:${compactJson(tokens)}\n\nCodePlan:${compactJson(codePlan)}\n\nTarget section:${compactJson(section)}\n\nContent files:${contentFiles}\n\nCodegen context:\n${codegenContext}${qualityReference(codeQualityReferenceUrl)}`,
   });
 
   return [

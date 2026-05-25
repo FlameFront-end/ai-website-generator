@@ -89,6 +89,45 @@ export class RunsWorkflowService {
     };
   }
 
+  async editReferenceBlock(
+    runId: string,
+    artifactId: string,
+    bbox: { x: number; y: number; width: number; height: number },
+    instruction: string,
+    userId: string,
+  ): Promise<{
+    id: string;
+    status: string;
+    artifactId: string;
+    path: string;
+    model: string;
+  }> {
+    const run = await this.crud.getRunOrFail(runId, userId);
+
+    if (run.status !== RunStatus.AwaitingReferenceApproval) {
+      throw new BadRequestException(
+        'Reference block editing is only available during reference approval',
+      );
+    }
+
+    if (bbox.x + bbox.width > 1 || bbox.y + bbox.height > 1) {
+      throw new BadRequestException('Selected area exceeds image bounds');
+    }
+
+    const result = await this.pipelineService.editReferenceBlock(
+      run,
+      artifactId,
+      bbox,
+      instruction,
+      userId,
+    );
+
+    return {
+      id: run.id,
+      status: run.status,
+      ...result,
+    };
+  }
   async selectStyle(
     runId: string,
     styleVariantId: string,

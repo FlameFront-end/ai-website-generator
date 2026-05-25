@@ -5,6 +5,16 @@ import {
   joinPromptSections,
 } from '../skills/prompt-context';
 
+function compactJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function qualityReference(url: string): string {
+  return url.trim()
+    ? `\n\nCode quality reference repository: ${url.trim()}\nMatch its typed content/config structure quality and naming discipline.`
+    : '';
+}
+
 const SYSTEM = joinPromptSections(
   buildSkillContext(['product-global-rules', 'brief-and-structure'], 5000),
   `Generate typed content/config files for a Next.js landing page.
@@ -30,12 +40,13 @@ export function buildGenerateContentMessages(
   tokens: DesignTokens,
   codePlan: CodePlan,
   codegenContext: string,
+  codeQualityReferenceUrl: string,
 ): ChatMessage[] {
   return [
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}\n\nCodePlan:\n${JSON.stringify(codePlan, null, 2)}\n\nCodegen context:\n${codegenContext}`,
+      content: `Brief:\n${brief}\n\nProjectSpec:${compactJson(spec)}\n\nDesignTokens:${compactJson(tokens)}\n\nCodePlan:${compactJson(codePlan)}\n\nCodegen context:\n${codegenContext}${qualityReference(codeQualityReferenceUrl)}`,
     },
   ];
 }

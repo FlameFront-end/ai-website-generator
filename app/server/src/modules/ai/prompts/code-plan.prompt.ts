@@ -5,6 +5,16 @@ import {
   joinPromptSections,
 } from '../skills/prompt-context';
 
+function compactJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function qualityReference(url: string): string {
+  return url.trim()
+    ? `\n\nCode quality reference repository: ${url.trim()}\nMatch its code quality, component boundaries, naming, file organization and production discipline. Do not copy product content unless explicitly present in the brief.`
+    : '';
+}
+
 const SYSTEM = joinPromptSections(
   buildSkillContext(
     ['product-global-rules', 'image-to-code', 'taste-output'],
@@ -32,12 +42,13 @@ export function buildCodePlanMessages(
   spec: ProjectSpec,
   tokens: DesignTokens,
   codegenContext: string,
+  codeQualityReferenceUrl: string,
 ): ChatMessage[] {
   return [
     { role: 'system', content: SYSTEM },
     {
       role: 'user',
-      content: `Brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}\n\nCodegen context:\n${codegenContext}`,
+      content: `Brief:\n${brief}\n\nProjectSpec:${compactJson(spec)}\n\nDesignTokens:${compactJson(tokens)}\n\nCodegen context:\n${codegenContext}${qualityReference(codeQualityReferenceUrl)}`,
     },
   ];
 }

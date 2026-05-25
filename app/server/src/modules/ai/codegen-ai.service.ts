@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
+import { getAppConfig } from '../../config/config.module';
 import type {
   CodePlan,
   CodePlanSection,
@@ -23,8 +25,15 @@ import {
 @Injectable()
 export class CodegenAiService {
   private readonly logger = new Logger(CodegenAiService.name);
+  private readonly codeQualityReferenceUrl: string;
 
-  constructor(private readonly ai: AiService) {}
+  constructor(
+    private readonly ai: AiService,
+    configService: ConfigService,
+  ) {
+    this.codeQualityReferenceUrl =
+      getAppConfig(configService).ai.codeQualityReferenceUrl;
+  }
 
   /**
    * Generate React component code + CSS via LLM
@@ -43,6 +52,7 @@ export class CodegenAiService {
         spec,
         tokens,
         designDescription,
+        this.codeQualityReferenceUrl,
       ),
       json: true,
       temperature: 0.3,
@@ -64,7 +74,13 @@ export class CodegenAiService {
     this.logger.log('Generating frontend code plan via AI');
 
     const result = await this.ai.chat('code', {
-      messages: buildCodePlanMessages(brief, spec, tokens, codegenContext),
+      messages: buildCodePlanMessages(
+        brief,
+        spec,
+        tokens,
+        codegenContext,
+        this.codeQualityReferenceUrl,
+      ),
       json: true,
       temperature: 0.2,
       maxTokens: 4096,
@@ -89,6 +105,7 @@ export class CodegenAiService {
         tokens,
         codePlan,
         codegenContext,
+        this.codeQualityReferenceUrl,
       ),
       json: true,
       temperature: 0.25,
@@ -108,7 +125,6 @@ export class CodegenAiService {
     codePlan: CodePlan,
     contentFiles: string,
     codegenContext: string,
-    fullPageImageDataUrl: string | null,
   ): Promise<GeneratedLayoutModule> {
     this.logger.log('Generating frontend layout files via AI');
 
@@ -120,7 +136,7 @@ export class CodegenAiService {
         codePlan,
         contentFiles,
         codegenContext,
-        fullPageImageDataUrl,
+        this.codeQualityReferenceUrl,
       ),
       json: true,
       temperature: 0.25,
@@ -155,6 +171,7 @@ export class CodegenAiService {
         contentFiles,
         codegenContext,
         sectionImageDataUrl,
+        this.codeQualityReferenceUrl,
       ),
       json: true,
       temperature: 0.3,

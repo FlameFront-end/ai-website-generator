@@ -30,13 +30,72 @@ export function formatAnswerValue(value: BriefClarificationAnswer["value"]) {
 }
 
 export function getSuggestedAnswer(question: BriefClarificationQuestion) {
+  const options = question.options ?? [];
+
+  if (question.type === "multi_choice") {
+    if (Array.isArray(question.suggestedAnswer)) {
+      const selectedOptions = question.suggestedAnswer
+        .map((answer) => findMatchingOption(options, String(answer)))
+        .filter((option): option is string => Boolean(option));
+
+      if (selectedOptions.length > 0) return selectedOptions;
+    }
+
+    if (typeof question.suggestedAnswer === "string") {
+      const selectedOption = findMatchingOption(
+        options,
+        question.suggestedAnswer,
+      );
+      if (selectedOption) return [selectedOption];
+    }
+
+    return options.slice(0, 2);
+  }
+
+  if (question.type === "single_choice") {
+    if (typeof question.suggestedAnswer === "string") {
+      return (
+        findMatchingOption(options, question.suggestedAnswer) ??
+        options[0] ??
+        ""
+      );
+    }
+
+    if (Array.isArray(question.suggestedAnswer)) {
+      return (
+        question.suggestedAnswer
+          .map((answer) => findMatchingOption(options, String(answer)))
+          .find(Boolean) ??
+        options[0] ??
+        ""
+      );
+    }
+
+    return options[0] ?? "";
+  }
+
   if (question.suggestedAnswer !== undefined) return question.suggestedAnswer;
   if (question.type === "yes_no") return true;
   if (question.type === "scale") return Math.ceil((question.max ?? 5) / 2);
-  if (question.type === "multi_choice")
-    return question.options?.slice(0, 2) ?? [];
-  if (question.type === "single_choice") return question.options?.[0] ?? "";
   return "";
+}
+
+function findMatchingOption(options: string[], answer: string) {
+  const normalizedAnswer = normalizeOptionText(answer);
+
+  return options.find((option) => {
+    const normalizedOption = normalizeOptionText(option);
+
+    return (
+      normalizedOption === normalizedAnswer ||
+      normalizedOption.includes(normalizedAnswer) ||
+      normalizedAnswer.includes(normalizedOption)
+    );
+  });
+}
+
+function normalizeOptionText(value: string) {
+  return value.trim().toLowerCase();
 }
 
 export function buildLocalizedBrief(brief: string, siteLanguage: string) {

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { useEffect, useMemo } from "react";
 
 import { runsApi } from "./runs-api";
@@ -27,9 +28,19 @@ export function useRunQuery(id: string) {
     queryKey: runsQueryKeys.detail(id),
     queryFn: () => runsApi.getRun(id),
     enabled: Boolean(id),
+    retry: (failureCount, error) => {
+      if (
+        isAxiosError(error) &&
+        (error.response?.status === 404 || error.response?.status === 429)
+      ) {
+        return false;
+      }
+
+      return failureCount < 2;
+    },
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "queued" || status === "running" ? 2500 : false;
+      return status === "queued" || status === "running" ? 5000 : false;
     },
   });
 }
@@ -58,6 +69,8 @@ export function useArtifactFileUrl(runId: string, artifactId?: string) {
     queryKey: runsQueryKeys.artifactFile(runId, artifactId ?? ""),
     queryFn: () => runsApi.getArtifactFile(runId, artifactId ?? ""),
     enabled: Boolean(runId && artifactId),
+    retry: false,
+    staleTime: 60_000,
   });
 
   const url = useMemo(

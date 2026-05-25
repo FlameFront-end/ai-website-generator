@@ -151,7 +151,6 @@ export class CodeGeneratorService {
       normalizedPlan,
       contentFiles,
       codegenContext,
-      options.fullPageImageDataUrl ?? null,
     );
     await options.onCodegenArtifact?.({
       kind: 'layout-module',

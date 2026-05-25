@@ -8,6 +8,16 @@ import {
   joinPromptSections,
 } from '../skills/prompt-context';
 
+function compactJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function qualityReference(url: string): string {
+  return url.trim()
+    ? `\n\nCode quality reference repository: ${url.trim()}\nMatch its layout structure, imports, naming and production quality.`
+    : '';
+}
+
 const SYSTEM = joinPromptSections(
   buildSkillContext(
     ['product-global-rules', 'image-to-code', 'taste-output'],
@@ -15,7 +25,7 @@ const SYSTEM = joinPromptSections(
   ),
   `Generate shell/layout files for a Next.js App Router landing page.
 
-If a full-page reference image is attached to the user message, use it to set the OVERALL composition: section ordering, vertical rhythm, page-level background and the global CSS variables in globals.css.
+Do not depend on a full-page screenshot. The landing is assembled from section components generated separately from per-block reference images.
 
 Return ONLY valid JSON:
 {
@@ -42,24 +52,13 @@ export function buildGenerateLayoutMessages(
   codePlan: CodePlan,
   contentFiles: string,
   codegenContext: string,
-  fullPageImageDataUrl: string | null,
+  codeQualityReferenceUrl: string,
 ): ChatMessage[] {
   const userParts: ChatContentPart[] = [];
 
-  if (fullPageImageDataUrl) {
-    userParts.push({
-      type: 'image_url',
-      image_url: { url: fullPageImageDataUrl, detail: 'high' },
-    });
-    userParts.push({
-      type: 'text',
-      text: 'The image above is the approved full-page reference for the entire landing. Use it to anchor section ordering, page-level background and overall vertical rhythm.',
-    });
-  }
-
   userParts.push({
     type: 'text',
-    text: `Brief:\n${brief}\n\nProjectSpec:\n${JSON.stringify(spec, null, 2)}\n\nDesignTokens:\n${JSON.stringify(tokens, null, 2)}\n\nCodePlan:\n${JSON.stringify(codePlan, null, 2)}\n\nContent files:\n${contentFiles}\n\nCodegen context:\n${codegenContext}`,
+    text: `Brief:\n${brief}\n\nProjectSpec:${compactJson(spec)}\n\nDesignTokens:${compactJson(tokens)}\n\nCodePlan:${compactJson(codePlan)}\n\nContent files:${contentFiles}\n\nCodegen context:\n${codegenContext}${qualityReference(codeQualityReferenceUrl)}`,
   });
 
   return [

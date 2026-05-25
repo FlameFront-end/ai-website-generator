@@ -155,15 +155,13 @@ export class StyleToSpecMapper {
 
   static toCodegenContext(style: StyleVariant): string {
     return [
-      'Project Context:',
-      `- Style name: ${style.name}`,
-      `- Visual style: ${style.visualStyle}`,
-      `- Color palette: ${style.colorPalette.join(', ')}`,
-      `- Typography: ${style.typographyStyle}`,
-      `- Layout: ${style.layoutStyle}`,
-      `- Mood: ${style.moodKeywords.join(', ')}`,
-      '',
-      `Description: ${style.description}`,
+      `style=${style.name}`,
+      `visual=${style.visualStyle}`,
+      `palette=${style.colorPalette.join(',')}`,
+      `type=${style.typographyStyle}`,
+      `layout=${style.layoutStyle}`,
+      `mood=${style.moodKeywords.join(',')}`,
+      `notes=${style.description}`,
     ].join('\n');
   }
 

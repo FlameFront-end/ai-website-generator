@@ -33,4 +33,6 @@ export const API_ENDPOINTS = {
   downloadCode: (runId: string) => `/runs/${e(runId)}/download-code`,
   approveStep: (runId: string) => `/runs/${e(runId)}/approve`,
   editRequest: (runId: string) => `/runs/${e(runId)}/edit-request`,
+  referenceBlockEdit: (runId: string) =>
+    `/runs/${e(runId)}/reference-blocks/edit`,
 } as const;

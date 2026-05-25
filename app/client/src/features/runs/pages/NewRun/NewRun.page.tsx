@@ -19,12 +19,7 @@ export default function NewRunPage() {
   const [searchParams] = useSearchParams();
   const requestedDraftId = searchParams.get("draft");
 
-  return (
-    <NewRunDraftPage
-      key={requestedDraftId ?? "new"}
-      draftId={requestedDraftId}
-    />
-  );
+  return <NewRunDraftPage draftId={requestedDraftId} />;
 }
 
 function NewRunDraftPage({

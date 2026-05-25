@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import type { ReferenceContextSummary, StyleVariant } from '../ai/types';
 import { ArtifactType, RunStatus } from '../../common/enums';
-import { RunEntity } from '../../db/entities';
+import { RunArtifactEntity, RunEntity } from '../../db/entities';
 import { PIPELINE_STEP_DELAY_MS } from '../../common/constants/pipeline';
 import { writeImageResultToFile, sleep } from '../../common/utils';
 import { ImageGenerationService } from '../image-generation/image-generation.service';
@@ -23,6 +23,13 @@ interface GeneratedReferenceBlock {
   relativePath: string;
   mimeType: string;
   model: string;
+}
+
+interface NormalizedBbox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 @Injectable()
@@ -134,6 +141,49 @@ export class ReferenceStepService {
       : selectedStyle;
 
     await this.prepareReferenceImage(run, updatedStyle, userId);
+  }
+
+  async editReferenceBlockImage(
+    run: RunEntity,
+    artifact: RunArtifactEntity,
+    bbox: NormalizedBbox,
+    instruction: string,
+    userId: string,
+  ): Promise<{ artifactId: string; path: string; model: string }> {
+    const absolutePath = this.storageService.getArtifactAbsolutePath(
+      artifact.path,
+    );
+    const backupPath = this.buildReferenceBackupPath(
+      run.id,
+      userId,
+      artifact.path,
+    );
+
+    await fs.mkdir(path.dirname(backupPath), { recursive: true });
+    await fs.copyFile(absolutePath, backupPath);
+
+    const mask = this.createSvgMask(bbox);
+    const result = await this.imageGenerationService.editImageRegion({
+      imagePath: absolutePath,
+      mask,
+      instruction,
+    });
+
+    await writeImageResultToFile(result.image, absolutePath);
+    await this.state.addLog(run.id, 'Reference block image edited', {
+      artifactId: artifact.id,
+      path: artifact.path,
+      backupPath,
+      bbox,
+      instruction,
+      model: result.model,
+    });
+
+    return {
+      artifactId: artifact.id,
+      path: artifact.path,
+      model: result.model,
+    };
   }
 
   private async generateReferenceBlockImages(
@@ -306,6 +356,46 @@ export class ReferenceStepService {
       'All generated reference blocks must feel like parts of the same website.',
       'Use the same palette, typography, spacing system, visual effects, and component language across sections.',
     ].join('\n');
+  }
+
+  private buildReferenceBackupPath(
+    runId: string,
+    userId: string,
+    artifactPath: string,
+  ): string {
+    const fileName = path.basename(artifactPath);
+    const stem = fileName.replace(/\.[^.]+$/, '');
+    const ext = path.extname(fileName) || '.png';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    return this.storageService.getRunAbsolutePath(
+      userId,
+      runId,
+      'reference',
+      'backups',
+      `${stem}-before-edit-${timestamp}${ext}`,
+    );
+  }
+
+  private createSvgMask(bbox: NormalizedBbox): Buffer {
+    const normalizedX = this.clamp01(bbox.x);
+    const normalizedY = this.clamp01(bbox.y);
+    const x = normalizedX * 1024;
+    const y = normalizedY * 1024;
+    const width = Math.min(this.clamp01(bbox.width), 1 - normalizedX) * 1024;
+    const height = Math.min(this.clamp01(bbox.height), 1 - normalizedY) * 1024;
+    const svg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">',
+      '<rect width="1024" height="1024" fill="black"/>',
+      `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="white"/>`,
+      '</svg>',
+    ].join('');
+
+    return Buffer.from(svg, 'utf8');
+  }
+
+  private clamp01(value: number): number {
+    return Math.max(0, Math.min(1, value));
   }
 
   private async saveReferenceContextSummary(

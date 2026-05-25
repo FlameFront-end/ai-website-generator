@@ -28,7 +28,7 @@ const env = cleanEnv(process.env, {
   JWT_EXPIRES_IN: str({ default: '7d' }),
   AI_ANALYSIS_PROVIDER: str({
     default: 'lmstudio',
-    choices: ['lmstudio', 'openai', 'openrouter', 'llm7'],
+    choices: ['lmstudio', 'openai', 'openrouter', 'llm7', 'gemini'],
   }),
   AI_ANALYSIS_BASE_URL: str({ default: 'http://localhost:1234/v1' }),
   AI_ANALYSIS_API_KEY: str({ default: '' }),
@@ -46,13 +46,14 @@ const env = cleanEnv(process.env, {
   AI_IMAGE_STRICT_JSON: str({ default: '' }),
   AI_CODE_PROVIDER: str({
     default: 'lmstudio',
-    choices: ['lmstudio', 'openai', 'openrouter', 'llm7'],
+    choices: ['lmstudio', 'openai', 'openrouter', 'llm7', 'gemini'],
   }),
   AI_CODE_BASE_URL: str({ default: 'http://localhost:1234/v1' }),
   AI_CODE_API_KEY: str({ default: '' }),
   AI_CODE_MODEL: str({ default: '' }),
   AI_CODE_TIMEOUT: str({ default: '' }),
   AI_CODE_STRICT_JSON: str({ default: '' }),
+  CODE_QUALITY_REFERENCE_URL: str({ default: '' }),
   THROTTLE_TTL: num({ default: 60 }),
   THROTTLE_LIMIT: num({ default: 60 }),
   THROTTLE_AUTH_TTL: num({ default: 60 }),
@@ -92,7 +93,12 @@ function buildDatabaseUrl(): string {
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
 
-export type AiProviderType = 'lmstudio' | 'openai' | 'openrouter' | 'llm7';
+export type AiProviderType =
+  | 'lmstudio'
+  | 'openai'
+  | 'openrouter'
+  | 'llm7'
+  | 'gemini';
 export type AiProviderRole = 'analysis' | 'image' | 'code';
 
 function normalizeTimeout(timeout: string): number | undefined {
@@ -161,6 +167,7 @@ export type AppConfig = Readonly<{
     expiresIn: string;
   }>;
   ai: Readonly<{
+    codeQualityReferenceUrl: string;
     roles: Readonly<
       Record<
         AiProviderRole,
@@ -207,6 +214,7 @@ export const appConfig: AppConfig = Object.freeze({
     expiresIn: env.JWT_EXPIRES_IN,
   }),
   ai: Object.freeze({
+    codeQualityReferenceUrl: env.CODE_QUALITY_REFERENCE_URL,
     roles: Object.freeze({
       analysis: buildAiRoleConfig('analysis'),
       image: buildAiRoleConfig('image'),

@@ -269,6 +269,32 @@ export class PipelineService implements OnApplicationShutdown {
     });
   }
 
+  async editReferenceBlock(
+    run: RunEntity,
+    artifactId: string,
+    bbox: { x: number; y: number; width: number; height: number },
+    instruction: string,
+    userId: string,
+  ): Promise<{ artifactId: string; path: string; model: string }> {
+    const referenceBlocks = await this.artifactService.getArtifactsByType(
+      run.id,
+      ArtifactType.ReferenceBlock,
+    );
+    const artifact = referenceBlocks.find((item) => item.id === artifactId);
+
+    if (!artifact) {
+      throw new Error('Reference block artifact not found');
+    }
+
+    return this.referenceStep.editReferenceBlockImage(
+      run,
+      artifact,
+      bbox,
+      instruction,
+      userId,
+    );
+  }
+
   /**
    * Restart a specific step
    */

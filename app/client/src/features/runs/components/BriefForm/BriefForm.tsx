@@ -74,7 +74,8 @@ export const BriefForm: FC<BriefFormProps> = ({
             English
           </button>
         </div>
-      </div>      <textarea
+      </div>
+      <textarea
         id="brief"
         value={brief}
         onChange={(event) => onDraftChange(event.target.value)}
@@ -98,4 +99,3 @@ export const BriefForm: FC<BriefFormProps> = ({
     </form>
   );
 };
-

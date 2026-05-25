@@ -12,6 +12,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 
 import { RunStatus } from '../../common/enums';
@@ -24,6 +25,7 @@ import { ArtifactReaderService } from './artifact-reader.service';
 import { ApproveStepDto } from './dto/approve-step.dto';
 import { ClarifyBriefDto } from './dto/clarify-brief.dto';
 import { CreateRunDto } from './dto/create-run.dto';
+import { EditReferenceBlockDto } from './dto/edit-reference-block.dto';
 import { EditRequestDto } from './dto/edit-request.dto';
 import { SelectStyleDto } from './dto/select-style.dto';
 import { UpdateRunPinnedDto } from './dto/update-run-pinned.dto';
@@ -66,6 +68,7 @@ export class RunsController {
   }
 
   @Get(':id')
+  @SkipThrottle()
   async getRun(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
@@ -221,6 +224,26 @@ export class RunsController {
     );
   }
 
+  @Post(':id/reference-blocks/edit')
+  editReferenceBlock(
+    @Param('id') id: string,
+    @Body() body: EditReferenceBlockDto,
+    @Request() req: RequestWithUser,
+  ): Promise<{
+    id: string;
+    status: string;
+    artifactId: string;
+    path: string;
+    model: string;
+  }> {
+    return this.workflow.editReferenceBlock(
+      id,
+      body.artifactId,
+      body.bbox,
+      body.instruction,
+      req.user.id,
+    );
+  }
   @Post(':id/select-style')
   selectStyle(
     @Param('id') id: string,

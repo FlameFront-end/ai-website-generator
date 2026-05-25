@@ -10,6 +10,8 @@ import type {
   CreateRunRequest,
   CreateRunResponse,
   DeleteRunResponse,
+  EditReferenceBlockRequest,
+  EditReferenceBlockResponse,
   Run,
   RunStatus,
   SelectStyleRequest,
@@ -178,6 +180,17 @@ export const runsApi = {
       id: string;
       status: RunStatus;
     }>(API_ENDPOINTS.editRequest(runId), { step, instruction });
+    return data;
+  },
+
+  async editReferenceBlock(
+    runId: string,
+    payload: EditReferenceBlockRequest,
+  ): Promise<EditReferenceBlockResponse> {
+    const { data } = await axiosInstance.post<EditReferenceBlockResponse>(
+      API_ENDPOINTS.referenceBlockEdit(runId),
+      payload,
+    );
     return data;
   },
 

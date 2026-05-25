@@ -9,6 +9,7 @@ import type {
   ChatCompletionOptions,
   ChatCompletionResult,
 } from './ai-provider.interface';
+import { GeminiProvider } from './gemini.provider';
 import { OpenAiCompatibleProvider } from './openai-compatible.provider';
 
 class UnsupportedChatProvider implements AiProvider {
@@ -51,6 +52,8 @@ export class AiProviderRegistry {
       case 'openrouter':
       case 'llm7':
         return new OpenAiCompatibleProvider(role, config);
+      case 'gemini':
+        return new GeminiProvider(role, config);
       default:
         return new UnsupportedChatProvider(role);
     }

@@ -1,8 +1,10 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */
-import type { FC } from "react";
+import type { FC, MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-import { useArtifactFileUrl } from "@/api/services/runs";
-import type { RunArtifact } from "@/api/services/runs";
+import { runsApi, useArtifactFileUrl } from "@/api/services/runs";
+import type { ReferenceBlockBbox, RunArtifact } from "@/api/services/runs";
 import { ImageViewerGallery } from "@/kit";
 import { pluralize } from "@/lib/pluralize";
 
@@ -48,6 +50,18 @@ interface ReferenceBlockProps {
   artifact: RunArtifact;
   index: number;
   onClick?: (src: string) => void;
+  onEdit?: (artifact: RunArtifact, index: number) => void;
+}
+
+interface EditingReferenceBlock {
+  artifact: RunArtifact;
+  index: number;
+}
+
+interface RegionSelection {
+  startX: number;
+  startY: number;
+  bbox: ReferenceBlockBbox;
 }
 
 /**
@@ -81,6 +95,7 @@ const ReferenceBlock: FC<ReferenceBlockProps> = ({
   artifact,
   index,
   onClick,
+  onEdit,
 }) => {
   const fileQuery = useArtifactFileUrl(runId, artifact.id);
   const meta = parseBlockMeta(artifact.path, index);
@@ -96,7 +111,18 @@ const ReferenceBlock: FC<ReferenceBlockProps> = ({
             <span className={refStyles.blockType}>{meta.sectionType}</span>
           )}
         </div>
-        <span className={refStyles.blockMeta}>{meta.fileName}</span>
+        <div className={refStyles.blockHeaderActions}>
+          <span className={refStyles.blockMeta}>{meta.fileName}</span>
+          <button
+            type="button"
+            className={refStyles.blockEditButton}
+            onClick={() => onEdit?.(artifact, index)}
+            title="Изменить фрагмент"
+            aria-label={`Изменить фрагмент блока ${index + 1}`}
+          >
+            ✦
+          </button>
+        </div>
       </header>
 
       <div className={refStyles.imageWrap}>
@@ -110,11 +136,265 @@ const ReferenceBlock: FC<ReferenceBlockProps> = ({
             src={fileQuery.url}
             alt={`Блок ${index + 1} — ${meta.sectionId}`}
             onClick={() => onClick?.(fileQuery.url || "")}
+            draggable={false}
             style={{ cursor: "pointer" }}
           />
         ) : null}
       </div>
     </figure>
+  );
+};
+
+interface ReferenceEditModalProps {
+  runId: string;
+  editing: EditingReferenceBlock;
+  onClose: () => void;
+}
+
+const ReferenceEditModal: FC<ReferenceEditModalProps> = ({
+  runId,
+  editing,
+  onClose,
+}) => {
+  const fileQuery = useArtifactFileUrl(runId, editing.artifact.id);
+  const meta = parseBlockMeta(editing.artifact.path, editing.index);
+  const imageWrapRef = useRef<HTMLDivElement | null>(null);
+  const [selection, setSelection] = useState<RegionSelection | null>(null);
+  const [instruction, setInstruction] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [isImageReady, setIsImageReady] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  const getNormalizedPoint = (event: MouseEvent<HTMLDivElement>) => {
+    const rect = imageWrapRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+
+    return {
+      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+    };
+  };
+
+  const handleMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (!isImageReady) return;
+    const point = getNormalizedPoint(event);
+    if (!point) return;
+    setIsDragging(true);
+    setError(null);
+    setSelection({
+      startX: point.x,
+      startY: point.y,
+      bbox: { x: point.x, y: point.y, width: 0, height: 0 },
+    });
+  };
+
+  const handleMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || !selection) return;
+    const point = getNormalizedPoint(event);
+    if (!point) return;
+    const x = Math.min(selection.startX, point.x);
+    const y = Math.min(selection.startY, point.y);
+    const width = Math.abs(point.x - selection.startX);
+    const height = Math.abs(point.y - selection.startY);
+    setSelection({ ...selection, bbox: { x, y, width, height } });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleResetSelection = () => {
+    setSelection(null);
+    setError(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!selection || !instruction.trim()) return;
+    if (selection.bbox.width < 0.01 || selection.bbox.height < 0.01) {
+      setError("Выделите область побольше.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await runsApi.editReferenceBlock(runId, {
+        artifactId: editing.artifact.id,
+        bbox: selection.bbox,
+        instruction: instruction.trim(),
+      });
+      await fileQuery.refetch({ cancelRefetch: false });
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Не удалось изменить блок.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const activeBox = selection?.bbox;
+  const hasSelectedRegion = Boolean(
+    isImageReady &&
+    activeBox &&
+    activeBox.width >= 0.01 &&
+    activeBox.height >= 0.01,
+  );
+
+  return createPortal(
+    <div className={refStyles.modalBackdrop} role="presentation">
+      <section className={refStyles.editModal} aria-modal="true" role="dialog">
+        <header className={refStyles.modalHeader}>
+          <div>
+            <span className={refStyles.modalEyebrow}>Точечная правка</span>
+            <h3>Выберите место и опишите изменение</h3>
+            <p>
+              Блок {editing.index + 1}
+              {meta.sectionType ? ` — ${meta.sectionType}` : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            className={refStyles.modalClose}
+            onClick={onClose}
+            disabled={isSubmitting}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className={refStyles.modalBody}>
+          <div className={refStyles.modalPreviewColumn}>
+            <div
+              ref={imageWrapRef}
+              className={refStyles.modalImageWrap}
+              role="presentation"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              {fileQuery.isError ? (
+                <div className={refStyles.blockError}>
+                  Не удалось загрузить изображение
+                </div>
+              ) : fileQuery.url ? (
+                <img
+                  key={fileQuery.url}
+                  src={fileQuery.url}
+                  alt={`Блок ${editing.index + 1} — ${meta.sectionId}`}
+                  draggable={false}
+                  className={isImageReady ? undefined : refStyles.imageHidden}
+                  onLoadStart={() => {
+                    setIsImageReady(false);
+                    setSelection(null);
+                  }}
+                  onLoad={() => setIsImageReady(true)}
+                  onError={() => setIsImageReady(false)}
+                />
+              ) : (
+                <div className={refStyles.blockError}>
+                  Загрузка изображения…
+                </div>
+              )}
+              {isImageReady && <div className={refStyles.editVeil} />}
+              {!isImageReady && (
+                <div className={refStyles.modalImageLoading}>
+                  Загружаем изображение…
+                </div>
+              )}
+              {isImageReady && !hasSelectedRegion && (
+                <div className={refStyles.editHint}>
+                  Обведите область, которую нужно изменить
+                </div>
+              )}
+              {isImageReady && activeBox && (
+                <div
+                  className={refStyles.selectionBox}
+                  style={{
+                    left: `${activeBox.x * 100}%`,
+                    top: `${activeBox.y * 100}%`,
+                    width: `${activeBox.width * 100}%`,
+                    height: `${activeBox.height * 100}%`,
+                  }}
+                >
+                  {hasSelectedRegion && (
+                    <span className={refStyles.selectionLabel}>Выбрано</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <aside className={refStyles.modalControls}>
+            <div className={refStyles.editPanelHeader}>
+              <strong>Что нужно сделать?</strong>
+              <span>
+                Сначала выделите нужный фрагмент на картинке, затем напишите
+                короткое описание правки.
+              </span>
+            </div>
+            <div className={refStyles.selectionStatus}>
+              {hasSelectedRegion
+                ? "Фрагмент выбран"
+                : "Выделите область на изображении"}
+            </div>
+            <label className={refStyles.promptLabel} htmlFor="reference-edit">
+              Описание изменения
+            </label>
+            <textarea
+              id="reference-edit"
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              placeholder="Например: заменить текст на «Start now» и сделать кнопку заметнее"
+              rows={7}
+            />
+            {error && <p className={refStyles.editError}>{error}</p>}
+            <div className={refStyles.editButtons}>
+              <button
+                type="button"
+                className={refStyles.secondaryButton}
+                onClick={handleResetSelection}
+                disabled={!selection || isSubmitting}
+              >
+                Выбрать заново
+              </button>
+              <button
+                type="button"
+                className={refStyles.secondaryButton}
+                onClick={onClose}
+                disabled={isSubmitting}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={refStyles.primaryButton}
+                onClick={handleSubmit}
+                disabled={
+                  !hasSelectedRegion || !instruction.trim() || isSubmitting
+                }
+              >
+                {isSubmitting ? "Сохраняем…" : "Обновить фрагмент"}
+              </button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>,
+    document.body,
   );
 };
 
@@ -124,6 +404,8 @@ export const ReferenceTab: FC<ReferenceTabProps> = ({
   blocks,
 }) => {
   const fullPageQuery = useArtifactFileUrl(runId, artifact?.id);
+  const [editingBlock, setEditingBlock] =
+    useState<EditingReferenceBlock | null>(null);
 
   const hasBlocks = blocks.length > 0;
   const hasFullPage = Boolean(artifact);
@@ -184,6 +466,12 @@ export const ReferenceTab: FC<ReferenceTabProps> = ({
                   artifact={block}
                   index={index}
                   onClick={(src) => openGallery(index, src)}
+                  onEdit={(artifactToEdit, artifactIndex) =>
+                    setEditingBlock({
+                      artifact: artifactToEdit,
+                      index: artifactIndex,
+                    })
+                  }
                 />
               ))}
               {isGenerating && <SkeletonBlock index={blocks.length} pending />}
@@ -218,6 +506,14 @@ export const ReferenceTab: FC<ReferenceTabProps> = ({
             </ImageViewerGallery>
           ) : null}
         </section>
+      )}
+
+      {editingBlock && (
+        <ReferenceEditModal
+          runId={runId}
+          editing={editingBlock}
+          onClose={() => setEditingBlock(null)}
+        />
       )}
     </div>
   );
