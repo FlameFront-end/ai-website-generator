@@ -9,7 +9,6 @@ export type RunStatus =
   | "failed"
   | "awaiting_style_selection"
   | "awaiting_reference_approval"
-  | "awaiting_code_approval"
   | "awaiting_final_approval";
 
 export type PipelineStep =
@@ -32,7 +31,6 @@ export type PipelineStep =
   | "screenshots_failed"
   | "visual_qa"
   | "visual_qa_failed"
-  | "awaiting_code_approval"
   | "awaiting_final_approval"
   | "frontend_project_ready"
   | "completed"

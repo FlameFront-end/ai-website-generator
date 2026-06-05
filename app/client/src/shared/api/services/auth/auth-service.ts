@@ -1,4 +1,4 @@
-import { axiosInstance } from "@/api";
+import axiosInstance from "@/api/axios-instance";
 import { API_ENDPOINTS } from "@/model";
 
 import type {

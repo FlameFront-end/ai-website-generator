@@ -1,46 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import type { BriefClarificationAnswer, ClarifyBriefResponse } from "@/api/services/runs";
 
-import { useCreateRunMutation } from "@/api/services/runs";
-import type {
-  BriefClarificationAnswer,
-  BriefClarificationQuestion,
-  ClarifyBriefResponse,
-} from "@/api/services/runs";
-import { runsApi } from "@/shared/api/services/runs/runs-api";
-import { logger } from "@/lib";
-import { ROUTES } from "@/model";
-
-import {
-  createBriefDraftId,
-  deleteBriefDraft,
-  readBriefDraft,
-  saveBriefDraft,
-  type BriefDraft,
-  type DraftAnswerMap,
-} from "../../../lib/brief-drafts";
-import {
-  buildLocalizedBrief,
-  getSuggestedAnswer,
-  MAX_CLARIFICATION_STEPS,
-  normalizeAnswerValue,
-} from "../../../lib/brief-wizard";
-
-type AnswerMap = DraftAnswerMap;
+import { getSuggestedAnswer } from "../../../lib/brief-wizard";
+import { useAnswerHistoryScroll } from "./useAnswerHistoryScroll";
+import { useBriefAnswerState } from "./useBriefAnswerState";
+import { useBriefDraftSession } from "./useBriefDraftSession";
+import { useBriefDraftAutosave } from "./useBriefDraftAutosave";
+import { useBriefWizardProgress } from "./useBriefWizardProgress";
+import { useClarificationFlow } from "./useClarificationFlow";
+import { useCreateRunFromBrief } from "./useCreateRunFromBrief";
 
 export function useBriefWizard(requestedDraftId: string | null) {
-  const navigate = useNavigate();
-  const [, setSearchParams] = useSearchParams();
-  const createRunMutation = useCreateRunMutation();
-
-  const [initialDraft] = useState(() =>
-    requestedDraftId ? readBriefDraft(requestedDraftId) : null,
-  );
-  const [draftId] = useState(
-    () => initialDraft?.id ?? requestedDraftId ?? createBriefDraftId(),
-  );
+  const {
+    deleteCurrentDraft,
+    draftId,
+    initialDraft,
+    persistDraftSearchParam,
+  } = useBriefDraftSession(requestedDraftId);
 
   const [rawBrief, setRawBrief] = useState(initialDraft?.rawBrief ?? "");
   const [siteLanguage, setSiteLanguage] = useState(
@@ -52,113 +29,61 @@ export function useBriefWizard(requestedDraftId: string | null) {
   const [projectTitle, setProjectTitle] = useState(initialDraft?.title ?? "");
   const [clarification, setClarification] =
     useState<ClarifyBriefResponse | null>(initialDraft?.clarification ?? null);
-  const [answers, setAnswers] = useState<BriefClarificationAnswer[]>(
-    initialDraft?.answers ?? [],
-  );
-  const [answerMap, setAnswerMap] = useState<AnswerMap>(
-    initialDraft?.answerMap ?? {},
-  );
+  const answerState = useBriefAnswerState({
+    initialAnswers: initialDraft?.answers ?? [],
+    initialAnswerMap: initialDraft?.answerMap ?? {},
+  });
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(
     initialDraft?.isHistoryExpanded ?? false,
   );
-  const [isClarifying, setIsClarifying] = useState(false);
   const historyListRef = useRef<HTMLDivElement | null>(null);
-
-  // ── Draft auto-save (debounced) ──────────────────────────────────
-
-  useEffect(() => {
-    const hasDraft =
-      rawBrief.trim() ||
-      finalBrief?.trim() ||
-      clarification ||
-      answers.length > 0 ||
-      Object.keys(answerMap).length > 0;
-
-    if (!hasDraft) return;
-
-    if (!requestedDraftId) {
-      setSearchParams({ draft: draftId }, { replace: true });
-    }
-
-    const timer = setTimeout(() => {
-      const draft: BriefDraft = {
-        id: draftId,
-        title: projectTitle.trim() || null,
-        rawBrief,
-        siteLanguage,
-        finalBrief,
-        clarification,
-        answers,
-        answerMap,
-        isHistoryExpanded,
-        createdAt: initialDraft?.createdAt ?? new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      saveBriefDraft(draft);
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [
+  const clarificationFlow = useClarificationFlow();
+  const createRunFromBrief = useCreateRunFromBrief({
     draftId,
-    initialDraft?.createdAt,
-    requestedDraftId,
+    projectTitle,
+    siteLanguage,
+  });
+
+  useBriefDraftAutosave({
+    draftId,
+    initialCreatedAt: initialDraft?.createdAt,
     rawBrief,
     siteLanguage,
     finalBrief,
     projectTitle,
     clarification,
-    answers,
-    answerMap,
+    answers: answerState.answers,
+    answerMap: answerState.answerMap,
     isHistoryExpanded,
-    setSearchParams,
-  ]);
+    onDraftCreated: persistDraftSearchParam,
+  });
 
-  // ── Scroll history ────────────────────────────────────────────────
+  useAnswerHistoryScroll(
+    historyListRef,
+    answerState.answers.length,
+    isHistoryExpanded,
+  );
 
-  useEffect(() => {
-    const historyList = historyListRef.current;
-    if (!historyList) return;
+  const applyClarification = (result: ClarifyBriefResponse) => {
+    setClarification(result);
+    answerState.setAnswerMap({});
 
-    requestAnimationFrame(() => {
-      historyList.scrollTo({
-        top: historyList.scrollHeight,
-        behavior: "smooth",
-      });
-    });
-  }, [answers.length, isHistoryExpanded]);
+    if (result.status === "ready" && result.finalBrief) {
+      setFinalBrief(result.finalBrief);
+      setProjectTitle(result.projectTitle ?? "");
+    }
+  };
 
-  // ── Clarification API ─────────────────────────────────────────────
-
-  const runClarification = async (
+  const requestClarification = async (
     brief: string,
     nextAnswers: BriefClarificationAnswer[],
   ) => {
-    setIsClarifying(true);
-    try {
-      const result = await runsApi.clarifyBrief({
-        brief,
-        siteLanguage,
-        answers: nextAnswers.map((a) => ({
-          questionId: a.questionId,
-          question: a.question,
-          value: a.value,
-          skipped: a.skipped,
-        })),
-      });
-      setClarification(result);
-      setAnswerMap({});
-
-      if (result.status === "ready" && result.finalBrief) {
-        setFinalBrief(result.finalBrief);
-        setProjectTitle(result.projectTitle ?? "");
-      }
-    } catch (error) {
-      logger.error("brief:clarify", error);
-      toast.error("Не удалось уточнить бриф");
-    } finally {
-      setIsClarifying(false);
-    }
+    const result = await clarificationFlow.runClarification({
+      brief,
+      siteLanguage,
+      answers: nextAnswers,
+    });
+    if (result) applyClarification(result);
   };
 
   const handleInitialBrief = (brief: string) => {
@@ -166,9 +91,28 @@ export function useBriefWizard(requestedDraftId: string | null) {
     setFinalBrief(null);
     setProjectTitle("");
     setClarification(null);
-    setAnswers([]);
-    setAnswerMap({});
-    void runClarification(brief, []);
+    answerState.resetAnswers();
+    void requestClarification(brief, []);
+  };
+
+  const updateDraftBrief = (brief: string) => {
+    setRawBrief(brief);
+  };
+
+  const updateSiteLanguage = (language: string) => {
+    setSiteLanguage(language);
+  };
+
+  const updateFinalBrief = (brief: string) => {
+    setFinalBrief(brief);
+  };
+
+  const updateProjectTitle = (title: string) => {
+    setProjectTitle(title);
+  };
+
+  const toggleHistory = () => {
+    setIsHistoryExpanded((current) => !current);
   };
 
   const submitAnswers = (
@@ -178,29 +122,13 @@ export function useBriefWizard(requestedDraftId: string | null) {
     const question = clarification?.questions[0];
     if (!question) return;
 
-    const nextAnswer: BriefClarificationAnswer = {
-      questionId: question.id,
-      question: question.question,
-      type: question.type,
-      description: question.description,
-      required: question.required,
-      options: question.options,
-      placeholder: question.placeholder,
-      suggestedAnswer: question.suggestedAnswer,
-      min: question.min,
-      max: question.max,
-      value: isSkipped
-        ? "skipped"
-        : (overrideValue ??
-          normalizeAnswerValue(question, answerMap[question.id])),
-      skipped: isSkipped,
-    };
-
-    const mergedAnswers = [...answers, nextAnswer];
-    setAnswers(mergedAnswers);
-    setAnswerMap({});
+    const mergedAnswers = answerState.submitAnswer({
+      question,
+      overrideValue,
+      isSkipped,
+    });
     setClarification((prev) => (prev ? { ...prev, questions: [] } : prev));
-    void runClarification(rawBrief, mergedAnswers);
+    void requestClarification(rawBrief, mergedAnswers);
   };
 
   const skipCurrentQuestion = () => {
@@ -208,13 +136,13 @@ export function useBriefWizard(requestedDraftId: string | null) {
   };
 
   const editAnswerFrom = (index: number) => {
-    const answer = answers[index];
+    const answer = answerState.answers[index];
     if (!answer?.type) return;
     const questionType = answer.type;
 
-    const nextAnswers = answers.slice(0, index);
-    setAnswers(nextAnswers);
-    setAnswerMap({ [answer.questionId]: answer.value });
+    const nextAnswers = answerState.answers.slice(0, index);
+    answerState.setAnswers(nextAnswers);
+    answerState.setAnswerMap({ [answer.questionId]: answer.value });
     setClarification((prev) =>
       prev
         ? {
@@ -239,122 +167,66 @@ export function useBriefWizard(requestedDraftId: string | null) {
   };
 
   const handleCreateRun = (brief: string) => {
-    const localizedBrief = buildLocalizedBrief(brief, siteLanguage);
-    createRunMutation.mutate(
-      { brief: localizedBrief, displayName: projectTitle.trim() || null },
-      {
-        onSuccess: (run) => {
-          deleteBriefDraft(draftId);
-          void navigate(ROUTES.runDetails(run.id));
-        },
-        onError: () => toast.error("Не удалось создать проект"),
-      },
-    );
+    createRunFromBrief.createRun(brief);
   };
 
   const resetDraft = () => {
-    deleteBriefDraft(draftId);
-    setSearchParams({}, { replace: true });
+    deleteCurrentDraft();
     setRawBrief("");
     setSiteLanguage("ru");
     setFinalBrief(null);
     setProjectTitle("");
     setClarification(null);
-    setAnswers([]);
-    setAnswerMap({});
+    answerState.resetAnswers();
     setIsHistoryExpanded(false);
   };
 
-  const updateAnswer = (
-    question: BriefClarificationQuestion,
-    value: string | number | boolean,
-  ) => {
-    setAnswerMap((prev) => {
-      if (question.type !== "multi_choice") {
-        return { ...prev, [question.id]: value };
-      }
-
-      const current = Array.isArray(prev[question.id])
-        ? (prev[question.id] as string[])
-        : [];
-      const option = String(value);
-      const next = current.includes(option)
-        ? current.filter((item) => item !== option)
-        : [...current, option];
-
-      return { ...prev, [question.id]: next };
-    });
-  };
+  const progress = useBriefWizardProgress({
+    answersCount: answerState.answers.length,
+    answerMap: answerState.answerMap,
+    clarification,
+  });
 
   const suggestCurrentAnswer = () => {
-    if (!currentQuestion) return;
-    setAnswerMap((prev) => ({
-      ...prev,
-      [currentQuestion.id]: getSuggestedAnswer(currentQuestion),
-    }));
+    if (!progress.currentQuestion) return;
+    answerState.setAnswerMap({
+      ...answerState.answerMap,
+      [progress.currentQuestion.id]: getSuggestedAnswer(progress.currentQuestion),
+    });
   };
-
-  // ── Derived state ─────────────────────────────────────────────────
-
-  const currentQuestion = clarification?.questions[0] ?? null;
-  const currentQuestionKey = currentQuestion
-    ? `${currentQuestion.id}:${currentQuestion.question}`
-    : "";
-  const currentAnswer = currentQuestion
-    ? answerMap[currentQuestion.id]
-    : undefined;
-  const displayedStep = Math.min(answers.length + 1, MAX_CLARIFICATION_STEPS);
-  const estimatedTotalQuestions = Math.min(
-    MAX_CLARIFICATION_STEPS,
-    Math.max(
-      displayedStep,
-      clarification?.estimatedTotalQuestions ?? answers.length + 2,
-    ),
-  );
-  const progressPercent = Math.min(
-    100,
-    Math.max(20, Math.round((displayedStep / estimatedTotalQuestions) * 100)),
-  );
-  const canSubmitAnswers = Boolean(
-    currentQuestion &&
-    (!currentQuestion.required ||
-      (Array.isArray(currentAnswer)
-        ? currentAnswer.length > 0
-        : currentAnswer !== undefined && currentAnswer !== "")),
-  );
 
   return {
     rawBrief,
     siteLanguage,
-    setSiteLanguage,
-    setRawBrief,
     finalBrief,
-    setFinalBrief,
     projectTitle,
-    setProjectTitle,
     clarification,
-    answers,
-    answerMap,
+    answers: answerState.answers,
+    answerMap: answerState.answerMap,
     isHistoryExpanded,
-    setIsHistoryExpanded,
-    isClarifying,
+    isClarifying: clarificationFlow.isClarifying,
     historyListRef,
-    isCreating: createRunMutation.isPending,
+    isCreating: createRunFromBrief.isCreating,
 
     handleInitialBrief,
+    updateDraftBrief,
+    updateSiteLanguage,
+    updateFinalBrief,
+    updateProjectTitle,
+    toggleHistory,
     submitAnswers,
     skipCurrentQuestion,
     editAnswerFrom,
     handleCreateRun,
     resetDraft,
-    updateAnswer,
+    updateAnswer: answerState.updateAnswer,
     suggestCurrentAnswer,
 
-    currentQuestion,
-    currentQuestionKey,
-    canSubmitAnswers,
-    displayedStep,
-    estimatedTotalQuestions,
-    progressPercent,
+    currentQuestion: progress.currentQuestion,
+    currentQuestionKey: progress.currentQuestionKey,
+    canSubmitAnswers: progress.canSubmitAnswers,
+    displayedStep: progress.displayedStep,
+    estimatedTotalQuestions: progress.estimatedTotalQuestions,
+    progressPercent: progress.progressPercent,
   };
 }

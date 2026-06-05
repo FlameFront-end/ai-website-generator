@@ -1,19 +1,23 @@
-/* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */
 import type { FC } from "react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+
+import { toast } from "react-toastify";
 
 import {
   useArtifactContentQuery,
-  useArtifactFileUrl,
+  useArtifactFileUrls,
+  useSelectStyleMutation,
 } from "@/api/services/runs";
-import type { RunArtifact, StyleVariant } from "@/api/services/runs";
-import { isStyleVariantsResponse, isStyleVariant, parseJsonSafe } from "@/api";
-import { runsApi } from "@/shared/api/services/runs/runs-api";
+import type { RunArtifact } from "@/api/services/runs";
 import { ImageViewerGallery } from "@/kit";
+import { logger } from "@/lib";
 
+import { StyleCard } from "./components/StyleCard";
+import { StyleSkeletonBlock } from "./components/StyleSkeletonBlock";
+import { parseSelectedStyle, parseVariants } from "./lib/style-variant-parsing";
 import styleTabStyles from "./StyleTab.module.scss";
-import refStyles from "../ReferenceTab/ReferenceTab.module.scss";
+import visualStyles from "./components/StyleVisual.module.scss";
 
 interface StyleTabProps {
   runId: string;
@@ -21,148 +25,10 @@ interface StyleTabProps {
   variantsArtifact: RunArtifact | undefined;
   imageArtifacts: RunArtifact[];
   selectedStyleArtifact: RunArtifact | undefined;
-  onSelected?: () => void;
-}
-
-interface StyleCardProps {
-  runId: string;
-  variant: StyleVariant;
-  artifact: RunArtifact | undefined;
-  selected: boolean;
-  isSelecting: boolean;
-  canSelect: boolean;
-  index: number;
-  onImageClick?: (src: string) => void;
-  onImageUrlChange?: (artifactId: string, src: string) => void;
-  onSelect: (variantId: string) => void;
+  onSelected?: () => Promise<void> | void;
 }
 
 const PLACEHOLDER_VARIANTS_WHEN_EMPTY = 3;
-
-const SkeletonBlock: FC<{ index: number; pending?: boolean }> = ({
-  index,
-  pending,
-}) => (
-  <figure
-    className={refStyles.block}
-    aria-label={`Вариант визуального стиля ${index + 1} (генерация)`}
-  >
-    <header className={refStyles.skeletonHeader}>
-      <div className={refStyles.skeletonTitle}>
-        <span className={refStyles.skeletonPill} />
-        <span className={refStyles.skeletonType} />
-      </div>
-      <span className={refStyles.skeletonFile} />
-    </header>
-    <div className={refStyles.skeletonImage}>
-      {pending && (
-        <span className={refStyles.skeletonCaption}>
-          <span className={refStyles.spinner} aria-hidden />
-          Готовим вариант стиля {index + 1}…
-        </span>
-      )}
-    </div>
-  </figure>
-);
-
-function parseVariants(content?: string): StyleVariant[] {
-  if (!content) return [];
-  const parsed = parseJsonSafe(content, isStyleVariantsResponse);
-  return parsed?.variants ?? [];
-}
-
-function parseSelectedStyle(content?: string): StyleVariant | null {
-  if (!content) return null;
-  return parseJsonSafe(content, isStyleVariant);
-}
-
-const StyleCard: FC<StyleCardProps> = ({
-  runId,
-  variant,
-  artifact,
-  selected,
-  isSelecting,
-  canSelect,
-  index,
-  onImageClick,
-  onImageUrlChange,
-  onSelect,
-}) => {
-  const imageQuery = useArtifactFileUrl(runId, artifact?.id);
-
-  useEffect(() => {
-    if (artifact?.id && imageQuery.url) {
-      onImageUrlChange?.(artifact.id, imageQuery.url);
-    }
-  }, [artifact?.id, imageQuery.url, onImageUrlChange]);
-
-  return (
-    <article
-      className={[
-        refStyles.block,
-        styleTabStyles.card,
-        selected ? styleTabStyles.selectedCard : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      <header className={refStyles.blockHeader}>
-        <div className={refStyles.blockTitle}>
-          <span className={refStyles.blockIndex}>
-            {String(index + 1).padStart(2, "0")}
-          </span>
-          <span className={refStyles.blockType}>{variant.name}</span>
-        </div>
-        <span className={styleTabStyles.cardMeta}>
-          {artifact?.path.split("/").pop() ?? variant.id}
-        </span>
-      </header>
-
-      <div className={styleTabStyles.imageWrap}>
-        {imageQuery.url ? (
-          <img
-            className={refStyles.blockImage}
-            src={imageQuery.url}
-            alt={variant.name}
-            onClick={() => onImageClick?.(imageQuery.url || "")}
-            style={{ cursor: "pointer" }}
-          />
-        ) : (
-          <div className={refStyles.skeletonImage}>
-            <span className={refStyles.skeletonCaption}>
-              <span className={refStyles.spinner} aria-hidden />
-              Генерация превью…
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className={styleTabStyles.cardBody}>
-        <div className={styleTabStyles.text}>
-          <h3>{variant.name}</h3>
-          <p>{variant.description}</p>
-        </div>
-
-        <div className={styleTabStyles.palette}>
-          {variant.colorPalette.map((color) => (
-            <span key={color} style={{ background: color }} title={color} />
-          ))}
-        </div>
-
-        {canSelect && (
-          <button
-            type="button"
-            className={styleTabStyles.selectButton}
-            disabled={selected || isSelecting}
-            onClick={() => onSelect(variant.id)}
-          >
-            <span>{selected ? "Стиль выбран" : "Выбрать этот стиль"}</span>
-          </button>
-        )}
-      </div>
-    </article>
-  );
-};
 
 export const StyleTab: FC<StyleTabProps> = ({
   runId,
@@ -173,14 +39,22 @@ export const StyleTab: FC<StyleTabProps> = ({
   onSelected,
 }) => {
   const [selectingId, setSelectingId] = useState<string | null>(null);
-  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [optimisticSelection, setOptimisticSelection] = useState<{
+    runId: string;
+    variantId: string;
+  } | null>(null);
   const canSelect = status === "awaiting_style_selection";
   const variantsQuery = useArtifactContentQuery(runId, variantsArtifact?.id);
   const selectedQuery = useArtifactContentQuery(
     runId,
     selectedStyleArtifact?.id,
   );
+  const selectStyleMutation = useSelectStyleMutation();
+  const imageArtifactIds = useMemo(
+    () => imageArtifacts.map((artifact) => artifact.id),
+    [imageArtifacts],
+  );
+  const imageUrls = useArtifactFileUrls(runId, imageArtifactIds);
 
   const variants = useMemo(
     () => parseVariants(variantsQuery.data?.content),
@@ -190,7 +64,12 @@ export const StyleTab: FC<StyleTabProps> = ({
     () => parseSelectedStyle(selectedQuery.data?.content),
     [selectedQuery.data?.content],
   );
-  const selectedStyleId = localSelectedId ?? selectedStyle?.id ?? null;
+  const optimisticSelectedId =
+    optimisticSelection?.runId === runId &&
+    optimisticSelection.variantId !== selectedStyle?.id
+      ? optimisticSelection.variantId
+      : null;
+  const selectedStyleId = optimisticSelectedId ?? selectedStyle?.id ?? null;
 
   const imageByVariantId = useMemo(() => {
     const map = new Map<string, RunArtifact>();
@@ -205,45 +84,39 @@ export const StyleTab: FC<StyleTabProps> = ({
   }, [imageArtifacts]);
 
   const handleSelect = async (variantId: string) => {
-    setLocalSelectedId(variantId);
+    setOptimisticSelection({ runId, variantId });
     setSelectingId(variantId);
     try {
-      await runsApi.selectStyle(runId, { styleVariantId: variantId });
-      onSelected?.();
+      await selectStyleMutation.mutateAsync({
+        runId,
+        payload: { styleVariantId: variantId },
+      });
+      await onSelected?.();
+      setOptimisticSelection(null);
     } catch (error) {
-      setLocalSelectedId(selectedStyle?.id ?? null);
-      throw error;
+      logger.error("run:select-style", error, { runId, variantId });
+      setOptimisticSelection(null);
+      toast.error("Не удалось выбрать стиль");
     } finally {
       setSelectingId(null);
     }
   };
 
-  const handleImageUrlChange = useCallback(
-    (artifactId: string, src: string) => {
-      setImageUrls((current) =>
-        current[artifactId] === src
-          ? current
-          : { ...current, [artifactId]: src },
-      );
-    },
-    [],
-  );
-
   if (variantsQuery.isLoading || !variantsArtifact) {
     return (
       <div className={styleTabStyles.root}>
-        <div className={refStyles.root}>
-          <div className={refStyles.header}>
+        <div className={visualStyles.root}>
+          <div className={visualStyles.header}>
             <h2>Выберите визуальный стиль сайта</h2>
-            <span className={refStyles.statusLine}>
-              <span className={refStyles.spinner} aria-hidden />
+            <span className={visualStyles.statusLine}>
+              <span className={visualStyles.spinner} aria-hidden />
               Генерация…
             </span>
           </div>
-          <div className={refStyles.blocks}>
+          <div className={visualStyles.blocks}>
             {Array.from({ length: PLACEHOLDER_VARIANTS_WHEN_EMPTY }).map(
               (_, index) => (
-                <SkeletonBlock
+                <StyleSkeletonBlock
                   key={`placeholder-${index}`}
                   index={index}
                   pending={index === 0}
@@ -266,10 +139,10 @@ export const StyleTab: FC<StyleTabProps> = ({
 
   return (
     <div className={styleTabStyles.root}>
-      <div className={refStyles.root}>
-        <div className={refStyles.header}>
+      <div className={visualStyles.root}>
+        <div className={visualStyles.header}>
           <h2>Выберите визуальный стиль сайта</h2>
-          <span className={refStyles.headerMeta}>
+          <span className={visualStyles.headerMeta}>
             {variants.length} вариантов
           </span>
         </div>
@@ -284,22 +157,21 @@ export const StyleTab: FC<StyleTabProps> = ({
           })}
         >
           {({ openGallery }) => (
-            <div className={refStyles.blocks}>
+            <div className={visualStyles.blocks}>
               {variants.map((variant, index) => {
                 const artifact = imageByVariantId.get(variant.id);
 
                 return (
                   <StyleCard
                     key={variant.id}
-                    runId={runId}
                     variant={variant}
                     artifact={artifact}
+                    imageUrl={artifact ? imageUrls[artifact.id] : undefined}
                     selected={selectedStyleId === variant.id}
                     isSelecting={selectingId === variant.id}
                     canSelect={canSelect}
                     index={index}
                     onImageClick={(src) => openGallery(index, src)}
-                    onImageUrlChange={handleImageUrlChange}
                     onSelect={handleSelect}
                   />
                 );

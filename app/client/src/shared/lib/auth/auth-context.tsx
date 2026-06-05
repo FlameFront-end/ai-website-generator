@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { User } from "@/api/services/auth";
-import { queryClient, isUser } from "@/api";
+import { isUser } from "@/api";
+import { queryClient } from "@/api/query-client";
 import { safeStorage } from "@/lib";
 
 import { AuthContext } from "./auth-types";

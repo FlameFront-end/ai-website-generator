@@ -12,19 +12,25 @@ import {
 } from "../../lib/constants";
 import { CodeViewer } from "../CodeViewer/CodeViewer";
 
+import { resolveArtifactFileQueryId } from "./artifact-viewer-helpers";
 import styles from "./ArtifactViewer.module.scss";
 
 export function ArtifactViewer({ runId, artifact }: ArtifactViewerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const isImage =
-    artifact.mimeType && IMAGE_MIME_TYPES.includes(artifact.mimeType);
-  const isText =
-    artifact.mimeType && TEXT_MIME_TYPES.includes(artifact.mimeType);
+  const isImage = Boolean(
+    artifact.mimeType && IMAGE_MIME_TYPES.includes(artifact.mimeType),
+  );
+  const isText = Boolean(
+    artifact.mimeType && TEXT_MIME_TYPES.includes(artifact.mimeType),
+  );
   const contentQuery = useArtifactContentQuery(
     runId,
     isOpen && isText ? artifact.id : undefined,
   );
-  const fileQuery = useArtifactFileUrl(runId, artifact.id);
+  const fileQuery = useArtifactFileUrl(
+    runId,
+    resolveArtifactFileQueryId(isOpen, isText, artifact.id),
+  );
   const fileName = artifact.path.split("/").pop() ?? artifact.path;
   const ext = fileName.split(".").pop() ?? "";
   const lang = getLanguageFromPath(fileName);

@@ -8,7 +8,7 @@ import {
   type IconProps,
 } from "react-toastify";
 
-import { queryClient } from "@/api";
+import { queryClient } from "@/api/query-client";
 import { useTheme } from "@/hooks";
 import { AuthProvider } from "@/lib";
 

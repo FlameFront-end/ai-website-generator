@@ -36,9 +36,13 @@ describe("isTabAvailable", () => {
     ).toBe(false);
   });
 
-  it("code tab is available at awaiting_code_approval", () => {
-    expect(isTabAvailable("code", "running", "awaiting_code_approval")).toBe(
-      true,
+  it("code tab is available once build starts", () => {
+    expect(isTabAvailable("code", "running", "build_project")).toBe(true);
+  });
+
+  it("code tab is unavailable before build starts", () => {
+    expect(isTabAvailable("code", "running", "prepare_frontend_project")).toBe(
+      false,
     );
   });
 
@@ -51,9 +55,7 @@ describe("isTabAvailable", () => {
   });
 
   it("uses currentStep for failed status", () => {
-    expect(isTabAvailable("code", "failed", "awaiting_code_approval")).toBe(
-      true,
-    );
+    expect(isTabAvailable("code", "failed", "build_project")).toBe(true);
     expect(isTabAvailable("code", "failed", "queued")).toBe(false);
   });
 

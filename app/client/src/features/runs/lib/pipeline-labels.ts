@@ -11,7 +11,6 @@ export const STATUS_LABELS: Record<RunStatus, string> = {
   failed: "Ошибка",
   awaiting_style_selection: "Выбор визуального стиля",
   awaiting_reference_approval: "Ожидание подтверждения",
-  awaiting_code_approval: "Ожидание подтверждения",
   awaiting_final_approval: "Ожидание подтверждения",
 };
 
@@ -35,7 +34,6 @@ export const STEP_LABELS: Record<PipelineStep, string> = {
   screenshots_failed: "Ошибка создания скриншотов",
   visual_qa: "Визуальный анализ",
   visual_qa_failed: "Ошибка визуального анализа",
-  awaiting_code_approval: "Ожидание подтверждения кода",
   awaiting_final_approval: "Ожидание финального подтверждения",
   frontend_project_ready: "Клиентский проект готов",
   completed: "Завершено",

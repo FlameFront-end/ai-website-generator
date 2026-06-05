@@ -13,7 +13,6 @@ interface ApprovalPanelProps {
 const STEP_TITLES: Record<string, string> = {
   awaiting_style_selection: "Стилистика",
   awaiting_reference_approval: "Визуальный референс",
-  awaiting_code_approval: "Код проекта",
   awaiting_final_approval: "Финальный результат",
 };
 

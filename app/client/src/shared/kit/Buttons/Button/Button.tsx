@@ -2,8 +2,7 @@ import type { ButtonHTMLAttributes, FC, ReactNode } from "react";
 
 import clsx from "clsx";
 
-import { Spinner } from "@/kit";
-
+import { Spinner } from "../../UI/Spinner/Spinner";
 import styles from "./Button.module.scss";
 
 export type ButtonVariant =

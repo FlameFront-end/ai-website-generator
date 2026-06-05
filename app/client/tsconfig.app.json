@@ -20,6 +20,7 @@
       "@/hooks": ["src/shared/hooks"],
       "@/model": ["src/shared/model"],
       "@/api": ["src/shared/api"],
+      "@/api/*": ["src/shared/api/*"],
       "@/api/services": ["src/shared/api/services"],
       "@/api/services/*": ["src/shared/api/services/*"],
       "@/*": ["src/*"]

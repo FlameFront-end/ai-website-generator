@@ -26,7 +26,6 @@ export const STEP_PROGRESS: Record<string, number> = {
   screenshots_failed: 100,
   visual_qa_failed: 100,
   awaiting_reference_approval: 60,
-  awaiting_code_approval: 75,
   awaiting_final_approval: 98,
 };
 
@@ -75,7 +74,6 @@ const STEP_ORDER: string[] = [
   "awaiting_reference_approval",
   "prepare_frontend_project",
   // code tab unlocks here
-  "awaiting_code_approval",
   "build_project",
   "built",
   "take_screenshots",
@@ -94,7 +92,7 @@ const TAB_MIN_STEP: Record<RunDetailsTab, number> = {
   overview: 0,
   style: STEP_ORDER.indexOf("generate_style_variants"),
   reference: STEP_ORDER.indexOf("prepare_reference_image"),
-  code: STEP_ORDER.indexOf("awaiting_code_approval"),
+  code: STEP_ORDER.indexOf("build_project"),
   result: STEP_ORDER.indexOf("screenshots_ready"),
   artifacts: 0,
   logs: 0,

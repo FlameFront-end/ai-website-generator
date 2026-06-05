@@ -45,8 +45,8 @@ function NewRunDraftPage({
           brief={w.rawBrief}
           siteLanguage={w.siteLanguage}
           isSubmitting={w.isClarifying}
-          onLanguageChange={w.setSiteLanguage}
-          onDraftChange={w.setRawBrief}
+          onLanguageChange={w.updateSiteLanguage}
+          onDraftChange={w.updateDraftBrief}
           onSubmit={w.handleInitialBrief}
         />
       )}
@@ -72,7 +72,7 @@ function NewRunDraftPage({
             answers={w.answers}
             isExpanded={w.isHistoryExpanded}
             historyListRef={w.historyListRef}
-            onToggleExpanded={() => w.setIsHistoryExpanded((v) => !v)}
+            onToggleExpanded={w.toggleHistory}
             onEditFrom={w.editAnswerFrom}
           />
 
@@ -146,8 +146,8 @@ function NewRunDraftPage({
           finalBrief={w.finalBrief}
           projectTitle={w.projectTitle}
           isCreating={w.isCreating}
-          onFinalBriefChange={w.setFinalBrief}
-          onProjectTitleChange={w.setProjectTitle}
+          onFinalBriefChange={w.updateFinalBrief}
+          onProjectTitleChange={w.updateProjectTitle}
           onReset={w.resetDraft}
           onCreateRun={w.handleCreateRun}
         />

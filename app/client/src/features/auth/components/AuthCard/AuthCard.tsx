@@ -1,6 +1,6 @@
 import type { FC, FormEventHandler, ReactNode } from "react";
 
-import { Logo } from "@/shared/widgets/Layout/Logo";
+import { Logo } from "@/widgets";
 
 import styles from "./AuthCard.module.scss";
 

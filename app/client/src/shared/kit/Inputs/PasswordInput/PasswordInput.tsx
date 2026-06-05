@@ -3,8 +3,7 @@ import { forwardRef, useState } from "react";
 
 import { Eye, EyeOff } from "lucide-react";
 
-import { IconButton } from "@/kit";
-
+import { IconButton } from "../../Buttons/IconButton/IconButton";
 import { Input } from "../Input/Input";
 
 type PasswordInputProps = Omit<

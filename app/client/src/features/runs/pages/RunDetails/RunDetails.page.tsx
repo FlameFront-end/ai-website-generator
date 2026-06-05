@@ -1,86 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Link, useParams } from "react-router-dom";
-import { toast } from "react-toastify";
 
 import { useRunQuery, useRunStatusQuery } from "@/api/services/runs";
-import { runsApi } from "@/shared/api/services/runs/runs-api";
 import { EmptyState, ErrorBoundary } from "@/kit";
-import { logger } from "@/lib";
 import { ROUTES } from "@/model";
 
-import { DeleteRunDialog, ProgressBar, RunHeader, RunTabs } from "./components";
-import { useActiveTab, useRunActions, useRunArtifacts } from "./hooks";
 import {
-  ArtifactsTab,
-  CodeTab,
-  LogsTab,
-  OverviewTab,
-  ReferenceTab,
-  ResultTab,
-  StyleTab,
-} from "./tabs";
+  DeleteRunDialog,
+  ProgressBar,
+  RunDetailsTabContent,
+  RunHeader,
+  RunTabs,
+} from "./components";
+import {
+  useActiveTab,
+  useRunActions,
+  useRunApproval,
+  useRunArtifacts,
+} from "./hooks";
+import {
+  CODE_RESTARTABLE_STATUSES,
+  getEffectiveCurrentStep,
+  RESTARTABLE_STATUSES,
+  STATUS_TO_TAB,
+} from "./lib/run-status-flow";
 import styles from "./RunDetails.module.scss";
-
-const STATUS_TO_TAB = {
-  awaiting_style_selection: "style",
-  awaiting_reference_approval: "reference",
-  awaiting_final_approval: "result",
-} as const;
-
-const RESTARTABLE_STATUSES = new Set<string>([
-  "awaiting_style_selection",
-  "awaiting_reference_approval",
-  "failed",
-]);
-
-const CODE_RESTARTABLE_STATUSES = new Set([
-  "awaiting_code_approval",
-  "awaiting_final_approval",
-  "build_failed",
-  "visual_failed",
-  "needs_manual_review",
-  "failed",
-  "completed",
-]);
 
 export default function RunDetailsPage() {
   const { runId = "" } = useParams();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
 
   const runQuery = useRunQuery(runId);
   useRunStatusQuery(runId);
   const { activeTab, setActiveTab } = useActiveTab();
   const actions = useRunActions();
   const artifacts = useRunArtifacts(runQuery.data);
+  const approval = useRunApproval(() => void runQuery.refetch());
   const previousStatusRef = useRef<string | null>(null);
-
-  const getStepFromStatus = (
-    status: string,
-  ): "style" | "reference" | "code" | "final" | null => {
-    if (status === "awaiting_style_selection") return "style";
-    if (status === "awaiting_reference_approval") return "reference";
-    if (status === "awaiting_final_approval") return "final";
-    return null;
-  };
-
-  const handleApprove = async () => {
-    if (!run) return;
-    const step = getStepFromStatus(run.status);
-    if (!step) return;
-
-    setIsApproving(true);
-    try {
-      await runsApi.approveStep(run.id, step);
-      void runQuery.refetch();
-    } catch (error) {
-      logger.error("run:approve", error, { runId: run.id, step });
-      toast.error("Не удалось подтвердить этап");
-    } finally {
-      setIsApproving(false);
-    }
-  };
 
   useEffect(() => {
     const status = runQuery.data?.status;
@@ -163,50 +120,18 @@ export default function RunDetailsPage() {
         onChange={setActiveTab}
         status={run.status}
         currentStep={effectiveCurrentStep}
-        onApprove={handleApprove}
-        isApproving={isApproving}
+        onApprove={() => void approval.approveCurrentStep(run)}
+        isApproving={approval.isApproving}
       />
 
       <ErrorBoundary key={activeTab}>
         <div className={styles.tabContent}>
-          {activeTab === "overview" && <OverviewTab run={run} />}
-
-          {activeTab === "reference" && (
-            <ReferenceTab
-              runId={run.id}
-              artifact={artifacts.reference_image}
-              blocks={artifacts.reference_blocks}
-            />
-          )}
-
-          {activeTab === "result" && (
-            <ResultTab
-              runId={run.id}
-              desktopScreenshot={artifacts.desktop_screenshot}
-              mobileScreenshot={artifacts.mobile_screenshot}
-              diffImage={artifacts.diff_image}
-              visualReport={artifacts.visual_report}
-            />
-          )}
-
-          {activeTab === "style" && (
-            <StyleTab
-              runId={run.id}
-              status={run.status}
-              variantsArtifact={artifacts.style_variants}
-              imageArtifacts={artifacts.style_variant_images}
-              selectedStyleArtifact={artifacts.selected_style}
-              onSelected={() => void runQuery.refetch()}
-            />
-          )}
-
-          {activeTab === "code" && <CodeTab runId={run.id} />}
-
-          {activeTab === "artifacts" && <ArtifactsTab run={run} />}
-
-          {activeTab === "logs" && (
-            <LogsTab runId={run.id} buildLogArtifact={artifacts.build_log} />
-          )}
+          <RunDetailsTabContent
+            activeTab={activeTab}
+            artifacts={artifacts}
+            run={run}
+            onStyleSelected={() => runQuery.refetch().then(() => undefined)}
+          />
         </div>
       </ErrorBoundary>
 
@@ -222,31 +147,4 @@ export default function RunDetailsPage() {
       />
     </section>
   );
-}
-
-function getEffectiveCurrentStep(
-  currentStep: string | null | undefined,
-  artifacts: {
-    hasStyleVariants: boolean;
-    hasReferenceImage: boolean;
-    hasFrontendProject: boolean;
-  },
-): string {
-  if (currentStep && currentStep !== "pipeline_failed") {
-    return currentStep;
-  }
-
-  if (!artifacts.hasStyleVariants) {
-    return "queued";
-  }
-
-  if (!artifacts.hasReferenceImage) {
-    return "awaiting_style_selection";
-  }
-
-  if (!artifacts.hasFrontendProject) {
-    return "awaiting_reference_approval";
-  }
-
-  return "awaiting_code_approval";
 }

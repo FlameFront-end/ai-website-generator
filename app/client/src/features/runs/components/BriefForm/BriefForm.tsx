@@ -24,6 +24,7 @@ export const BriefForm: FC<BriefFormProps> = ({
   onSubmit,
 }) => {
   const submitBrief = () => {
+    if (isSubmitting) return;
     const trimmed = brief.trim();
     if (trimmed) onSubmit(trimmed);
   };

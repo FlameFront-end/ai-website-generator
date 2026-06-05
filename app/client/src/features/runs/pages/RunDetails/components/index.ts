@@ -6,3 +6,4 @@ export { FileTree } from "./FileTree/FileTree";
 export { ProgressBar } from "./ProgressBar/ProgressBar";
 export { RunHeader } from "./RunHeader/RunHeader";
 export { RunTabs } from "./RunTabs/RunTabs";
+export { RunDetailsTabContent } from "./RunDetailsTabContent/RunDetailsTabContent";

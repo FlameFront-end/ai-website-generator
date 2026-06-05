@@ -1,8 +1,7 @@
 import type { FC, ReactNode } from "react";
 import { useEffect, useRef } from "react";
 
-import { Button } from "@/kit";
-
+import { Button } from "../../Buttons/Button/Button";
 import styles from "./Modal.module.scss";
 
 export interface ModalProps {
