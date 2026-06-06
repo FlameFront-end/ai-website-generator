@@ -18,6 +18,7 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   @MaxLength(1_400_000, { message: 'Avatar is too large' })
+  /** Base64 data URI, not a remote URL. */
   @Matches(/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/]+={0,2}$/i, {
     message: 'Invalid avatar format',
   })

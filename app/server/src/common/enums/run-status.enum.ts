@@ -9,6 +9,5 @@ export enum RunStatus {
   Failed = 'failed',
   AwaitingStyleSelection = 'awaiting_style_selection',
   AwaitingReferenceApproval = 'awaiting_reference_approval',
-  AwaitingCodeApproval = 'awaiting_code_approval',
   AwaitingFinalApproval = 'awaiting_final_approval',
 }

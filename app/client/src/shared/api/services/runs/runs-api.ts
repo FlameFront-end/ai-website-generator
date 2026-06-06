@@ -13,8 +13,8 @@ import type {
   EditReferenceBlockRequest,
   EditReferenceBlockResponse,
   Run,
+  RunActionResponse,
   RunLogsResponse,
-  RunStatus,
   RunStatusResponse,
   SelectStyleRequest,
   StyleVariantsResponse,
@@ -106,40 +106,30 @@ export const runsApi = {
     return data;
   },
 
-  async rebuildRun(runId: string): Promise<{ id: string; status: RunStatus }> {
-    const { data } = await axiosInstance.post<{
-      id: string;
-      status: RunStatus;
-    }>(API_ENDPOINTS.rebuildRun(runId));
+  async rebuildRun(runId: string): Promise<RunActionResponse> {
+    const { data } = await axiosInstance.post<RunActionResponse>(
+      API_ENDPOINTS.rebuildRun(runId),
+    );
     return data;
   },
 
-  async restartCurrentStep(
-    runId: string,
-  ): Promise<{ id: string; status: RunStatus }> {
-    const { data } = await axiosInstance.post<{
-      id: string;
-      status: RunStatus;
-    }>(API_ENDPOINTS.restartCurrentStep(runId));
+  async restartCurrentStep(runId: string): Promise<RunActionResponse> {
+    const { data } = await axiosInstance.post<RunActionResponse>(
+      API_ENDPOINTS.restartCurrentStep(runId),
+    );
     return data;
   },
 
-  async stopCurrentStep(
-    runId: string,
-  ): Promise<{ id: string; status: RunStatus }> {
-    const { data } = await axiosInstance.post<{
-      id: string;
-      status: RunStatus;
-    }>(API_ENDPOINTS.stopCurrentStep(runId));
+  async stopCurrentStep(runId: string): Promise<RunActionResponse> {
+    const { data } = await axiosInstance.post<RunActionResponse>(
+      API_ENDPOINTS.stopCurrentStep(runId),
+    );
     return data;
   },
-  async restartCodeStep(
-    runId: string,
-  ): Promise<{ id: string; status: RunStatus }> {
-    const { data } = await axiosInstance.post<{
-      id: string;
-      status: RunStatus;
-    }>(API_ENDPOINTS.restartCodeStep(runId));
+  async restartCodeStep(runId: string): Promise<RunActionResponse> {
+    const { data } = await axiosInstance.post<RunActionResponse>(
+      API_ENDPOINTS.restartCodeStep(runId),
+    );
     return data;
   },
 
@@ -184,11 +174,11 @@ export const runsApi = {
   async approveStep(
     runId: string,
     step: "style" | "reference" | "code" | "final",
-  ): Promise<{ id: string; status: RunStatus }> {
-    const { data } = await axiosInstance.post<{
-      id: string;
-      status: RunStatus;
-    }>(API_ENDPOINTS.approveStep(runId), { step });
+  ): Promise<RunActionResponse> {
+    const { data } = await axiosInstance.post<RunActionResponse>(
+      API_ENDPOINTS.approveStep(runId),
+      { step },
+    );
     return data;
   },
 
@@ -196,11 +186,11 @@ export const runsApi = {
     runId: string,
     step: "style" | "reference" | "code" | "final",
     instruction: string,
-  ): Promise<{ id: string; status: RunStatus }> {
-    const { data } = await axiosInstance.post<{
-      id: string;
-      status: RunStatus;
-    }>(API_ENDPOINTS.editRequest(runId), { step, instruction });
+  ): Promise<RunActionResponse> {
+    const { data } = await axiosInstance.post<RunActionResponse>(
+      API_ENDPOINTS.editRequest(runId),
+      { step, instruction },
+    );
     return data;
   },
 
@@ -217,7 +207,7 @@ export const runsApi = {
 
   async getStyleVariants(runId: string): Promise<StyleVariantsResponse> {
     const { data } = await axiosInstance.get<StyleVariantsResponse>(
-      API_ENDPOINTS.artifactContent(runId, "style-variants"),
+      API_ENDPOINTS.styleVariants(runId),
     );
     return data;
   },
@@ -225,11 +215,11 @@ export const runsApi = {
   async selectStyle(
     runId: string,
     payload: SelectStyleRequest,
-  ): Promise<{ id: string; status: RunStatus }> {
-    const { data } = await axiosInstance.post<{
-      id: string;
-      status: RunStatus;
-    }>(`${API_ENDPOINTS.run(runId)}/select-style`, payload);
+  ): Promise<RunActionResponse> {
+    const { data } = await axiosInstance.post<RunActionResponse>(
+      `${API_ENDPOINTS.run(runId)}/select-style`,
+      payload,
+    );
     return data;
   },
 };

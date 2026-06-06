@@ -102,6 +102,11 @@ export interface RunStatusResponse {
   updatedAt: string;
 }
 
+export interface RunActionResponse {
+  id: string;
+  status: RunStatus;
+}
+
 export interface CreateRunRequest {
   brief: string;
   displayName?: string | null;

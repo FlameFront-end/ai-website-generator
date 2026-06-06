@@ -8,4 +8,11 @@ describe('pipeline step metadata', () => {
     expect(metadata.awaitingStatus).toBe(RunStatus.AwaitingStyleSelection);
     expect(metadata.awaitingCurrentStep).toBe('awaiting_style_selection');
   });
+
+  it('moves the code step directly to final approval', () => {
+    const metadata = getPipelineStepMetadata('code');
+
+    expect(metadata.awaitingStatus).toBe(RunStatus.AwaitingFinalApproval);
+    expect(metadata.awaitingCurrentStep).toBe('awaiting_final_approval');
+  });
 });

@@ -12,6 +12,7 @@ import {
   type PipelineStep,
 } from '../pipeline/pipeline-step';
 import { RunsCrudService } from './runs-crud.service';
+import type { RunActionResponse } from './dto/response';
 
 @Injectable()
 export class RunsWorkflowService {
@@ -24,10 +25,7 @@ export class RunsWorkflowService {
     private readonly crud: RunsCrudService,
   ) {}
 
-  async rebuildRun(
-    runId: string,
-    userId: string,
-  ): Promise<{ id: string; status: string }> {
+  async rebuildRun(runId: string, userId: string): Promise<RunActionResponse> {
     const run = await this.crud.getRunLightOrFail(runId, userId);
 
     const isScheduled = await this.pipelineService.rebuildRun(run, userId);
@@ -44,7 +42,7 @@ export class RunsWorkflowService {
   async restartCurrentStep(
     runId: string,
     userId: string,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     let run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (run.status !== RunStatus.Failed) {
@@ -86,7 +84,7 @@ export class RunsWorkflowService {
   async stopCurrentStep(
     runId: string,
     userId: string,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     const run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (run.status !== RunStatus.Running && run.status !== RunStatus.Queued) {
@@ -109,7 +107,7 @@ export class RunsWorkflowService {
     userId: string,
   ): Promise<{
     id: string;
-    status: string;
+    status: RunStatus;
     artifactId: string;
     path: string;
     model: string;
@@ -144,7 +142,7 @@ export class RunsWorkflowService {
     runId: string,
     styleVariantId: string,
     userId: string,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     const run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (run.status !== RunStatus.AwaitingStyleSelection) {
@@ -164,7 +162,7 @@ export class RunsWorkflowService {
   async restartCodeStep(
     runId: string,
     userId: string,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     const run = await this.crud.getRunLightOrFail(runId, userId);
 
     if (!this.canRestartCodeStep(run.status)) {
@@ -194,7 +192,7 @@ export class RunsWorkflowService {
     runId: string,
     step: 'style' | 'reference' | 'code' | 'final',
     userId: string,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     const run = await this.crud.getRunLightOrFail(runId, userId);
 
     const stepToStatusMap: Record<typeof step, RunStatus> = {
@@ -247,7 +245,7 @@ export class RunsWorkflowService {
     step: 'style' | 'reference' | 'code' | 'final',
     instruction: string,
     userId: string,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     const run = await this.crud.getRunLightOrFail(runId, userId);
 
     await this.crud.addLog(
@@ -291,7 +289,6 @@ export class RunsWorkflowService {
     const statusToStep: Partial<Record<RunStatus, PipelineStep>> = {
       [RunStatus.AwaitingStyleSelection]: 'style',
       [RunStatus.AwaitingReferenceApproval]: 'reference',
-      [RunStatus.AwaitingCodeApproval]: 'code',
     };
 
     if (statusToStep[status]) {
@@ -324,7 +321,6 @@ export class RunsWorkflowService {
 
   private canRestartCodeStep(status: RunStatus): boolean {
     return [
-      RunStatus.AwaitingCodeApproval,
       RunStatus.AwaitingFinalApproval,
       RunStatus.BuildFailed,
       RunStatus.VisualFailed,

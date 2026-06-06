@@ -25,6 +25,9 @@ export function useApproveStepMutation() {
       void queryClient.invalidateQueries({
         queryKey: runsQueryKeys.detail(runId),
       });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.status(runId),
+      });
     },
   });
 }
@@ -43,6 +46,9 @@ export function useSelectStyleMutation() {
     onSuccess: (_result, { runId }) => {
       void queryClient.invalidateQueries({
         queryKey: runsQueryKeys.detail(runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.status(runId),
       });
     },
   });

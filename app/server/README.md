@@ -199,7 +199,7 @@ PostgreSQL 17 with TypeORM. Entities:
 - **RunLog** — `id`, `runId`, `level`, `message`, `data`
 - **RunArtifact** — `id`, `runId`, `type` (ArtifactType enum), `filePath`, `metadata`
 
-Run statuses: `queued`, `running`, `awaiting_style_selection`, `awaiting_reference_approval`, `awaiting_code_approval`, `awaiting_final_approval`, `reference_failed`, `build_failed`, `visual_failed`, `needs_manual_review`, `completed`, `failed`.
+Run statuses: `queued`, `running`, `awaiting_style_selection`, `awaiting_reference_approval`, `awaiting_final_approval`, `reference_failed`, `build_failed`, `visual_failed`, `needs_manual_review`, `completed`, `failed`.
 
 ### Migrations
 

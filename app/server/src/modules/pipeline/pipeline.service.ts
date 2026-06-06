@@ -128,9 +128,6 @@ export class PipelineService implements OnApplicationShutdown {
           case RunStatus.AwaitingReferenceApproval:
             await this.resumeFromReference(run, userId);
             break;
-          case RunStatus.AwaitingCodeApproval:
-            await this.resumeFromCode(run, userId);
-            break;
           case RunStatus.AwaitingFinalApproval:
             await this.resumeFromFinal(run, userId);
             break;
@@ -408,30 +405,6 @@ export class PipelineService implements OnApplicationShutdown {
       designDescription,
       userId,
     );
-  }
-
-  private async resumeFromCode(run: RunEntity, userId: string): Promise<void> {
-    const referenceArtifact = await this.artifactService.getArtifactByType(
-      run.id,
-      ArtifactType.ReferenceImage,
-    );
-
-    if (!referenceArtifact) {
-      await this.state.failRun(run, 'Reference image artifact not found');
-      return;
-    }
-
-    const selectedStyleArtifact = await this.artifactService.getArtifactByType(
-      run.id,
-      ArtifactType.SelectedStyle,
-    );
-
-    if (!selectedStyleArtifact) {
-      await this.state.failRun(run, 'Selected style not found');
-      return;
-    }
-
-    await this.codegenStep.runBuildAndQA(run, run.id, userId);
   }
 
   private async resumeFromFinal(run: RunEntity, userId: string): Promise<void> {

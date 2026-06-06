@@ -22,6 +22,7 @@ import {
 import {
   CODE_RESTARTABLE_STATUSES,
   getEffectiveCurrentStep,
+  isRunStatusActive,
   RESTARTABLE_STATUSES,
   STATUS_TO_TAB,
 } from "./lib/run-status-flow";
@@ -32,7 +33,7 @@ export default function RunDetailsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const runQuery = useRunQuery(runId);
-  useRunStatusQuery(runId);
+  useRunStatusQuery(runId, isRunStatusActive(runQuery.data?.status));
   const { activeTab, setActiveTab } = useActiveTab();
   const actions = useRunActions();
   const artifacts = useRunArtifacts(runQuery.data);

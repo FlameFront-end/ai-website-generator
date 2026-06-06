@@ -66,6 +66,7 @@ describe('RunsController (e2e)', () => {
 
     artifactsService = {
       getArtifactContent: jest.fn(),
+      getStyleVariantsContent: jest.fn(),
       getArtifactFile: jest.fn(),
       getCodeFiles: jest.fn(),
       getCodeFileContent: jest.fn(),
@@ -561,6 +562,27 @@ describe('RunsController (e2e)', () => {
 
       expect(res.body).toEqual(files);
       expect(artifactsService.getCodeFiles).toHaveBeenCalledWith(
+        'run-1',
+        MOCK_USER.id,
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // GET /api/runs/:id/style-variants
+  // ---------------------------------------------------------------------------
+  describe('GET /api/runs/:id/style-variants', () => {
+    it('should return style variants content', async () => {
+      const styleVariants = { variants: [] };
+      artifactsService.getStyleVariantsContent.mockResolvedValue(styleVariants);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/runs/run-1/style-variants')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(res.body).toEqual(styleVariants);
+      expect(artifactsService.getStyleVariantsContent).toHaveBeenCalledWith(
         'run-1',
         MOCK_USER.id,
       );

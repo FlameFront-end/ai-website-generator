@@ -10,7 +10,7 @@ export type RunArtifactResponse = Readonly<{
   type: ArtifactType;
   path: string;
   mimeType: string | null;
-  createdAt: Date;
+  createdAt: string;
 }>;
 
 export type RunLogResponse = Readonly<{
@@ -18,7 +18,7 @@ export type RunLogResponse = Readonly<{
   level: string;
   message: string;
   metadata: Record<string, unknown> | null;
-  createdAt: Date;
+  createdAt: string;
 }>;
 
 export type RunResponse = Readonly<{
@@ -31,8 +31,8 @@ export type RunResponse = Readonly<{
   currentStep: string | null;
   score: number | null;
   errorMessage: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   artifacts: RunArtifactResponse[];
   logs: RunLogResponse[];
 }>;
@@ -48,8 +48,8 @@ export function toRunResponse(run: RunEntity): RunResponse {
     currentStep: run.currentStep,
     score: run.score,
     errorMessage: run.errorMessage,
-    createdAt: run.createdAt,
-    updatedAt: run.updatedAt,
+    createdAt: run.createdAt.toISOString(),
+    updatedAt: run.updatedAt.toISOString(),
     artifacts: (run.artifacts ?? []).map(toRunArtifactResponse),
     logs: (run.logs ?? []).map(toRunLogResponse),
   };
@@ -63,7 +63,7 @@ function toRunArtifactResponse(
     type: artifact.type,
     path: artifact.path,
     mimeType: artifact.mimeType,
-    createdAt: artifact.createdAt,
+    createdAt: artifact.createdAt.toISOString(),
   };
 }
 
@@ -73,6 +73,6 @@ function toRunLogResponse(log: RunLogEntity): RunLogResponse {
     level: log.level,
     message: log.message,
     metadata: log.metadata,
-    createdAt: log.createdAt,
+    createdAt: log.createdAt.toISOString(),
   };
 }

@@ -30,9 +30,10 @@ import { EditRequestDto } from './dto/edit-request.dto';
 import { SelectStyleDto } from './dto/select-style.dto';
 import { UpdateRunPinnedDto } from './dto/update-run-pinned.dto';
 import { UpdateRunDto } from './dto/update-run.dto';
-import type { RunResponse } from './dto/response';
+import type { RunActionResponse, RunResponse } from './dto/response';
 import { RunsCrudService } from './runs-crud.service';
 import { RunsWorkflowService } from './runs-workflow.service';
+import type { StyleVariantsResult } from '../ai/types';
 
 @Controller('runs')
 @UseGuards(JwtAuthGuard)
@@ -77,7 +78,7 @@ export class RunsController {
     id: string;
     status: RunStatus;
     currentStep: string | null;
-    updatedAt: Date;
+    updatedAt: string;
   }> {
     const result = await this.crud.getRunStatus(id, req.user.id);
 
@@ -157,6 +158,14 @@ export class RunsController {
     return this.artifacts.getArtifactContent(id, artifactId, req.user.id);
   }
 
+  @Get(':id/style-variants')
+  getStyleVariants(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<StyleVariantsResult> {
+    return this.artifacts.getStyleVariantsContent(id, req.user.id);
+  }
+
   @Get(':id/artifacts/:artifactId/file')
   async getArtifactFile(
     @Param('id') id: string,
@@ -208,7 +217,7 @@ export class RunsController {
   rebuild(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     return this.workflow.rebuildRun(id, req.user.id);
   }
 
@@ -216,7 +225,7 @@ export class RunsController {
   restartCurrentStep(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     return this.workflow.restartCurrentStep(id, req.user.id);
   }
 
@@ -224,14 +233,14 @@ export class RunsController {
   stopCurrentStep(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     return this.workflow.stopCurrentStep(id, req.user.id);
   }
   @Post(':id/restart-code-step')
   restartCodeStep(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     return this.workflow.restartCodeStep(id, req.user.id);
   }
 
@@ -240,7 +249,7 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: ApproveStepDto,
     @Request() req: RequestWithUser,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     return this.workflow.approveStep(id, body.step, req.user.id);
   }
 
@@ -249,7 +258,7 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: EditRequestDto,
     @Request() req: RequestWithUser,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     return this.workflow.requestEdit(
       id,
       body.step,
@@ -265,7 +274,7 @@ export class RunsController {
     @Request() req: RequestWithUser,
   ): Promise<{
     id: string;
-    status: string;
+    status: RunStatus;
     artifactId: string;
     path: string;
     model: string;
@@ -283,7 +292,7 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: SelectStyleDto,
     @Request() req: RequestWithUser,
-  ): Promise<{ id: string; status: string }> {
+  ): Promise<RunActionResponse> {
     return this.workflow.selectStyle(id, body.styleVariantId, req.user.id);
   }
 }

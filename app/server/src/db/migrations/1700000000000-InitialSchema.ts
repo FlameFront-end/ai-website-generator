@@ -20,7 +20,6 @@ export class InitialSchema1700000000000 implements MigrationInterface {
         'failed',
         'awaiting_style_selection',
         'awaiting_reference_approval',
-        'awaiting_code_approval',
         'awaiting_final_approval'
       )
     `);

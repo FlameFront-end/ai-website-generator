@@ -1,9 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { isAxiosError } from "axios";
 
 import { runsApi } from "./runs-api";
 import { runsQueryKeys } from "./query-keys";
 import type { Run, RunLogsResponse, RunStatusResponse } from "./types";
+
+export function isRunStatusActive(status?: string | null): boolean {
+  return status === "queued" || status === "running";
+}
 
 export function useRunsQuery() {
   return useQuery({
@@ -31,41 +36,50 @@ export function useRunQuery(id: string) {
   });
 }
 
-export function useRunStatusQuery(id: string) {
+export function useRunStatusQuery(id: string, enabled = true) {
   const queryClient = useQueryClient();
 
-  return useQuery<RunStatusResponse>({
+  const query = useQuery<RunStatusResponse>({
     queryKey: runsQueryKeys.status(id),
-    queryFn: async () => {
-      const status = await runsApi.getRunStatus(id);
-      queryClient.setQueryData<Run>(runsQueryKeys.detail(id), (prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          status: status.status,
-          currentStep: status.currentStep,
-          updatedAt: status.updatedAt,
-        };
-      });
-      if (status.status !== "queued" && status.status !== "running") {
-        void queryClient.invalidateQueries({
-          queryKey: runsQueryKeys.detail(id),
-        });
-      }
-      return status;
-    },
-    enabled: Boolean(id),
+    queryFn: () => runsApi.getRunStatus(id),
+    enabled: Boolean(id) && enabled,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "queued" || status === "running" ? 5000 : false;
+      return isRunStatusActive(status) ? 5000 : false;
     },
   });
+
+  useEffect(() => {
+    const status = query.data;
+
+    if (!status) {
+      return;
+    }
+
+    queryClient.setQueryData<Run>(runsQueryKeys.detail(id), (prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        status: status.status,
+        currentStep: status.currentStep,
+        updatedAt: status.updatedAt,
+      };
+    });
+
+    if (!isRunStatusActive(status.status)) {
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.detail(id),
+      });
+    }
+  }, [id, query.data, queryClient]);
+
+  return query;
 }
 
-export function useRunLogsQuery(runId: string, limit = 50, offset = 0) {
+export function useRunLogsQuery(runId: string, limit = 50) {
   return useQuery<RunLogsResponse>({
-    queryKey: [...runsQueryKeys.logs(runId), limit, offset],
-    queryFn: () => runsApi.getRunLogs(runId, limit, offset),
+    queryKey: [...runsQueryKeys.logs(runId), limit],
+    queryFn: () => runsApi.getRunLogs(runId, limit),
     enabled: Boolean(runId),
     staleTime: 10_000,
   });

@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { runsApi } from "./runs-api";
 import { runsQueryKeys } from "./query-keys";
@@ -44,8 +44,10 @@ export function useArtifactFileUrls(
       staleTime: Infinity,
     })),
   });
-  const blobs = useMemo(() => queries.map((query) => query.data), [queries]);
-  return useObjectUrlMap(artifactIds, blobs);
+  return useObjectUrlMap(
+    artifactIds,
+    queries.map((query) => query.data),
+  );
 }
 
 function useObjectUrl(blob: Blob | undefined): string | null {

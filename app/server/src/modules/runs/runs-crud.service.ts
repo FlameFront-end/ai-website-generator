@@ -101,7 +101,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
     id: string;
     status: RunStatus;
     currentStep: string | null;
-    updatedAt: Date;
+    updatedAt: string;
   } | null> {
     const run = await this.runsRepository.findOne({
       where: { id, userId },
@@ -112,7 +112,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
       id: run.id,
       status: run.status,
       currentStep: run.currentStep,
-      updatedAt: run.updatedAt,
+      updatedAt: run.updatedAt.toISOString(),
     };
   }
 

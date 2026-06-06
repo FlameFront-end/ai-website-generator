@@ -9,6 +9,17 @@ import type {
 } from "@/api/services/runs";
 import { logger } from "@/lib";
 
+export function toClarifyBriefAnswersPayload(
+  answers: BriefClarificationAnswer[],
+) {
+  return answers.map((answer) => ({
+    questionId: answer.questionId,
+    question: answer.question,
+    value: answer.value,
+    skipped: answer.skipped,
+  }));
+}
+
 export function isLatestClarificationRequest(
   requestId: number,
   latestRequestId: number,
@@ -47,12 +58,7 @@ export function useClarificationFlow(): UseClarificationFlowResult {
       const result = await clarifyBriefMutation.mutateAsync({
         brief,
         siteLanguage,
-        answers: answers.map((answer) => ({
-          questionId: answer.questionId,
-          question: answer.question,
-          value: answer.value,
-          skipped: answer.skipped,
-        })),
+        answers: toClarifyBriefAnswersPayload(answers),
       });
 
       return isLatestClarificationRequest(

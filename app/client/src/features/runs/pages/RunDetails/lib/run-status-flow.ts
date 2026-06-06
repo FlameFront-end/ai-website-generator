@@ -21,6 +21,10 @@ export const CODE_RESTARTABLE_STATUSES = new Set<string>([
   "completed",
 ]);
 
+export function isRunStatusActive(status?: string | null): boolean {
+  return status === "queued" || status === "running";
+}
+
 export type ApprovalStep = "style" | "reference" | "code" | "final";
 
 export function getStepFromStatus(status: string): ApprovalStep | null {

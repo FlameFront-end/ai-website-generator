@@ -13,6 +13,9 @@ function invalidateRunAndCode(
   void queryClient.invalidateQueries({
     queryKey: runsQueryKeys.codeFiles(runId),
   });
+  void queryClient.invalidateQueries({
+    queryKey: runsQueryKeys.status(runId),
+  });
 }
 
 export function useRebuildRunMutation() {
@@ -45,6 +48,9 @@ export function useStopCurrentStepMutation() {
     onSuccess: (_result, runId) => {
       void queryClient.invalidateQueries({
         queryKey: runsQueryKeys.detail(runId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: runsQueryKeys.status(runId),
       });
     },
   });

@@ -20,6 +20,7 @@ export const API_ENDPOINTS = {
   RUNS: "/runs",
   run: (runId: string) => `/runs/${e(runId)}`,
   runStatus: (runId: string) => `/runs/${e(runId)}/status`,
+  styleVariants: (runId: string) => `/runs/${e(runId)}/style-variants`,
   rebuildRun: (runId: string) => `/runs/${e(runId)}/rebuild`,
   restartCurrentStep: (runId: string) =>
     `/runs/${e(runId)}/restart-current-step`,

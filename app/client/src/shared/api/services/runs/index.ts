@@ -41,6 +41,7 @@ export type {
   PipelineStep,
   ReferenceBlockBbox,
   Run,
+  RunActionResponse,
   RunArtifact,
   RunLog,
   RunLogsResponse,

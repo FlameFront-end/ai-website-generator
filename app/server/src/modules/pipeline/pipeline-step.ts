@@ -42,8 +42,8 @@ export const PIPELINE_STEP_METADATA: Readonly<
   code: {
     title: 'Website code',
     runningStep: 'prepare_frontend_project',
-    awaitingStatus: RunStatus.AwaitingCodeApproval,
-    awaitingCurrentStep: 'awaiting_code_approval',
+    awaitingStatus: RunStatus.AwaitingFinalApproval,
+    awaitingCurrentStep: 'awaiting_final_approval',
     cleanupFolders: ['code', 'screenshots', 'qa'],
     cleanupArtifactTypes: [
       ArtifactType.CodePlan,
