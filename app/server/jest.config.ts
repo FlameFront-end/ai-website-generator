@@ -10,8 +10,10 @@ const config: Config = {
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/main.ts'],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  modulePathIgnorePatterns: ['<rootDir>/dist'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^pixelmatch$': '<rootDir>/src/test/pixelmatch.mock.ts',
   },
 };
 

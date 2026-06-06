@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Repository } from 'typeorm';
 
 import { RunArtifactEntity } from '../../db/entities';
-import { inferMimeType } from '../../common/utils';
+import { inferMimeType, isPathInsideDirectory } from '../../common/utils';
 import { StorageService } from '../storage/storage.service';
 import { RunsCrudService } from './runs-crud.service';
 
@@ -127,7 +127,7 @@ export class ArtifactReaderService {
     );
     const absolutePath = path.resolve(codePath, filePath);
 
-    if (!absolutePath.startsWith(codePath)) {
+    if (!isPathInsideDirectory(codePath, absolutePath)) {
       throw new BadRequestException(
         'File path is outside the project directory',
       );

@@ -17,7 +17,7 @@ import type { Response } from 'express';
 
 import { RunStatus } from '../../common/enums';
 import type { RequestWithUser } from '../../common/types/request.types';
-import { RunEntity, RunLogEntity } from '../../db/entities';
+import { RunLogEntity } from '../../db/entities';
 import { BriefAiService } from '../ai/brief-ai.service';
 import type { BriefClarificationResult } from '../ai/types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,6 +30,7 @@ import { EditRequestDto } from './dto/edit-request.dto';
 import { SelectStyleDto } from './dto/select-style.dto';
 import { UpdateRunPinnedDto } from './dto/update-run-pinned.dto';
 import { UpdateRunDto } from './dto/update-run.dto';
+import type { RunResponse } from './dto/response';
 import { RunsCrudService } from './runs-crud.service';
 import { RunsWorkflowService } from './runs-workflow.service';
 
@@ -63,7 +64,7 @@ export class RunsController {
   }
 
   @Get()
-  getRuns(@Request() req: RequestWithUser): Promise<RunEntity[]> {
+  getRuns(@Request() req: RequestWithUser): Promise<RunResponse[]> {
     return this.crud.getRuns(req.user.id);
   }
 
@@ -105,7 +106,7 @@ export class RunsController {
   async getRun(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
-  ): Promise<RunEntity> {
+  ): Promise<RunResponse> {
     const run = await this.crud.getRun(id, req.user.id);
 
     if (!run) {
@@ -120,7 +121,7 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: UpdateRunDto,
     @Request() req: RequestWithUser,
-  ): Promise<RunEntity> {
+  ): Promise<RunResponse> {
     return this.crud.updateRun(id, body, req.user.id);
   }
 
@@ -129,7 +130,7 @@ export class RunsController {
     @Param('id') id: string,
     @Body() body: UpdateRunPinnedDto,
     @Request() req: RequestWithUser,
-  ): Promise<RunEntity> {
+  ): Promise<RunResponse> {
     return this.crud.updateRunPinned(id, body.isPinned, req.user.id);
   }
 

@@ -141,11 +141,11 @@ describe('StyleToSpecMapper', () => {
     it('should produce a multiline context string', () => {
       const ctx = StyleToSpecMapper.toCodegenContext(mockStyle);
 
-      expect(ctx).toContain('Style name: Modern Dark');
-      expect(ctx).toContain('Visual style: Bold gradient overlays');
-      expect(ctx).toContain('#0F172A');
-      expect(ctx).toContain('Typography: Inter, sans-serif');
-      expect(ctx).toContain('Mood: modern, tech, premium');
+      expect(ctx).toContain('style=Modern Dark');
+      expect(ctx).toContain('visual=Bold gradient overlays');
+      expect(ctx).toContain('palette=#0F172A,#3B82F6,#8B5CF6');
+      expect(ctx).toContain('type=Inter, sans-serif');
+      expect(ctx).toContain('mood=modern,tech,premium');
     });
   });
 

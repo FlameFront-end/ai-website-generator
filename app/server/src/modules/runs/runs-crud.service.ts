@@ -16,6 +16,7 @@ import { PipelineService } from '../pipeline/pipeline.service';
 import { RunLogService } from './run-log.service';
 import type { CreateRunDto } from './dto/create-run.dto';
 import type { UpdateRunDto } from './dto/update-run.dto';
+import { toRunResponse, type RunResponse } from './dto/response';
 
 const RUN_NUMBER_PAD = 3;
 const RUNNING_STEP_TIMEOUT_MS = 20 * 60 * 1000;
@@ -72,7 +73,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async getRuns(userId: string): Promise<RunEntity[]> {
+  async getRuns(userId: string): Promise<RunResponse[]> {
     const runs = await this.runsRepository.find({
       where: { userId },
       relations: {
@@ -90,7 +91,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
         (a) => !INTERNAL_ARTIFACT_TYPES.has(a.type),
       );
     }
-    return runs;
+    return runs.map(toRunResponse);
   }
 
   async getRunStatus(
@@ -115,7 +116,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async getRun(id: string, userId: string): Promise<RunEntity | null> {
+  async getRun(id: string, userId: string): Promise<RunResponse | null> {
     const run = await this.runsRepository.findOne({
       where: { id, userId },
       relations: {
@@ -128,7 +129,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
       );
       run.logs = [];
     }
-    return run;
+    return run ? toRunResponse(run) : null;
   }
 
   async getRunLogs(
@@ -162,7 +163,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
       },
     );
 
-    return updatedRun;
+    return toRunResponse(updatedRun);
   }
 
   async updateRunPinned(id: string, isPinned: boolean, userId: string) {
@@ -180,7 +181,7 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
       isPinned,
     });
 
-    return updatedRun;
+    return toRunResponse(updatedRun);
   }
 
   async deleteRun(id: string, userId: string) {
@@ -217,7 +218,12 @@ export class RunsCrudService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getRunOrFail(id: string, userId: string): Promise<RunEntity> {
-    const run = await this.getRun(id, userId);
+    const run = await this.runsRepository.findOne({
+      where: { id, userId },
+      relations: {
+        artifacts: true,
+      },
+    });
 
     if (!run) {
       throw new NotFoundException('Run not found');

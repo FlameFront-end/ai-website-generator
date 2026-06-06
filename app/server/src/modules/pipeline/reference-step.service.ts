@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import type { ReferenceContextSummary, StyleVariant } from '../ai/types';
@@ -9,6 +8,7 @@ import { PIPELINE_STEP_DELAY_MS } from '../../common/constants/pipeline';
 import { writeImageResultToFile, sleep } from '../../common/utils';
 import { ImageGenerationService } from '../image-generation/image-generation.service';
 import { StorageService } from '../storage/storage.service';
+import { FileSystemService } from '../storage/filesystem.service';
 import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
 
@@ -37,6 +37,7 @@ export class ReferenceStepService {
   constructor(
     private readonly state: PipelineStateService,
     private readonly storageService: StorageService,
+    private readonly fileSystem: FileSystemService,
     private readonly artifactService: ArtifactService,
     private readonly imageGenerationService: ImageGenerationService,
   ) {}
@@ -159,8 +160,7 @@ export class ReferenceStepService {
       artifact.path,
     );
 
-    await fs.mkdir(path.dirname(backupPath), { recursive: true });
-    await fs.copyFile(absolutePath, backupPath);
+    await this.fileSystem.copyFile(absolutePath, backupPath);
 
     const mask = this.createSvgMask(bbox);
     const result = await this.imageGenerationService.editImageRegion({
@@ -197,7 +197,7 @@ export class ReferenceStepService {
       runId,
       'reference',
     );
-    await fs.mkdir(outputDir, { recursive: true });
+    await this.fileSystem.ensureDir(outputDir);
 
     const sections = this.buildReferenceSectionsFromBrief(brief);
     const stylePrompt = this.buildStylePrompt(selectedStyle);

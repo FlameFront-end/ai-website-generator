@@ -30,11 +30,7 @@ export class PipelineStateService {
       where: { id: run.id },
     });
 
-    if (
-      existingRun?.status === RunStatus.Failed &&
-      existingRun.errorMessage?.startsWith('PIPELINE_STOPPED:') &&
-      run.status !== RunStatus.Failed
-    ) {
+    if (this.isPipelineStopped(existingRun)) {
       return existingRun;
     }
 
@@ -64,6 +60,11 @@ export class PipelineStateService {
   }
 
   async failRun(run: RunEntity, message: string): Promise<void> {
+    const existingRun = await this.getRun(run.id);
+    if (this.isPipelineStopped(existingRun)) {
+      return;
+    }
+
     await this.runsRepository.update(run.id, {
       status: RunStatus.Failed,
       currentStep: run.currentStep || 'pipeline_failed',
@@ -74,12 +75,49 @@ export class PipelineStateService {
     });
   }
 
-  async stopRunById(runId: string, reason: string): Promise<void> {
+  async stopRunById(
+    runId: string,
+    reason: string,
+    userId?: string,
+  ): Promise<void> {
     await this.runsRepository.update(runId, {
       status: RunStatus.Failed,
       errorMessage: `PIPELINE_STOPPED: ${reason}`,
     });
+    const updatedRun = await this.runsRepository.findOne({
+      where: { id: runId },
+    });
+    const statusUserId = userId ?? updatedRun?.userId ?? undefined;
+    if (updatedRun && statusUserId) {
+      await this.storageService.writeStatusFile(
+        statusUserId,
+        runId,
+        updatedRun,
+      );
+    }
     await this.addLog(runId, `Pipeline stopped: ${reason}`);
+  }
+
+  async startRun(
+    run: RunEntity,
+    currentStep: string,
+    userId: string,
+  ): Promise<RunEntity> {
+    await this.runsRepository.update(run.id, {
+      status: RunStatus.Running,
+      currentStep,
+      errorMessage: null,
+    });
+
+    const updatedRun = await this.runsRepository.findOne({
+      where: { id: run.id },
+    });
+
+    if (updatedRun) {
+      await this.storageService.writeStatusFile(userId, run.id, updatedRun);
+    }
+
+    return updatedRun || run;
   }
 
   async completeRun(
@@ -88,6 +126,11 @@ export class PipelineStateService {
     userId: string,
     slug: string,
   ): Promise<RunEntity> {
+    const existingRun = await this.getRun(qaRun.id);
+    if (this.isPipelineStopped(existingRun)) {
+      return existingRun;
+    }
+
     const updatedRun = await this.runsRepository.save({
       ...qaRun,
       status: RunStatus.Completed,
@@ -118,10 +161,24 @@ export class PipelineStateService {
       >
     >,
   ): Promise<RunEntity> {
+    const existingRun = await this.getRun(run.id);
+    if (this.isPipelineStopped(existingRun)) {
+      return existingRun;
+    }
+
     await this.runsRepository.update(run.id, updates);
     const updatedRun = await this.runsRepository.findOne({
       where: { id: run.id },
     });
     return updatedRun || run;
+  }
+
+  private isPipelineStopped(
+    run: RunEntity | null | undefined,
+  ): run is RunEntity {
+    return (
+      run?.status === RunStatus.Failed &&
+      Boolean(run.errorMessage?.startsWith('PIPELINE_STOPPED:'))
+    );
   }
 }

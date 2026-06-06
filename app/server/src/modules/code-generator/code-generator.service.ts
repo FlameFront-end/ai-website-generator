@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import type { DesignTokens, GeneratedFile, ProjectSpec } from '../ai/types';
@@ -8,6 +7,7 @@ import { DesignAiService } from '../ai/design-ai.service';
 import { CodeRepairService } from './code-repair.service';
 import { CodeValidationService } from './code-validation.service';
 import { ScaffoldTemplateService } from './scaffold-template.service';
+import { FileSystemService } from '../storage/filesystem.service';
 
 const RESET_OUTPUT_ATTEMPTS = 6;
 const RESET_OUTPUT_RETRY_DELAY_MS = 1000;
@@ -53,6 +53,7 @@ export class CodeGeneratorService {
     private readonly scaffoldService: ScaffoldTemplateService,
     private readonly validationService: CodeValidationService,
     private readonly repairService: CodeRepairService,
+    private readonly fileSystem: FileSystemService,
   ) {}
 
   /**
@@ -271,8 +272,8 @@ export class CodeGeneratorService {
       files.map(async (file) => {
         const filePath = path.join(basePath, file.path);
         const dir = path.dirname(filePath);
-        await fs.mkdir(dir, { recursive: true });
-        await fs.writeFile(filePath, file.content, 'utf8');
+        await this.fileSystem.ensureDir(dir);
+        await this.fileSystem.writeFile(filePath, file.content);
       }),
     );
   }
@@ -280,8 +281,8 @@ export class CodeGeneratorService {
   private async resetOutputDirectory(basePath: string): Promise<void> {
     for (let attempt = 1; attempt <= RESET_OUTPUT_ATTEMPTS; attempt += 1) {
       try {
-        await fs.rm(basePath, { recursive: true, force: true });
-        await fs.mkdir(basePath, { recursive: true });
+        await this.fileSystem.remove(basePath);
+        await this.fileSystem.ensureDir(basePath);
         return;
       } catch (error) {
         const code =

@@ -1,17 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { getAppConfig } from '../../config/config.module';
 import type { RunEntity } from '../../db/entities';
+import { FileSystemService } from './filesystem.service';
 
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly generatedRoot: string;
 
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    private readonly fileSystem: FileSystemService,
+  ) {
     this.generatedRoot = getAppConfig(configService).storage.generatedRoot;
   }
 
@@ -67,10 +70,10 @@ export class StorageService {
       'qa',
     ] as const;
 
-    await fs.mkdir(runPath, { recursive: true });
+    await this.fileSystem.ensureDir(runPath);
     await Promise.all(
       folders.map((folder) =>
-        fs.mkdir(path.join(runPath, folder), { recursive: true }),
+        this.fileSystem.ensureDir(path.join(runPath, folder)),
       ),
     );
     this.logger.debug(`Run folders created: ${slug}`);
@@ -81,8 +84,8 @@ export class StorageService {
     content: string | Buffer,
   ): Promise<void> {
     const dir = path.dirname(absolutePath);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(absolutePath, content);
+    await this.fileSystem.ensureDir(dir);
+    await this.fileSystem.writeFile(absolutePath, content);
     this.logger.debug(
       `File written: ${absolutePath} (${Buffer.byteLength(content)} bytes)`,
     );
@@ -90,13 +93,12 @@ export class StorageService {
 
   async readArtifactFile(relativePath: string): Promise<string> {
     const absolutePath = this.getArtifactAbsolutePath(relativePath);
-    return fs.readFile(absolutePath, 'utf8');
+    return this.fileSystem.readText(absolutePath);
   }
 
   async fileExists(filePath: string): Promise<boolean> {
     try {
-      await fs.access(filePath);
-      return true;
+      return await this.fileSystem.exists(filePath);
     } catch {
       return false;
     }
@@ -117,10 +119,9 @@ export class StorageService {
       updatedAt: run.updatedAt,
     };
 
-    await fs.writeFile(
+    await this.fileSystem.writeFile(
       statusPath,
       `${JSON.stringify(payload, null, 2)}\n`,
-      'utf8',
     );
   }
 }

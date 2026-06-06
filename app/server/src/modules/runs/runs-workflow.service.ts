@@ -5,6 +5,12 @@ import { Repository } from 'typeorm';
 import { ArtifactType, RunStatus } from '../../common/enums';
 import { RunArtifactEntity, RunEntity } from '../../db/entities';
 import { PipelineService } from '../pipeline/pipeline.service';
+import {
+  formatApprovalStep,
+  inferPipelineStepFromCurrentStep,
+  type ApprovalStep,
+  type PipelineStep,
+} from '../pipeline/pipeline-step';
 import { RunsCrudService } from './runs-crud.service';
 
 @Injectable()
@@ -24,13 +30,14 @@ export class RunsWorkflowService {
   ): Promise<{ id: string; status: string }> {
     const run = await this.crud.getRunLightOrFail(runId, userId);
 
-    await this.crud.addLog(run.id, 'Rebuild started');
-
-    void this.pipelineService.rebuildRun(run, userId);
+    const isScheduled = await this.pipelineService.rebuildRun(run, userId);
+    if (isScheduled) {
+      await this.crud.addLog(run.id, 'Rebuild started');
+    }
 
     return {
       id: run.id,
-      status: run.status,
+      status: isScheduled ? RunStatus.Running : run.status,
     };
   }
 
@@ -58,16 +65,21 @@ export class RunsWorkflowService {
       );
     }
 
-    await this.crud.addLog(
-      run.id,
-      `Step restart request accepted: ${this.formatPipelineStep(step)}`,
+    const isScheduled = await this.pipelineService.restartStep(
+      run,
+      step,
+      userId,
     );
-
-    await this.pipelineService.restartStep(run, step, userId);
+    if (isScheduled) {
+      await this.crud.addLog(
+        run.id,
+        `Step restart request accepted: ${this.formatPipelineStep(step)}`,
+      );
+    }
 
     return {
       id: run.id,
-      status: RunStatus.Running,
+      status: isScheduled ? RunStatus.Running : run.status,
     };
   }
 
@@ -81,7 +93,7 @@ export class RunsWorkflowService {
       throw new BadRequestException('Only an active step can be stopped');
     }
 
-    await this.crud.markRunStopped(run, 'Step stopped by user');
+    await this.pipelineService.stopRun(run.id, 'Step stopped by user', userId);
 
     return {
       id: run.id,
@@ -163,12 +175,18 @@ export class RunsWorkflowService {
 
     await this.ensureCodeRestartArtifacts(run.id);
 
-    await this.crud.addLog(run.id, 'Code regeneration request accepted');
-    await this.pipelineService.restartStep(run, 'code', userId);
+    const isScheduled = await this.pipelineService.restartStep(
+      run,
+      'code',
+      userId,
+    );
+    if (isScheduled) {
+      await this.crud.addLog(run.id, 'Code regeneration request accepted');
+    }
 
     return {
       id: run.id,
-      status: RunStatus.Running,
+      status: isScheduled ? RunStatus.Running : run.status,
     };
   }
 
@@ -269,10 +287,8 @@ export class RunsWorkflowService {
     status: RunStatus,
     currentStep?: string | null,
     runId?: string,
-  ): Promise<'style' | 'reference' | 'code' | null> {
-    const statusToStep: Partial<
-      Record<RunStatus, 'style' | 'reference' | 'code'>
-    > = {
+  ): Promise<PipelineStep | null> {
+    const statusToStep: Partial<Record<RunStatus, PipelineStep>> = {
       [RunStatus.AwaitingStyleSelection]: 'style',
       [RunStatus.AwaitingReferenceApproval]: 'reference',
       [RunStatus.AwaitingCodeApproval]: 'code',
@@ -283,7 +299,7 @@ export class RunsWorkflowService {
     }
 
     if (status === RunStatus.Failed) {
-      const step = this.getRestartableStepFromCurrentStep(currentStep);
+      const step = inferPipelineStepFromCurrentStep(currentStep);
       if (step || !runId) {
         return Promise.resolve(step);
       }
@@ -293,27 +309,9 @@ export class RunsWorkflowService {
     return Promise.resolve(null);
   }
 
-  private getRestartableStepFromCurrentStep(
-    currentStep?: string | null,
-  ): 'style' | 'reference' | 'code' | null {
-    if (!currentStep) return null;
-    if (currentStep.includes('style')) return 'style';
-    if (currentStep.includes('reference')) return 'reference';
-    if (
-      currentStep.includes('code') ||
-      currentStep.includes('frontend') ||
-      currentStep.includes('build') ||
-      currentStep.includes('screenshot') ||
-      currentStep.includes('visual')
-    ) {
-      return 'code';
-    }
-    return null;
-  }
-
   private async inferFailedRestartStepFromArtifacts(
     runId: string,
-  ): Promise<'style' | 'reference' | 'code'> {
+  ): Promise<PipelineStep> {
     const artifacts = await this.artifactsRepository.find({
       where: { runId },
     });
@@ -336,14 +334,7 @@ export class RunsWorkflowService {
     ].includes(status);
   }
 
-  private formatPipelineStep(step: string): string {
-    const labels: Record<string, string> = {
-      style: 'Style',
-      reference: 'Reference',
-      code: 'Code',
-      final: 'Final review',
-    };
-
-    return labels[step] ?? step;
+  private formatPipelineStep(step: ApprovalStep): string {
+    return formatApprovalStep(step);
   }
 }

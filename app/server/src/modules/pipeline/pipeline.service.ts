@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
-import { promises as fs } from 'node:fs';
 
 import type { StyleVariant } from '../ai/types';
 import { ArtifactType, RunStatus } from '../../common/enums';
@@ -7,12 +6,14 @@ import { RunEntity } from '../../db/entities';
 import { sleep } from '../../common/utils';
 import { PIPELINE_STEP_DELAY_MS } from '../../common/constants/pipeline';
 import { StorageService } from '../storage/storage.service';
+import { FileSystemService } from '../storage/filesystem.service';
 import { ArtifactService } from './artifact.service';
 import { PipelineStateService } from './pipeline-state.service';
 import { StyleStepService } from './style-step.service';
 import { ReferenceStepService } from './reference-step.service';
 import { CodegenStepService } from './codegen-step.service';
 import { StyleToSpecMapper } from '../ai/mappers/style-to-spec.mapper';
+import { getPipelineStepMetadata, type PipelineStep } from './pipeline-step';
 const SHUTDOWN_DRAIN_TIMEOUT_MS = 15_000;
 
 @Injectable()
@@ -24,6 +25,7 @@ export class PipelineService implements OnApplicationShutdown {
   constructor(
     private readonly state: PipelineStateService,
     private readonly storageService: StorageService,
+    private readonly fileSystem: FileSystemService,
     private readonly artifactService: ArtifactService,
     private readonly styleStep: StyleStepService,
     private readonly referenceStep: ReferenceStepService,
@@ -79,19 +81,36 @@ export class PipelineService implements OnApplicationShutdown {
     });
   }
 
-  async rebuildRun(run: RunEntity, userId: string): Promise<void> {
-    if (this.shuttingDown) return;
-    const rebuildRun = await this.state.updateRunStatus(
-      run,
-      RunStatus.Running,
-      'build_project',
-      userId,
-    );
-    this.trackRun(run.id, () =>
-      this.codegenStep.runBuildAndQA(rebuildRun, rebuildRun.id, userId),
-    );
+  async stopRun(runId: string, reason: string, userId?: string): Promise<void> {
+    await this.state.stopRunById(runId, reason, userId);
   }
 
+  async rebuildRun(run: RunEntity, userId: string): Promise<boolean> {
+    if (this.shuttingDown) return false;
+
+    if (!this.reserveRun(run.id)) {
+      return false;
+    }
+
+    let rebuildRun: RunEntity;
+    try {
+      rebuildRun = await this.state.updateRunStatus(
+        run,
+        RunStatus.Running,
+        'build_project',
+        userId,
+      );
+    } catch (error) {
+      this.activeRuns.delete(run.id);
+      this.logger.error(`Failed to start rebuild for run ${run.id}`, error);
+      return false;
+    }
+
+    this.runReserved(run.id, async () => {
+      await this.codegenStep.runBuildAndQA(rebuildRun, rebuildRun.id, userId);
+    });
+    return true;
+  }
   /**
    * Resume run from current status
    */
@@ -231,7 +250,7 @@ export class PipelineService implements OnApplicationShutdown {
    */
   regenerateStep(
     run: RunEntity,
-    step: 'style' | 'reference' | 'code' | 'final',
+    step: PipelineStep | 'final',
     instruction: string,
     userId: string,
   ): void {
@@ -300,42 +319,65 @@ export class PipelineService implements OnApplicationShutdown {
    */
   async restartStep(
     run: RunEntity,
-    step: 'style' | 'reference' | 'code',
+    step: PipelineStep,
     userId: string,
-  ): Promise<void> {
-    if (this.shuttingDown) return;
+  ): Promise<boolean> {
+    if (this.shuttingDown) return false;
 
-    const stepTitleMap: Record<typeof step, string> = {
-      style: 'Style',
-      reference: 'Visual reference',
-      code: 'Website code',
-    };
-    const runningStepMap: Record<typeof step, string> = {
-      style: 'generate_style_variants',
-      reference: 'prepare_reference_image',
-      code: 'prepare_frontend_project',
-    };
+    if (!this.reserveRun(run.id)) {
+      return false;
+    }
 
-    await this.state.updateRunStatus(
-      run,
-      RunStatus.Running,
-      runningStepMap[step],
-      userId,
-    );
-    await this.state.addLog(run.id, `Restarting step: ${stepTitleMap[step]}`);
+    const metadata = getPipelineStepMetadata(step);
+    let startedRun: RunEntity;
+    try {
+      startedRun = await this.state.startRun(run, metadata.runningStep, userId);
+    } catch (error) {
+      this.activeRuns.delete(run.id);
+      this.logger.error(`Failed to start run ${run.id}`, error);
+      return false;
+    }
 
-    this.trackRun(run.id, () => this.finishRestartStep(run, step, userId));
+    this.runReserved(run.id, async () => {
+      await this.state.addLog(run.id, `Restarting step: ${metadata.title}`);
+      await this.finishRestartStep(startedRun, step, userId);
+    });
+    return true;
   }
 
   // ===================== Private helpers =====================
 
-  private trackRun(runId: string, fn: () => Promise<void>): void {
-    const promise = fn()
+  private trackRun(runId: string, fn: () => Promise<void>): boolean {
+    if (!this.reserveRun(runId)) {
+      return false;
+    }
+
+    this.runReserved(runId, fn);
+    return true;
+  }
+
+  private reserveRun(runId: string): boolean {
+    if (this.isRunActive(runId)) {
+      this.logger.warn(`Pipeline run ${runId} is already active`);
+      return false;
+    }
+
+    this.activeRuns.set(runId, Promise.resolve());
+    return true;
+  }
+
+  private runReserved(runId: string, fn: () => Promise<void>): void {
+    const promise = Promise.resolve()
+      .then(fn)
       .catch((err: unknown) => {
         this.logger.error(`Unhandled error in tracked run ${runId}`, err);
       })
       .finally(() => this.activeRuns.delete(runId));
     this.activeRuns.set(runId, promise);
+  }
+
+  private isRunActive(runId: string): boolean {
+    return this.activeRuns.has(runId);
   }
 
   private async resumeFromReference(
@@ -404,15 +446,9 @@ export class PipelineService implements OnApplicationShutdown {
 
   private async finishRestartStep(
     run: RunEntity,
-    step: 'style' | 'reference' | 'code',
+    step: PipelineStep,
     userId: string,
   ): Promise<void> {
-    const awaitingStatusMap: Record<typeof step, RunStatus> = {
-      style: RunStatus.AwaitingStyleSelection,
-      reference: RunStatus.AwaitingReferenceApproval,
-      code: RunStatus.AwaitingCodeApproval,
-    };
-
     try {
       switch (step) {
         case 'style':
@@ -429,10 +465,11 @@ export class PipelineService implements OnApplicationShutdown {
           return;
       }
 
+      const metadata = getPipelineStepMetadata(step);
       await this.state.updateRunStatus(
         run,
-        awaitingStatusMap[step],
-        `awaiting_${step}_approval`,
+        metadata.awaitingStatus,
+        metadata.awaitingCurrentStep,
         userId,
       );
     } catch (error) {
@@ -445,59 +482,17 @@ export class PipelineService implements OnApplicationShutdown {
   private async cleanStepWorkspace(
     userId: string,
     runId: string,
-    step: 'style' | 'reference' | 'code',
+    step: PipelineStep,
   ): Promise<void> {
-    const folders = this.getStepFolders(step);
-    const types = this.getStepArtifactTypes(step);
+    const metadata = getPipelineStepMetadata(step);
 
-    for (const folder of folders) {
+    for (const folder of metadata.cleanupFolders) {
       const dir = this.storageService.getRunAbsolutePath(userId, runId, folder);
-      await fs.rm(dir, { recursive: true, force: true });
+      await this.fileSystem.remove(dir);
     }
 
-    for (const type of types) {
+    for (const type of metadata.cleanupArtifactTypes) {
       await this.artifactService.deleteArtifactsByType(runId, type);
-    }
-  }
-
-  private getStepFolders(step: 'style' | 'reference' | 'code'): string[] {
-    switch (step) {
-      case 'style':
-        return ['style'];
-      case 'reference':
-        return ['reference'];
-      case 'code':
-        return ['code', 'screenshots', 'qa'];
-    }
-  }
-
-  private getStepArtifactTypes(
-    step: 'style' | 'reference' | 'code',
-  ): ArtifactType[] {
-    switch (step) {
-      case 'style':
-        return [ArtifactType.StyleVariants, ArtifactType.SelectedStyle];
-      case 'reference':
-        return [
-          ArtifactType.ReferenceImage,
-          ArtifactType.ReferenceBlock,
-          ArtifactType.ReferenceContextSummary,
-          ArtifactType.ReferenceValidation,
-        ];
-      case 'code':
-        return [
-          ArtifactType.CodePlan,
-          ArtifactType.CodeContentModule,
-          ArtifactType.CodeLayoutModule,
-          ArtifactType.CodeSectionsModule,
-          ArtifactType.FrontendProject,
-          ArtifactType.BuildLog,
-          ArtifactType.BuildError,
-          ArtifactType.DesktopScreenshot,
-          ArtifactType.MobileScreenshot,
-          ArtifactType.DiffImage,
-          ArtifactType.VisualReport,
-        ];
     }
   }
 }
